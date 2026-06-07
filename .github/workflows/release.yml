@@ -1,0 +1,99 @@
+name: Release ONewPipe
+
+on:
+  push:
+    tags:
+      - 'v*' # Trigger on version tags
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  build-android:
+    name: Build Android APK
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v3
+      - name: Set up JDK 17
+        uses: actions/setup-java@v3
+        with:
+          java-version: '17'
+          distribution: 'temurin'
+          cache: gradle
+      - name: Build Android Release APK
+        run: ./gradlew :app:assembleRelease
+      - name: Build Android Debug APK
+        run: ./gradlew :app:assembleDebug
+      - name: Upload APKs
+        uses: actions/upload-artifact@v3
+        with:
+          name: Android-APKs
+          path: app/build/outputs/apk/*/*.apk
+
+  build-windows:
+    name: Build Windows App
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v3
+      - name: Set up JDK 17
+        uses: actions/setup-java@v3
+        with:
+          java-version: '17'
+          distribution: 'temurin'
+          cache: gradle
+      - name: Build Windows Installer (MSI/EXE)
+        run: .\gradlew.bat :desktopApp:packageDistributionForCurrentOS
+      - name: Upload Windows Installer
+        uses: actions/upload-artifact@v3
+        with:
+          name: Windows-Installer
+          path: desktopApp/build/compose/binaries/main/*/*.msi
+      - name: Upload Windows Portable
+        uses: actions/upload-artifact@v3
+        with:
+          name: Windows-Portable
+          path: desktopApp/build/compose/binaries/main/*/*.exe
+
+  build-linux:
+    name: Build Linux App
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v3
+      - name: Set up JDK 17
+        uses: actions/setup-java@v3
+        with:
+          java-version: '17'
+          distribution: 'temurin'
+          cache: gradle
+      - name: Build Linux DEB
+        run: ./gradlew :desktopApp:packageDistributionForCurrentOS
+      - name: Upload Linux DEB
+        uses: actions/upload-artifact@v3
+        with:
+          name: Linux-DEB
+          path: desktopApp/build/compose/binaries/main/*/*.deb
+
+  release:
+    name: Create GitHub Release
+    needs: [build-android, build-windows, build-linux]
+    runs-on: ubuntu-latest
+    steps:
+      - name: Download all artifacts
+        uses: actions/download-artifact@v3
+        with:
+          path: artifacts
+
+      - name: Display structure of downloaded files
+        run: ls -R artifacts
+
+      - name: Create Release
+        uses: softprops/action-gh-release@v1
+        if: startsWith(github.ref, 'refs/tags/')
+        with:
+          files: |
+            artifacts/**/*.apk
+            artifacts/**/*.msi
+            artifacts/**/*.exe
+            artifacts/**/*.deb
+          generate_release_notes: true

@@ -3,7 +3,7 @@
  * SPDX-License-Identifier: GPL-3.0-or-later
  */
 
-package net.newpipe.app
+package fr.arthonetwork.onewpipe
 
 import androidx.compose.ui.window.Window
 import androidx.compose.ui.window.application
@@ -12,7 +12,7 @@ import androidx.compose.ui.window.application
  * Entry point for compose-related UI components on Desktop
  */
 fun main() = application {
-    Window(onCloseRequest = ::exitApplication, title = "NewPipe") {
+    Window(onCloseRequest = ::exitApplication, title = "ONewPipe") {
         App()
     }
 }

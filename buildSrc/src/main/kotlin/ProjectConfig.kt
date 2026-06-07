@@ -11,5 +11,5 @@ const val NEWPIPE_VERSION_SDK_TARGET = 35
 const val NEWPIPE_VERSION_CODE = 1012
 const val NEWPIPE_VERSION_NAME = "0.28.7"
 
-const val NEWPIPE_APPLICATION_ID_OLD = "org.schabi.newpipe"
-const val NEWPIPE_APPLICATION_ID_NEW = "net.newpipe.app"
+const val NEWPIPE_APPLICATION_ID_OLD = "fr.arthonetwork.onewpipe"
+const val NEWPIPE_APPLICATION_ID_NEW = "fr.arthonetwork.onewpipe"

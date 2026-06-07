@@ -97,6 +97,7 @@ kotlin {
                 implementation(libs.jetbrains.compose.ui)
                 implementation(libs.jetbrains.compose.resources)
                 implementation(libs.jetbrains.compose.preview)
+                implementation(compose.materialIconsExtended)
 
                 implementation(libs.jetbrains.lifecycle.viewmodel)
 

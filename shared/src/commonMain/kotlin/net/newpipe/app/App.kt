@@ -17,6 +17,11 @@ import androidx.compose.foundation.layout.*
 import androidx.compose.material3.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.runtime.*
+import net.newpipe.app.composable.Sidebar
+import net.newpipe.app.composable.NavItem
+import net.newpipe.app.composable.MediaGrid
+import net.newpipe.app.composable.GlassSearchBar
 import net.newpipe.app.composable.TopAppBar
 import net.newpipe.app.theme.currentService
 
@@ -28,28 +33,41 @@ import net.newpipe.app.theme.currentService
 fun App(startDestination: Screen? = null) {
     KoinApplication(configuration = koinConfiguration<KoinApp>()) {
         AppTheme {
-            val service = currentService()
-            Scaffold(
-                topBar = {
-                    TopAppBar(title = "ONewPipe Desktop - ${service.serviceName}")
-                }
-            ) { padding ->
-                Box(
-                    modifier = Modifier
-                        .fillMaxSize()
-                        .padding(padding),
-                    contentAlignment = Alignment.Center
-                ) {
-                    Column(horizontalAlignment = Alignment.CenterHorizontally) {
-                        Text(
-                            text = "Bienvenue sur ONewPipe Desktop!",
-                            style = MaterialTheme.typography.headlineMedium
-                        )
+            var selectedItem by remember { mutableStateOf(NavItem.HOME) }
+
+            // Using Surface as the background for the whole app
+            Surface(
+                modifier = Modifier.fillMaxSize(),
+                color = MaterialTheme.colorScheme.background
+            ) {
+                Row(modifier = Modifier.fillMaxSize()) {
+                    // Left Sidebar
+                    Sidebar(
+                        selectedItem = selectedItem,
+                        onItemSelected = { selectedItem = it }
+                    )
+
+                    // Main Content Area
+                    Column(
+                        modifier = Modifier
+                            .fillMaxSize()
+                            .weight(1f)
+                    ) {
+                        Spacer(modifier = Modifier.height(24.dp))
+                        GlassSearchBar()
                         Spacer(modifier = Modifier.height(16.dp))
+
+                        // Dynamic Title
+                        val service = currentService()
                         Text(
-                            text = "Service actif : ${service.serviceName}",
-                            style = MaterialTheme.typography.bodyLarge
+                            text = "${selectedItem.title} - ${service.serviceName}",
+                            style = MaterialTheme.typography.headlineMedium.copy(fontWeight = androidx.compose.ui.text.font.FontWeight.Bold),
+                            color = MaterialTheme.colorScheme.onBackground,
+                            modifier = Modifier.padding(horizontal = 24.dp, vertical = 8.dp)
                         )
+
+                        // Grid
+                        MediaGrid(modifier = Modifier.weight(1f))
                     }
                 }
             }

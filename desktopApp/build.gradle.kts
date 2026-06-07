@@ -21,7 +21,7 @@ dependencies {
 
 compose.desktop {
     application {
-        mainClass = "net.newpipe.app.MainKt"
+        mainClass = "fr.arthonetwork.onewpipe.MainKt"
 
         nativeDistributions {
             targetFormats(TargetFormat.Dmg, TargetFormat.Msi, TargetFormat.Deb)

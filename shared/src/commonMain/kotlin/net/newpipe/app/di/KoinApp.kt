@@ -5,10 +5,16 @@
 
 package net.newpipe.app.di
 
-import org.koin.core.annotation.KoinApplication
+import org.koin.core.context.startKoin
+import org.koin.dsl.KoinAppDeclaration
 
-/**
- * Entry point for Koin-related configuration
- */
-@KoinApplication
-object KoinApp
+object KoinApp {
+    fun init(appDeclaration: KoinAppDeclaration? = null) {
+        startKoin {
+            if (appDeclaration != null) {
+                appDeclaration()
+            }
+            modules(domainModule, platformModule)
+        }
+    }
+}

@@ -26,23 +26,34 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import net.newpipe.app.theme.currentServiceScheme
 
-data class DummyMedia(val id: Int, val title: String, val author: String, val duration: String, val views: String)
-
-val dummyVideos = listOf(
-    DummyMedia(1, "Building a Compose Desktop App", "Kotlin By JetBrains", "14:20", "12k views"),
-    DummyMedia(2, "Lofi Hip Hop Radio - Beats to Relax/Study to", "Lofi Girl", "LIVE", "45k watching"),
-    DummyMedia(3, "Understanding Kotlin Coroutines", "Android Developers", "22:15", "89k views"),
-    DummyMedia(4, "How to design a premium UI", "DesignCourse", "10:05", "150k views"),
-    DummyMedia(5, "Top 10 Kotlin Multiplatform libraries", "Touchlab", "08:30", "5k views"),
-    DummyMedia(6, "Chillwave Synthpop Mix", "NewRetroWave", "45:00", "2M views"),
-    DummyMedia(7, "Compose Multiplatform 1.6 Release", "JetBrains", "18:40", "34k views"),
-    DummyMedia(8, "The history of Linux", "TechLore", "1:15:00", "200k views"),
-    DummyMedia(9, "Cyberpunk 2077 OST", "CD Projekt Red", "2:30:00", "5M views"),
-    DummyMedia(10, "Learning Rust in 2024", "Let's Get Rusty", "25:00", "120k views")
-)
+import net.newpipe.app.domain.MediaItem
+import coil3.compose.AsyncImage
 
 @Composable
-fun MediaGrid(modifier: Modifier = Modifier) {
+fun MediaGrid(
+    items: List<MediaItem>,
+    isLoading: Boolean = false,
+    errorMessage: String? = null,
+    modifier: Modifier = Modifier
+) {
+    if (isLoading) {
+        Box(modifier = modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
+            CircularProgressIndicator(color = currentServiceScheme().primary)
+        }
+        return
+    }
+
+    if (errorMessage != null) {
+        Box(modifier = modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
+            Text(
+                text = errorMessage,
+                color = MaterialTheme.colorScheme.error,
+                style = MaterialTheme.typography.bodyLarge
+            )
+        }
+        return
+    }
+
     LazyVerticalGrid(
         columns = GridCells.Adaptive(minSize = 280.dp),
         contentPadding = PaddingValues(24.dp),
@@ -50,14 +61,14 @@ fun MediaGrid(modifier: Modifier = Modifier) {
         verticalArrangement = Arrangement.spacedBy(24.dp),
         modifier = modifier.fillMaxSize()
     ) {
-        items(dummyVideos) { video ->
-            MediaCard(video)
+        items(items) { media ->
+            MediaCard(media)
         }
     }
 }
 
 @Composable
-fun MediaCard(media: DummyMedia) {
+fun MediaCard(media: MediaItem) {
     val interactionSource = remember { MutableInteractionSource() }
     val isHovered by interactionSource.collectIsHoveredAsState()
     
@@ -73,26 +84,28 @@ fun MediaCard(media: DummyMedia) {
             .clickable(
                 interactionSource = interactionSource,
                 indication = null
-            ) { /* handle click */ },
+            ) { /* handle click to play */ },
         shape = RoundedCornerShape(16.dp),
         elevation = CardDefaults.cardElevation(defaultElevation = elevation),
         colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f))
     ) {
         Column {
-            // Thumbnail placeholder
+            // Thumbnail
             Box(
                 modifier = Modifier
                     .fillMaxWidth()
                     .aspectRatio(16f / 9f)
-                    .background(
-                        brush = Brush.verticalGradient(
-                            colors = listOf(
-                                Color.DarkGray,
-                                Color.Black
-                            )
-                        )
-                    )
+                    .background(Color.Black)
             ) {
+                if (media.thumbnailUrl.isNotEmpty()) {
+                    AsyncImage(
+                        model = media.thumbnailUrl,
+                        contentDescription = "Thumbnail",
+                        modifier = Modifier.fillMaxSize(),
+                        contentScale = androidx.compose.ui.layout.ContentScale.Crop
+                    )
+                }
+
                 // Duration pill
                 Surface(
                     color = Color.Black.copy(alpha = 0.7f),
@@ -102,9 +115,9 @@ fun MediaCard(media: DummyMedia) {
                         .padding(8.dp)
                 ) {
                     Text(
-                        text = media.duration,
-                        color = Color.White,
-                        style = MaterialTheme.typography.labelSmall,
+                        text = if (media.isLive) "LIVE" else media.durationText,
+                        color = if (media.isLive) Color.Red else Color.White,
+                        style = MaterialTheme.typography.labelSmall.copy(fontWeight = FontWeight.Bold),
                         modifier = Modifier.padding(horizontal = 4.dp, vertical = 2.dp)
                     )
                 }
@@ -140,14 +153,9 @@ fun MediaCard(media: DummyMedia) {
                 )
                 Spacer(modifier = Modifier.height(4.dp))
                 Text(
-                    text = media.author,
+                    text = media.uploaderName,
                     style = MaterialTheme.typography.bodyMedium,
                     color = MaterialTheme.colorScheme.onSurfaceVariant
-                )
-                Text(
-                    text = media.views,
-                    style = MaterialTheme.typography.bodySmall,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.7f)
                 )
             }
         }

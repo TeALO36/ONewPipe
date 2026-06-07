@@ -7,11 +7,9 @@ package net.newpipe.app.di.settings
 
 import com.russhwolf.settings.NSUserDefaultsSettings
 import com.russhwolf.settings.Settings
-import org.koin.core.annotation.Singleton
 import platform.Foundation.NSUserDefaults
 
 /**
- * Settings for iOS based on UserDefaultsSettings
+ * Settings for Apple devices based on NSUserDefaults
  */
-@Singleton
 fun provideSettings(): Settings = NSUserDefaultsSettings(NSUserDefaults())

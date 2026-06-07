@@ -8,7 +8,6 @@ plugins {
     alias(libs.plugins.jetbrains.kotlin.multiplatform)
     alias(libs.plugins.jetbrains.kotlin.compose)
     alias(libs.plugins.jetbrains.compose.multiplatform)
-    alias(libs.plugins.koin)
     alias(libs.plugins.jetbrains.kotlinx.serialization)
 }
 
@@ -106,9 +105,9 @@ kotlin {
                 implementation(libs.kotlinx.serialization.json)
 
                 implementation(libs.koin.compose.viewmodel)
-                implementation(libs.koin.annotations)
 
                 implementation(libs.russhwolf.settings.core)
+                implementation(libs.coil.compose)
             }
         }
         commonTest.dependencies {
@@ -120,6 +119,17 @@ kotlin {
             implementation(libs.jetbrains.compose.preview)
             implementation(libs.androidx.activity)
             implementation(libs.androidx.preference)
+            implementation(libs.newpipe.extractor)
+            implementation(libs.squareup.okhttp)
+            implementation(libs.coil.network.okhttp)
+            implementation(libs.koin.android)
+        }
+        val jvmMain by getting {
+            dependencies {
+                api(libs.newpipe.extractor)
+                api(libs.squareup.okhttp)
+                api(libs.coil.network.okhttp)
+            }
         }
         val androidDeviceTest by getting {
             dependencies {
@@ -143,6 +153,4 @@ dependencies {
     androidRuntimeClasspath(libs.jetbrains.compose.tooling)
 }
 
-koinCompiler {
-    userLogs = true // See what the compiler plugin detects
-}
+

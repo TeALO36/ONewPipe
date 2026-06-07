@@ -16,7 +16,10 @@ import androidx.compose.ui.unit.dp
 import net.newpipe.app.theme.currentServiceScheme
 
 @Composable
-fun GlassSearchBar(modifier: Modifier = Modifier) {
+fun GlassSearchBar(
+    modifier: Modifier = Modifier,
+    onSearch: (String) -> Unit = {}
+) {
     var searchQuery by remember { mutableStateOf("") }
     val serviceColor = currentServiceScheme().primaryContainer
 
@@ -35,22 +38,38 @@ fun GlassSearchBar(modifier: Modifier = Modifier) {
             contentDescription = "Search Icon",
             tint = MaterialTheme.colorScheme.onSurfaceVariant
         )
-        Spacer(modifier = Modifier.width(8.dp))
         
-        // Simulating a TextField without outline
-        Box(modifier = Modifier.weight(1f)) {
-            if (searchQuery.isEmpty()) {
+        TextField(
+            value = searchQuery,
+            onValueChange = { searchQuery = it },
+            placeholder = {
                 Text(
                     text = "Search videos, music...",
                     color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.5f)
                 )
-            }
-        }
+            },
+            colors = TextFieldDefaults.colors(
+                focusedContainerColor = Color.Transparent,
+                unfocusedContainerColor = Color.Transparent,
+                disabledContainerColor = Color.Transparent,
+                focusedIndicatorColor = Color.Transparent,
+                unfocusedIndicatorColor = Color.Transparent,
+                disabledIndicatorColor = Color.Transparent
+            ),
+            singleLine = true,
+            modifier = Modifier.weight(1f),
+            keyboardActions = androidx.compose.foundation.text.KeyboardActions(
+                onDone = { onSearch(searchQuery) }
+            ),
+            keyboardOptions = androidx.compose.foundation.text.KeyboardOptions(
+                imeAction = androidx.compose.ui.text.input.ImeAction.Search
+            )
+        )
         
-        IconButton(onClick = { /* mic action */ }) {
+        IconButton(onClick = { onSearch(searchQuery) }) {
             Icon(
-                imageVector = Icons.Default.Mic,
-                contentDescription = "Voice Search",
+                imageVector = Icons.Default.Search,
+                contentDescription = "Submit Search",
                 tint = MaterialTheme.colorScheme.onSurfaceVariant
             )
         }

@@ -17,13 +17,13 @@ ONewPipe is a privacy-focused, lightweight, and responsive frontend for YouTube,
 ## 📥 Installation
 
 ### Android
-Download the latest `.apk` from the [Releases](https://github.com/TODO/ONewPipe/releases) page.
+Download the latest `.apk` from the [Releases](https://github.com/TeALO36/ONewPipe/releases) page.
 
 ### Windows 
-Download the `.msi` (Installer) or `.exe` (Portable) from the [Releases](https://github.com/TODO/ONewPipe/releases) page.
+Download the `.msi` (Installer) or `.exe` (Portable) from the [Releases](https://github.com/TeALO36/ONewPipe/releases) page.
 
 ### Linux
-Download the `.deb` package from the [Releases](https://github.com/TODO/ONewPipe/releases) page.
+Download the `.deb` package from the [Releases](https://github.com/TeALO36/ONewPipe/releases) page.
 
 ---
 *Disclaimer: ONewPipe is a fork of [NewPipe](https://github.com/TeamNewPipe/NewPipe).*

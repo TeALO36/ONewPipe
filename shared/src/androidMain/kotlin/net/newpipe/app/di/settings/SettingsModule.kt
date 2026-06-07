@@ -9,12 +9,10 @@ import android.content.Context
 import androidx.preference.PreferenceManager
 import com.russhwolf.settings.Settings
 import com.russhwolf.settings.SharedPreferencesSettings
-import org.koin.core.annotation.Singleton
 
 /**
- * Settings for Android based on SharedPreferences
+ * Settings for Android devices based on SharedPreferences
  */
-@Singleton
 fun provideSettings(context: Context): Settings = SharedPreferencesSettings(
     PreferenceManager.getDefaultSharedPreferences(context)
 )

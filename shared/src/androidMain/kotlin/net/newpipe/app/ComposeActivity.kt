@@ -13,6 +13,10 @@ import kotlinx.serialization.json.Json
 import net.newpipe.Constants
 import net.newpipe.app.navigation.Screen
 
+import org.schabi.newpipe.extractor.NewPipe
+import net.newpipe.app.backend.OkHttpDownloader
+import okhttp3.OkHttpClient
+
 /**
  * Entry point for compose-related UI components on Android
  */
@@ -20,6 +24,14 @@ class ComposeActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         enableEdgeToEdge()
         super.onCreate(savedInstanceState)
+        try {
+            NewPipe.init(OkHttpDownloader(OkHttpClient.Builder().build()))
+            net.newpipe.app.di.KoinApp.init {
+                org.koin.android.ext.koin.androidContext(this@ComposeActivity)
+            }
+        } catch (e: Exception) {
+            // Already initialized
+        }
 
         setContent {
             App(

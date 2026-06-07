@@ -18,10 +18,10 @@ import androidx.compose.ui.tooling.preview.PreviewLightDark
 import androidx.compose.ui.tooling.preview.PreviewWrapper
 import net.newpipe.app.preview.ThemePreviewProvider
 import net.newpipe.app.theme.currentServiceTopAppBarColors
-import newpipe.shared.generated.resources.Res
-import newpipe.shared.generated.resources.app_name
-import newpipe.shared.generated.resources.ic_arrow_back
-import newpipe.shared.generated.resources.navigate_back
+import onewpipe.shared.generated.resources.Res
+import onewpipe.shared.generated.resources.app_name
+import onewpipe.shared.generated.resources.ic_arrow_back
+import onewpipe.shared.generated.resources.navigate_back
 import org.jetbrains.compose.resources.painterResource
 import org.jetbrains.compose.resources.stringResource
 

@@ -16,9 +16,9 @@ import com.russhwolf.settings.Settings
 import kotlin.test.Test
 import kotlin.test.assertTrue
 import net.newpipe.app.extensions.withKoin
-import newpipe.shared.generated.resources.Res
-import newpipe.shared.generated.resources.app_name
-import newpipe.shared.generated.resources.navigate_back
+import onewpipe.shared.generated.resources.Res
+import onewpipe.shared.generated.resources.app_name
+import onewpipe.shared.generated.resources.navigate_back
 import org.jetbrains.compose.resources.getString
 import org.jetbrains.compose.resources.stringResource
 import org.koin.dsl.module

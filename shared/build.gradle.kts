@@ -31,7 +31,7 @@ val buildConfigGenerator by tasks.registering(Sync::class) {
 }
 
 kotlin {
-    jvmToolchain(21)
+    jvmToolchain(17)
 
     compilerOptions {
         freeCompilerArgs.addAll(

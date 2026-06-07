@@ -11,6 +11,10 @@ plugins {
     alias(libs.plugins.jetbrains.compose.multiplatform)
 }
 
+kotlin {
+    jvmToolchain(21)
+}
+
 dependencies {
     implementation(projects.shared)
 

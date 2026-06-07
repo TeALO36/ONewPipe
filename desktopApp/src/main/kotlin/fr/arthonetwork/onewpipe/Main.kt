@@ -7,6 +7,7 @@ package fr.arthonetwork.onewpipe
 
 import androidx.compose.ui.window.Window
 import androidx.compose.ui.window.application
+import net.newpipe.app.App
 
 /**
  * Entry point for compose-related UI components on Desktop

@@ -10,10 +10,13 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.ArrowDropDown
+import androidx.compose.material.icons.filled.Cloud
+import androidx.compose.material.icons.filled.VideoLibrary
 import androidx.compose.material3.DropdownMenu
 import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.FilterChip
@@ -30,6 +33,7 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import net.newpipe.app.domain.HomeState
 import net.newpipe.app.domain.MediaItem
@@ -37,8 +41,12 @@ import net.newpipe.app.domain.TrendingCategory
 import net.newpipe.app.theme.Service
 
 /**
- * Main content of the home screen: search bar, service switcher, dynamic title,
- * trending category tabs and the media grid.
+ * Main content of the app: search bar, service switcher, dynamic title and
+ * the section-specific content for each sidebar item.
+ *
+ * Home and Trending show the media grid (trending by category, or search
+ * results). Subscriptions and Library have no data source yet, so they show
+ * an honest empty state instead of silently reusing the home feed.
  */
 @Composable
 fun HomeContent(
@@ -55,19 +63,23 @@ fun HomeContent(
 ) {
     Column(modifier = modifier.fillMaxSize()) {
         Spacer(modifier = Modifier.height(24.dp))
-        Row(
-            modifier = Modifier.fillMaxWidth().padding(horizontal = 24.dp),
-            verticalAlignment = Alignment.CenterVertically
-        ) {
-            GlassSearchBar(
-                onSearch = onSearch,
-                modifier = Modifier.weight(1f)
-            )
-            Spacer(modifier = Modifier.width(16.dp))
 
-            ServiceSwitcher(service = service, onServiceSelected = onServiceSelected)
+        val isMediaSection = selectedItem == NavItem.HOME || selectedItem == NavItem.TRENDING
+        if (isMediaSection) {
+            Row(
+                modifier = Modifier.fillMaxWidth().padding(horizontal = 24.dp),
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                GlassSearchBar(
+                    onSearch = onSearch,
+                    modifier = Modifier.weight(1f)
+                )
+                Spacer(modifier = Modifier.width(16.dp))
+
+                ServiceSwitcher(service = service, onServiceSelected = onServiceSelected)
+            }
+            Spacer(modifier = Modifier.height(16.dp))
         }
-        Spacer(modifier = Modifier.height(16.dp))
 
         // Dynamic Title
         Text(
@@ -79,43 +91,91 @@ fun HomeContent(
 
         Spacer(modifier = Modifier.height(8.dp))
 
-        // Trending Category Tabs
-        Row(
-            modifier = Modifier
-                .fillMaxWidth()
-                .horizontalScroll(rememberScrollState())
-                .padding(horizontal = 24.dp),
-            horizontalArrangement = Arrangement.spacedBy(8.dp)
-        ) {
-            TrendingCategory.entries.forEach { category ->
-                FilterChip(
-                    selected = selectedCategory == category,
-                    onClick = { onCategorySelected(category) },
-                    label = { Text(category.label) },
-                    colors = FilterChipDefaults.filterChipColors(
-                        selectedContainerColor = MaterialTheme.colorScheme.primary.copy(alpha = 0.25f)
-                    )
+        when (selectedItem) {
+            NavItem.HOME, NavItem.TRENDING -> {
+                // Trending Category Tabs
+                Row(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .horizontalScroll(rememberScrollState())
+                        .padding(horizontal = 24.dp),
+                    horizontalArrangement = Arrangement.spacedBy(8.dp)
+                ) {
+                    TrendingCategory.entries.forEach { category ->
+                        FilterChip(
+                            selected = selectedCategory == category,
+                            onClick = { onCategorySelected(category) },
+                            label = { Text(category.label) },
+                            colors = FilterChipDefaults.filterChipColors(
+                                selectedContainerColor = MaterialTheme.colorScheme.primary.copy(alpha = 0.25f)
+                            )
+                        )
+                    }
+                }
+
+                Spacer(modifier = Modifier.height(12.dp))
+
+                when (homeState) {
+                    is HomeState.Loading -> {
+                        MediaGrid(items = emptyList(), isLoading = true, modifier = Modifier.weight(1f))
+                    }
+                    is HomeState.Success -> {
+                        MediaGrid(
+                            items = homeState.items,
+                            onMediaClick = onMediaClick,
+                            onDownloadClick = onDownloadClick,
+                            modifier = Modifier.weight(1f)
+                        )
+                    }
+                    is HomeState.Error -> {
+                        MediaGrid(items = emptyList(), errorMessage = homeState.message, modifier = Modifier.weight(1f))
+                    }
+                }
+            }
+            NavItem.SUBSCRIPTIONS -> {
+                EmptySection(
+                    icon = { Icon(Icons.Filled.Cloud, contentDescription = null, modifier = Modifier.size(56.dp)) },
+                    title = "No subscriptions yet",
+                    message = "Connect to your ONewPipe server (cloud icon, bottom left) to sync your " +
+                        "channels and subscriptions across devices."
+                )
+            }
+            NavItem.LIBRARY -> {
+                EmptySection(
+                    icon = { Icon(Icons.Filled.VideoLibrary, contentDescription = null, modifier = Modifier.size(56.dp)) },
+                    title = "Your library is empty",
+                    message = "Watch history, playlists and downloads will appear here. " +
+                        "Played videos are saved and synchronized through your server."
                 )
             }
         }
+    }
+}
 
-        Spacer(modifier = Modifier.height(12.dp))
-
-        when (homeState) {
-            is HomeState.Loading -> {
-                MediaGrid(items = emptyList(), isLoading = true, modifier = Modifier.weight(1f))
-            }
-            is HomeState.Success -> {
-                MediaGrid(
-                    items = homeState.items,
-                    onMediaClick = onMediaClick,
-                    onDownloadClick = onDownloadClick,
-                    modifier = Modifier.weight(1f)
-                )
-            }
-            is HomeState.Error -> {
-                MediaGrid(items = emptyList(), errorMessage = homeState.message, modifier = Modifier.weight(1f))
-            }
+/** Friendly placeholder for sections whose data source is not implemented yet. */
+@Composable
+private fun EmptySection(
+    icon: @Composable () -> Unit,
+    title: String,
+    message: String
+) {
+    Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
+        Column(horizontalAlignment = Alignment.CenterHorizontally) {
+            icon()
+            Spacer(modifier = Modifier.height(16.dp))
+            Text(
+                text = title,
+                style = MaterialTheme.typography.titleLarge,
+                fontWeight = FontWeight.Bold
+            )
+            Spacer(modifier = Modifier.height(8.dp))
+            Text(
+                text = message,
+                style = MaterialTheme.typography.bodyMedium,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                textAlign = TextAlign.Center,
+                modifier = Modifier.padding(horizontal = 48.dp)
+            )
         }
     }
 }

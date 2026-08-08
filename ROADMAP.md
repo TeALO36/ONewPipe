@@ -26,6 +26,7 @@
 
 ### 1.2 Interface — grande refonte
 - [x] Éclater `App.kt` (monolithe ~400 lignes) en écrans modulaires : `HomeContent` (recherche + catégories + grille), `PlayerOverlay` (lecteur + détails + liées), `DownloadOverlay` (téléchargements)
+- [x] **Navigation sidebar fonctionnelle** : chaque menu affiche son contenu (Home/Trending → grille, Subscriptions/Library → états vides explicites au lieu de réutiliser l'accueil)
 - [ ] Navigation par onglets / sidebar cohérente mobile + desktop
 - [ ] Thème dynamique par service (YouTube rouge, SoundCloud orange, Bandcamp bleu…) + thème sombre/clair + Material 3
 - [ ] Mode adaptatif : layout smartphone ↔ tablette ↔ desktop (grille responsive)
@@ -158,6 +159,8 @@
 - ✅ NewPipeExtractor mis à jour vers la dernière version upstream
 - ✅ **Tendances par catégories** fonctionnelles (Tout/Gaming/Musique/Films & Séries/Podcasts) : triées par popularité, vues affichées sur les cartes
 - ✅ **Crash du lecteur corrigé** (vlcj « Invalid memory access » au stop — course entre threads)
+- ✅ **Lecteur réparé dans les builds empaquetés** : le runtime jpackage n'incluait pas `jdk.unsupported` → `sun.misc.Unsafe` introuvable → surface vidéo noire. Fix : `modules("jdk.unsupported")` dans `nativeDistributions`. **Vérifié en conditions réelles** : clic sur une vidéo → lecture complète (« The Weeknd - Popular », contrôles, progression 0:00→3:50), fermeture sans crash, 0 erreur vlcj
+- ✅ **Navigation vérifiée en conditions réelles** : Home → grille, Subscriptions → état vide, retour → grille
 - ✅ UI modulaire : `App.kt` éclaté en `HomeContent` / `PlayerOverlay` / `DownloadOverlay`
-- ⚠️ Warnings vlcj « sun.misc.Unsafe » au démarrage du lecteur (non fatals, la lecture fonctionne) — à corriger via un runtime configuré ou un autre pipeline vidéo
+- ⚠️ Warnings vlcj « stale plugins cache » au démarrage (inoffensifs, liés à l'installation VLC locale)
 - ⚠️ Le kiosk tendances officiel de YouTube est bloqué côté upstream (issue #12805) → poToken à implémenter pour le retrouver

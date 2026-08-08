@@ -49,7 +49,7 @@ private data class WatchStateResponse(val synced: Int = 0, val items: List<Watch
 @Serializable
 private data class ErrorResponse(val error: String = "")
 
-class ServerException(message: String) : Exception(message)
+class ServerException(message: String, val statusCode: Int = 0) : Exception(message)
 
 /**
  * Talks to the ONewPipe server (see the `server` Gradle module).
@@ -86,7 +86,7 @@ class ServerClient {
             if (response.status.value !in 200..299) {
                 val error = runCatching { json.decodeFromString<ErrorResponse>(body) }.getOrNull()?.error
                     ?: "Server error (${response.status.value})"
-                throw ServerException(error)
+                throw ServerException(error, response.status.value)
             }
             json.decodeFromString<AuthResponse>(body)
         } finally {
@@ -104,7 +104,7 @@ class ServerClient {
                 contentType(ContentType.Application.Json)
                 setBody(WatchStateRequest(items))
             }
-            if (response.status.value !in 200..299) throw ServerException("Sync failed (${response.status.value})")
+            if (response.status.value !in 200..299) throw ServerException("Sync failed (${response.status.value})", response.status.value)
             json.decodeFromString<WatchStateResponse>(response.body<String>()).synced
         } finally {
             client.close()
@@ -119,7 +119,7 @@ class ServerClient {
             val response = client.get("${baseUrl(config.serverUrl)}/api/watchstate") {
                 bearerAuth(config.token)
             }
-            if (response.status.value !in 200..299) throw ServerException("Sync failed (${response.status.value})")
+            if (response.status.value !in 200..299) throw ServerException("Sync failed (${response.status.value})", response.status.value)
             json.decodeFromString<List<WatchStateItem>>(response.body<String>())
         } finally {
             client.close()

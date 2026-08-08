@@ -18,11 +18,18 @@ class ServerClientTest {
     private val serverUrl: String = System.getenv("ONEWPIPE_SERVER_URL")
         ?: "http://localhost:8099"
 
+    /**
+     * A real ONewPipe server answers 401 for bad credentials. Anything else
+     * (connection refused, 404 from another service on the port) means there
+     * is no ONewPipe server to test against.
+     */
     private fun serverReachable(): Boolean = runBlocking {
-        runCatching {
+        val error = runCatching {
             val client = ServerClient()
             client.login(serverUrl, "no-such-user", "no-such-pass")
-        }.isFailure
+        }.exceptionOrNull()
+        // 401 Unauthorized = a real ONewPipe server answering with bad credentials.
+        error is ServerException && error.statusCode == 401
     }
 
     @Test

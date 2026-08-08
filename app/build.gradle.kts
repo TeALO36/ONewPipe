@@ -35,7 +35,7 @@ configure<ApplicationExtension> {
             minorApiLevel = NEWPIPE_VERSION_SDK_COMPILE_MINOR
         }
     }
-    namespace = NEWPIPE_APPLICATION_ID_OLD
+    namespace = NEWPIPE_NAMESPACE
 
     defaultConfig {
         applicationId = NEWPIPE_APPLICATION_ID_OLD

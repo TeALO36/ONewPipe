@@ -33,7 +33,8 @@ enum class NavItem(val title: String, val icon: ImageVector) {
 fun Sidebar(
     modifier: Modifier = Modifier,
     selectedItem: NavItem,
-    onItemSelected: (NavItem) -> Unit
+    onItemSelected: (NavItem) -> Unit,
+    onServiceSelected: (net.newpipe.app.theme.Service) -> Unit
 ) {
     val serviceColor = currentServiceScheme().primaryContainer
 
@@ -44,20 +45,40 @@ fun Sidebar(
         containerColor = MaterialTheme.colorScheme.surface.copy(alpha = 0.8f),
         contentColor = MaterialTheme.colorScheme.onSurface,
         header = {
+            var expanded by remember { mutableStateOf(false) }
+            
             // App Logo or Icon can go here
-            Box(
-                modifier = Modifier
-                    .padding(vertical = 24.dp)
-                    .size(48.dp)
-                    .clip(RoundedCornerShape(12.dp))
-                    .background(serviceColor),
-                contentAlignment = Alignment.Center
-            ) {
-                Icon(
-                    imageVector = Icons.Filled.PlayArrow,
-                    contentDescription = "Logo",
-                    tint = Color.White
-                )
+            Box {
+                Box(
+                    modifier = Modifier
+                        .padding(vertical = 24.dp)
+                        .size(48.dp)
+                        .clip(RoundedCornerShape(12.dp))
+                        .background(serviceColor)
+                        .clickable { expanded = true },
+                    contentAlignment = Alignment.Center
+                ) {
+                    Icon(
+                        imageVector = Icons.Filled.PlayArrow,
+                        contentDescription = "Logo",
+                        tint = Color.White
+                    )
+                }
+                
+                DropdownMenu(
+                    expanded = expanded,
+                    onDismissRequest = { expanded = false }
+                ) {
+                    net.newpipe.app.theme.Service.entries.forEach { srv ->
+                        DropdownMenuItem(
+                            text = { Text(srv.serviceName) },
+                            onClick = {
+                                expanded = false
+                                onServiceSelected(srv)
+                            }
+                        )
+                    }
+                }
             }
         }
     ) {

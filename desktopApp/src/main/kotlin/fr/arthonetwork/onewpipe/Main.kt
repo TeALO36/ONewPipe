@@ -18,7 +18,7 @@ import net.newpipe.app.di.KoinApp
  * Entry point for compose-related UI components on Desktop
  */
 fun main() {
-    NewPipe.init(OkHttpDownloader(OkHttpClient.Builder().build()))
+    NewPipe.init(OkHttpDownloader(OkHttpClient.Builder().build()), org.schabi.newpipe.extractor.localization.Localization("en", "US"))
     KoinApp.init()
     
     application {

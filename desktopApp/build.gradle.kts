@@ -17,7 +17,6 @@ kotlin {
 
 dependencies {
     implementation(projects.shared)
-
     implementation(compose.desktop.currentOs)
     implementation(libs.jetbrains.coroutines.swing)
     implementation(libs.jetbrains.compose.preview)

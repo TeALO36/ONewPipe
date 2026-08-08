@@ -123,12 +123,31 @@ kotlin {
             implementation(libs.squareup.okhttp)
             implementation(libs.coil.network.okhttp)
             implementation(libs.koin.android)
+            implementation(libs.media3.exoplayer)
+            implementation(libs.media3.ui)
         }
         val jvmMain by getting {
             dependencies {
                 api(libs.newpipe.extractor)
                 api(libs.squareup.okhttp)
                 api(libs.coil.network.okhttp)
+                
+                val osName = System.getProperty("os.name").lowercase()
+                val osClassifier = when {
+                    osName.contains("win") -> "win"
+                    osName.contains("mac") -> "mac"
+                    osName.contains("nux") || osName.contains("nix") -> "linux"
+                    else -> "linux"
+                }
+                
+                implementation("org.openjfx:javafx-base:17.0.2:$osClassifier")
+                implementation("org.openjfx:javafx-graphics:17.0.2:$osClassifier")
+                implementation("org.openjfx:javafx-media:17.0.2:$osClassifier")
+                implementation("org.openjfx:javafx-controls:17.0.2:$osClassifier")
+                implementation("org.openjfx:javafx-web:17.0.2:$osClassifier")
+                implementation("org.openjfx:javafx-swing:17.0.2:$osClassifier")
+                
+                implementation("uk.co.caprica:vlcj:4.8.2")
             }
         }
         val androidDeviceTest by getting {

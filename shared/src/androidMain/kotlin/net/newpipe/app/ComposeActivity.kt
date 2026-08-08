@@ -16,6 +16,7 @@ import net.newpipe.app.navigation.Screen
 import org.schabi.newpipe.extractor.NewPipe
 import net.newpipe.app.backend.OkHttpDownloader
 import okhttp3.OkHttpClient
+import org.koin.android.ext.koin.androidContext
 
 /**
  * Entry point for compose-related UI components on Android
@@ -27,7 +28,7 @@ class ComposeActivity : ComponentActivity() {
         try {
             NewPipe.init(OkHttpDownloader(OkHttpClient.Builder().build()))
             net.newpipe.app.di.KoinApp.init {
-                org.koin.android.ext.koin.androidContext(this@ComposeActivity)
+                androidContext(this@ComposeActivity)
             }
         } catch (e: Exception) {
             // Already initialized

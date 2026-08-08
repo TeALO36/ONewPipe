@@ -4,8 +4,10 @@ import org.schabi.newpipe.BuildConfig
 import org.schabi.newpipe.extractor.InfoItem.InfoType
 import org.schabi.newpipe.extractor.exceptions.ContentNotAvailableException
 
-internal const val ID_AUTHORITY = BuildConfig.APPLICATION_ID
-internal const val ID_ROOT = "//$ID_AUTHORITY"
+// Not const: Kotlin 2.3's IR constant evaluator crashes when folding consts
+// backed by BuildConfig.APPLICATION_ID (see KT-* assertion in kapt stub gen).
+internal val ID_AUTHORITY = BuildConfig.APPLICATION_ID
+internal val ID_ROOT = "//$ID_AUTHORITY"
 internal const val ID_BOOKMARKS = "playlists"
 internal const val ID_HISTORY = "history"
 internal const val ID_INFO_ITEM = "item"

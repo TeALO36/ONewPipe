@@ -13,6 +13,7 @@ import androidx.compose.foundation.lazy.grid.items
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.PlayArrow
+import androidx.compose.material.icons.filled.Add
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
@@ -34,6 +35,8 @@ fun MediaGrid(
     items: List<MediaItem>,
     isLoading: Boolean = false,
     errorMessage: String? = null,
+    onMediaClick: (MediaItem) -> Unit = {},
+    onDownloadClick: (MediaItem) -> Unit = {},
     modifier: Modifier = Modifier
 ) {
     if (isLoading) {
@@ -62,13 +65,17 @@ fun MediaGrid(
         modifier = modifier.fillMaxSize()
     ) {
         items(items) { media ->
-            MediaCard(media)
+            MediaCard(
+                media = media, 
+                onClick = { onMediaClick(media) },
+                onDownloadClick = { onDownloadClick(media) }
+            )
         }
     }
 }
 
 @Composable
-fun MediaCard(media: MediaItem) {
+fun MediaCard(media: MediaItem, onClick: () -> Unit = {}, onDownloadClick: (MediaItem) -> Unit = {}) {
     val interactionSource = remember { MutableInteractionSource() }
     val isHovered by interactionSource.collectIsHoveredAsState()
     
@@ -83,8 +90,9 @@ fun MediaCard(media: MediaItem) {
             .scale(scale)
             .clickable(
                 interactionSource = interactionSource,
-                indication = null
-            ) { /* handle click to play */ },
+                indication = null,
+                onClick = onClick
+            ),
         shape = RoundedCornerShape(16.dp),
         elevation = CardDefaults.cardElevation(defaultElevation = elevation),
         colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f))
@@ -152,12 +160,47 @@ fun MediaCard(media: MediaItem) {
                     overflow = TextOverflow.Ellipsis
                 )
                 Spacer(modifier = Modifier.height(4.dp))
-                Text(
-                    text = media.uploaderName,
-                    style = MaterialTheme.typography.bodyMedium,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant
-                )
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Text(
+                        text = media.uploaderName,
+                        style = MaterialTheme.typography.bodyMedium,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        modifier = Modifier.weight(1f)
+                    )
+
+                    if (media.viewCount > 0) {
+                        Text(
+                            text = formatViewCount(media.viewCount),
+                            style = MaterialTheme.typography.labelMedium,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                        )
+                    }
+
+                    IconButton(
+                        onClick = { onDownloadClick(media) },
+                        modifier = Modifier.size(32.dp)
+                    ) {
+                        Icon(
+                            imageVector = androidx.compose.material.icons.Icons.Default.Add,
+                            contentDescription = "Download",
+                            tint = MaterialTheme.colorScheme.primary
+                        )
+                    }
+                }
             }
         }
     }
 }
+
+private fun formatViewCount(count: Long): String = when {
+    count >= 1_000_000_000 -> "${(count / 1_000_000_000.0).format(1)}B views"
+    count >= 1_000_000 -> "${(count / 1_000_000.0).format(1)}M views"
+    count >= 1_000 -> "${(count / 1_000.0).format(1)}K views"
+    else -> "$count views"
+}
+
+private fun Double.format(digits: Int): String = String.format("%.${digits}f", this)

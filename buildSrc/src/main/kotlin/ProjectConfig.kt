@@ -11,5 +11,11 @@ const val NEWPIPE_VERSION_SDK_TARGET = 35
 const val NEWPIPE_VERSION_CODE = 1012
 const val NEWPIPE_VERSION_NAME = "0.28.7"
 
+// The namespace determines the package of generated R/BuildConfig classes.
+// The whole app codebase still references org.schabi.newpipe.R and
+// org.schabi.newpipe.BuildConfig, so the namespace must stay unchanged.
+const val NEWPIPE_NAMESPACE = "org.schabi.newpipe"
+// The application ID is the unique identifier of the installed app and can
+// safely be customized per fork.
 const val NEWPIPE_APPLICATION_ID_OLD = "fr.arthonetwork.onewpipe"
 const val NEWPIPE_APPLICATION_ID_NEW = "fr.arthonetwork.onewpipe"

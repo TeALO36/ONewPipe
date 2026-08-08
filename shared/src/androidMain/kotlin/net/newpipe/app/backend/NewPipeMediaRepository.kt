@@ -4,9 +4,12 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import net.newpipe.app.domain.MediaItem
 import net.newpipe.app.domain.MediaRepository
+import net.newpipe.app.domain.PageResult
 import net.newpipe.app.domain.TrendingCategory
 import org.schabi.newpipe.extractor.NewPipe
 import org.schabi.newpipe.extractor.InfoItem
+import org.schabi.newpipe.extractor.Page
+import org.schabi.newpipe.extractor.ServiceList
 import org.schabi.newpipe.extractor.channel.ChannelInfoItem
 import org.schabi.newpipe.extractor.kiosk.KioskInfo
 import org.schabi.newpipe.extractor.linkhandler.SearchQueryHandler
@@ -16,86 +19,142 @@ import org.schabi.newpipe.extractor.stream.StreamInfoItem
 
 class NewPipeMediaRepository : MediaRepository {
 
+    // Cache pagination states keyed by operation identifier
+    private val searchPages = mutableMapOf<String, Page>()
+    private val trendingPages = mutableMapOf<String, Page>()
+
     override suspend fun getTrending(
         serviceId: Int,
         category: TrendingCategory
-    ): List<MediaItem> = withContext(Dispatchers.IO) {
+    ): PageResult = withContext(Dispatchers.IO) {
         try {
             val service = NewPipe.getService(serviceId)
 
-            // Try the official trending/kiosk feed first, but only for the generic
-            // "All" category: the YouTube kiosk has no per-category tabs and it is
-            // frequently blocked by YouTube (400 / consent wall).
+            // Try the official trending/kiosk feed first for ALL category
             if (category == TrendingCategory.ALL) {
-                val kioskItems = tryFetchKiosk(serviceId, service)
-                if (kioskItems.isNotEmpty()) return@withContext kioskItems
+                val kioskResult = tryFetchKiosk(serviceId, service)
+                if (kioskResult.items.isNotEmpty()) return@withContext kioskResult
             }
 
-            // Fallback: curated search query that reliably returns popular content.
-            searchItems(service, category.fallbackQuery)
+            // Fallback: curated search query that reliably returns popular content
+            searchWithPagination(service, category.fallbackQuery, "trending:${category.id}")
         } catch (e: Exception) {
             e.printStackTrace()
-            emptyList()
+            PageResult(emptyList())
         }
     }
 
-    override suspend fun search(serviceId: Int, query: String): List<MediaItem> =
+    override suspend fun search(serviceId: Int, query: String): PageResult =
         withContext(Dispatchers.IO) {
             try {
-                searchItems(NewPipe.getService(serviceId), query)
+                searchWithPagination(NewPipe.getService(serviceId), query, "search:$query")
             } catch (e: Exception) {
                 e.printStackTrace()
-                emptyList()
+                PageResult(emptyList())
             }
         }
+
+    override suspend fun loadMore(serviceId: Int, pageToken: String): PageResult =
+        withContext(Dispatchers.IO) {
+            try {
+                val service = NewPipe.getService(serviceId)
+                val page = trendingPages[pageToken] ?: searchPages[pageToken]
+                if (page == null || !Page.isValid(page)) {
+                    return@withContext PageResult(emptyList())
+                }
+
+                val isKiosk = pageToken.startsWith("kiosk:")
+                val result = if (isKiosk) {
+                    val kioskUrl = pageToken.removePrefix("kiosk:")
+                    KioskInfo.getMoreItems(service, kioskUrl, page)
+                } else {
+                    val query = if (pageToken.startsWith("search:")) {
+                        pageToken.removePrefix("search:")
+                    } else if (pageToken.startsWith("trending:")) {
+                        TrendingCategory.entries.find { it.id == pageToken.removePrefix("trending:") }
+                            ?.fallbackQuery ?: "trending"
+                    } else {
+                        pageToken
+                    }
+                    val queryHandler = buildQueryHandler(service, query)
+                    SearchInfo.getMoreItems(service, queryHandler, page)
+                }
+
+                // Store next page token
+                val nextPage = result.nextPage
+                if (nextPage != null) {
+                    if (isKiosk) {
+                        trendingPages[pageToken] = nextPage
+                    } else {
+                        searchPages[pageToken] = nextPage
+                    }
+                }
+
+                PageResult(
+                    items = result.items.mapNotNull { it.toMediaItem() },
+                    nextPageToken = if (result.hasNextPage()) pageToken else null
+                )
+            } catch (e: Exception) {
+                e.printStackTrace()
+                PageResult(emptyList())
+            }
+        }
+
+    private fun searchWithPagination(
+        service: org.schabi.newpipe.extractor.StreamingService,
+        query: String,
+        pageId: String
+    ): PageResult {
+        val queryHandler = buildQueryHandler(service, query)
+        val searchInfo = SearchInfo.getInfo(service, queryHandler)
+
+        // Store the next page for later pagination
+        if (searchInfo.hasNextPage()) {
+            trendingPages[pageId] = searchInfo.nextPage
+        }
+
+        val items = searchInfo.relatedItems.mapNotNull { item -> item.toMediaItem() }
+            .sortedByDescending { it.viewCount }
+            .distinctBy { it.url }
+
+        return PageResult(
+            items = items,
+            nextPageToken = if (searchInfo.hasNextPage()) pageId else null
+        )
+    }
 
     private fun tryFetchKiosk(
         serviceId: Int,
         service: org.schabi.newpipe.extractor.StreamingService
-    ): List<MediaItem> {
+    ): PageResult {
         val kioskUrl = when (serviceId) {
-            0 -> "https://www.youtube.com/feed/trending" // YouTube
-            1 -> "https://soundcloud.com/discover" // SoundCloud
-            2 -> "https://media.ccc.de/c" // MediaCCC
-            3 -> "https://framatube.org/videos/trending" // PeerTube
-            4 -> "https://bandcamp.com" // Bandcamp
+            0 -> "https://www.youtube.com/feed/trending"
+            1 -> "https://soundcloud.com/discover"
+            2 -> "https://media.ccc.de/c"
+            3 -> "https://framatube.org/videos/trending"
+            4 -> "https://bandcamp.com"
             else -> "https://www.youtube.com/feed/trending"
         }
         return try {
             val kioskInfo = KioskInfo.getInfo(service, kioskUrl)
-            kioskInfo.relatedItems.mapNotNull { item ->
-                if (item is StreamInfoItem) item.toMediaItem() else null
+
+            // Store next page for pagination
+            val pageId = "kiosk:$kioskUrl"
+            val nextPage = kioskInfo.nextPage
+            if (nextPage != null) {
+                trendingPages[pageId] = nextPage
             }
+
+            PageResult(
+                items = kioskInfo.relatedItems.mapNotNull { item ->
+                    if (item is StreamInfoItem) item.toMediaItem() else null
+                },
+                nextPageToken = if (kioskInfo.hasNextPage()) pageId else null
+            )
         } catch (e: Exception) {
             e.printStackTrace()
-            emptyList()
+            PageResult(emptyList())
         }
-    }
-
-    private fun searchItems(
-        service: org.schabi.newpipe.extractor.StreamingService,
-        query: String
-    ): List<MediaItem> {
-        val queryHandler = buildQueryHandler(service, query)
-        val searchInfo = SearchInfo.getInfo(service, queryHandler)
-        // Sort by view count (descending) and dedupe by URL so the category tabs
-        // surface the most popular content first, which is what "trending" is about.
-        val seen = mutableSetOf<String>()
-        return searchInfo.relatedItems.mapNotNull { item ->
-            when (item) {
-                is StreamInfoItem -> item.toMediaItem()
-                is ChannelInfoItem -> MediaItem(
-                    url = item.url,
-                    title = item.name,
-                    uploaderName = "Channel • ${item.subscriberCount} subs",
-                    thumbnailUrl = item.thumbnails.maxByOrNull { it.width }?.url
-                        ?: item.thumbnails.firstOrNull()?.url ?: "",
-                    durationText = "",
-                    isLive = false
-                )
-                else -> null
-            }
-        }.sortedByDescending { it.viewCount }.filter { seen.add(it.url) }
     }
 
     private fun buildQueryHandler(
@@ -105,8 +164,6 @@ class NewPipeMediaRepository : MediaRepository {
         return try {
             val ytFactory = service.searchQHFactory as? YoutubeSearchQueryHandlerFactory
             if (ytFactory != null) {
-                // Restrict to videos only so the category tabs show actual videos
-                // instead of channels and playlists.
                 ytFactory.fromQuery(query, listOf(YoutubeSearchQueryHandlerFactory.VIDEOS), null)
             } else {
                 service.searchQHFactory.fromQuery(query)
@@ -116,16 +173,28 @@ class NewPipeMediaRepository : MediaRepository {
         }
     }
 
-    private fun StreamInfoItem.toMediaItem(): MediaItem = MediaItem(
-        url = url,
-        title = name,
-        uploaderName = uploaderName,
-        thumbnailUrl = thumbnails.maxByOrNull { it.width }?.url
-            ?: thumbnails.firstOrNull()?.url ?: "",
-        durationText = formatDuration(duration),
-        isLive = false,
-        viewCount = viewCount
-    )
+    private fun InfoItem.toMediaItem(): MediaItem? = when (this) {
+        is StreamInfoItem -> MediaItem(
+            url = url,
+            title = name,
+            uploaderName = uploaderName,
+            thumbnailUrl = thumbnails.maxByOrNull { it.width }?.url
+                ?: thumbnails.firstOrNull()?.url ?: "",
+            durationText = formatDuration(duration),
+            isLive = false,
+            viewCount = viewCount
+        )
+        is ChannelInfoItem -> MediaItem(
+            url = url,
+            title = name,
+            uploaderName = "Channel • ${subscriberCount} subs",
+            thumbnailUrl = thumbnails.maxByOrNull { it.width }?.url
+                ?: thumbnails.firstOrNull()?.url ?: "",
+            durationText = "",
+            isLive = false
+        )
+        else -> null
+    }
 
     private fun formatDuration(seconds: Long): String {
         if (seconds <= 0) return ""

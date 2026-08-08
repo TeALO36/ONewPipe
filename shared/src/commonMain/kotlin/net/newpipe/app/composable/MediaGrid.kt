@@ -11,6 +11,7 @@ import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.grid.GridCells
 import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
 import androidx.compose.foundation.lazy.grid.items
+import androidx.compose.foundation.lazy.grid.rememberLazyGridState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.PlayArrow
@@ -34,9 +35,11 @@ import coil3.compose.AsyncImage
 fun MediaGrid(
     items: List<MediaItem>,
     isLoading: Boolean = false,
+    isLoadingMore: Boolean = false,
     errorMessage: String? = null,
     onMediaClick: (MediaItem) -> Unit = {},
     onDownloadClick: (MediaItem) -> Unit = {},
+    onLoadMore: () -> Unit = {},
     modifier: Modifier = Modifier
 ) {
     if (isLoading) {
@@ -55,16 +58,29 @@ fun MediaGrid(
         return
     }
 
+    val gridState = rememberLazyGridState()
+
+    // Detect when the user scrolls near the bottom and trigger loadMore
+    LaunchedEffect(gridState, items.size) {
+        snapshotFlow {
+            val lastVisibleItem = gridState.layoutInfo.visibleItemsInfo.lastOrNull()?.index ?: 0
+            val totalItems = gridState.layoutInfo.totalItemsCount
+            lastVisibleItem >= totalItems - 6 // Trigger when 6 items from the end
+        }.collect { shouldLoad ->
+            if (shouldLoad && items.isNotEmpty()) {
+                onLoadMore()
+            }
+        }
+    }
+
     LazyVerticalGrid(
+        state = gridState,
         columns = GridCells.Adaptive(minSize = 280.dp),
         contentPadding = PaddingValues(24.dp),
         horizontalArrangement = Arrangement.spacedBy(24.dp),
         verticalArrangement = Arrangement.spacedBy(24.dp),
         modifier = modifier.fillMaxSize()
     ) {
-        // NOTE: no per-item entrance animation here — animating lazy items on scroll
-        // re-triggers on every item entering the viewport and causes visible flicker.
-        // The whole grid is animated once by the Crossfade in HomeContent instead.
         items(items, key = { it.url }) { media ->
             MediaCard(
                 media = media,
@@ -72,11 +88,29 @@ fun MediaGrid(
                 onDownloadClick = { onDownloadClick(media) }
             )
         }
+
+        // Loading more indicator at the bottom
+        if (isLoadingMore) {
+            item {
+                Box(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(16.dp),
+                    contentAlignment = Alignment.Center
+                ) {
+                    CircularProgressIndicator(
+                        modifier = Modifier.size(32.dp),
+                        color = MaterialTheme.colorScheme.primary,
+                        strokeWidth = 3.dp
+                    )
+                }
+            }
+        }
     }
 }
 
 @Composable
-fun MediaCard(media: MediaItem, onClick: () -> Unit = {}, onDownloadClick: (MediaItem) -> Unit = {}) {
+fun MediaCard(media: MediaItem, onClick: () -> Unit = {}, onDownloadClick: () -> Unit = {}) {
     val interactionSource = remember { MutableInteractionSource() }
     val isHovered by interactionSource.collectIsHoveredAsState()
     val isPressed by interactionSource.collectIsPressedAsState()
@@ -189,7 +223,7 @@ fun MediaCard(media: MediaItem, onClick: () -> Unit = {}, onDownloadClick: (Medi
                     }
 
                     IconButton(
-                        onClick = { onDownloadClick(media) },
+                        onClick = { onDownloadClick() },
                         modifier = Modifier.size(32.dp)
                     ) {
                         Icon(

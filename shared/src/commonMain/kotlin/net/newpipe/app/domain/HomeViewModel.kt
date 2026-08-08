@@ -25,6 +25,12 @@ class HomeViewModel(
     private val _selectedCategory = MutableStateFlow(TrendingCategory.ALL)
     val selectedCategory: StateFlow<TrendingCategory> = _selectedCategory.asStateFlow()
 
+    // Pagination state
+    private var currentPageToken: String? = null
+    private var currentItems = mutableListOf<MediaItem>()
+    private var _isLoadingMore = false
+    val isLoadingMore: Boolean get() = _isLoadingMore
+
     private var currentServiceId: Int = Service.YOUTUBE.serviceId
     private var currentQuery: String? = null
 
@@ -45,10 +51,30 @@ class HomeViewModel(
     }
 
     fun reload() {
+        currentItems.clear()
+        currentPageToken = null
         if (currentQuery.isNullOrBlank()) {
             loadTrending()
         } else {
             search(currentQuery!!)
+        }
+    }
+
+    /** Load the next page when the user scrolls to the bottom of the grid. */
+    fun loadMore() {
+        if (isLoadingMore || currentPageToken == null) return
+        _isLoadingMore = true
+        viewModelScope.launch {
+            try {
+                val result = repository.loadMore(currentServiceId, currentPageToken!!)
+                currentPageToken = result.nextPageToken
+                currentItems.addAll(result.items)
+                _state.value = HomeState.Success(currentItems.toList())
+            } catch (e: Exception) {
+                // Silently ignore pagination errors — the user already sees the first page
+            } finally {
+                _isLoadingMore = false
+            }
         }
     }
 
@@ -57,11 +83,14 @@ class HomeViewModel(
         viewModelScope.launch {
             _state.value = HomeState.Loading
             try {
-                val items = repository.getTrending(currentServiceId, category)
-                if (items.isEmpty()) {
+                val result = repository.getTrending(currentServiceId, category)
+                currentItems.clear()
+                currentItems.addAll(result.items)
+                currentPageToken = result.nextPageToken
+                if (currentItems.isEmpty()) {
                     _state.value = HomeState.Error("No trending items found")
                 } else {
-                    _state.value = HomeState.Success(items)
+                    _state.value = HomeState.Success(currentItems.toList())
                 }
             } catch (e: Exception) {
                 _state.value = HomeState.Error(e.message ?: "Unknown error")
@@ -78,11 +107,14 @@ class HomeViewModel(
         viewModelScope.launch {
             _state.value = HomeState.Loading
             try {
-                val items = repository.search(currentServiceId, query)
-                if (items.isEmpty()) {
+                val result = repository.search(currentServiceId, query)
+                currentItems.clear()
+                currentItems.addAll(result.items)
+                currentPageToken = result.nextPageToken
+                if (currentItems.isEmpty()) {
                     _state.value = HomeState.Error("No results found for '$query'")
                 } else {
-                    _state.value = HomeState.Success(items)
+                    _state.value = HomeState.Success(currentItems.toList())
                 }
             } catch (e: Exception) {
                 _state.value = HomeState.Error(e.message ?: "Unknown error")

@@ -10,6 +10,12 @@ data class MediaItem(
     val viewCount: Long = 0
 )
 
+/** Paginated result from the repository. */
+data class PageResult(
+    val items: List<MediaItem>,
+    val nextPageToken: String? = null
+)
+
 /**
  * Trending categories shown on the home screen.
  *
@@ -31,10 +37,15 @@ enum class TrendingCategory(
 
 interface MediaRepository {
     /**
-     * Returns trending items for the given service, scoped to [category].
-     * Implementations should try the service's official trending/kiosk feed first
-     * and gracefully fall back to a search query when the kiosk is unavailable.
+     * Returns the first page of trending items for the given service, scoped
+     * to [category]. Implementations should try the service's official
+     * trending/kiosk feed first and gracefully fall back to a search query.
      */
-    suspend fun getTrending(serviceId: Int, category: TrendingCategory): List<MediaItem>
-    suspend fun search(serviceId: Int, query: String): List<MediaItem>
+    suspend fun getTrending(serviceId: Int, category: TrendingCategory): PageResult
+
+    /** Returns the first page of search results for the given query. */
+    suspend fun search(serviceId: Int, query: String): PageResult
+
+    /** Returns the next page using a token obtained from a previous [PageResult]. */
+    suspend fun loadMore(serviceId: Int, pageToken: String): PageResult
 }

@@ -67,6 +67,8 @@ fun HomeContent(
     onCategorySelected: (TrendingCategory) -> Unit,
     onMediaClick: (MediaItem) -> Unit,
     onDownloadClick: (MediaItem) -> Unit,
+    onLoadMore: () -> Unit = {},
+    isLoadingMore: Boolean = false,
     modifier: Modifier = Modifier
 ) {
     Column(modifier = modifier.fillMaxSize()) {
@@ -153,8 +155,10 @@ fun HomeContent(
                             is HomeState.Success -> {
                                 MediaGrid(
                                     items = state.items,
+                                    isLoadingMore = isLoadingMore,
                                     onMediaClick = onMediaClick,
                                     onDownloadClick = onDownloadClick,
+                                    onLoadMore = onLoadMore,
                                     modifier = Modifier.weight(1f)
                                 )
                             }
@@ -180,8 +184,10 @@ fun HomeContent(
                             is HomeState.Success -> {
                                 MediaGrid(
                                     items = state.items,
+                                    isLoadingMore = isLoadingMore,
                                     onMediaClick = onMediaClick,
                                     onDownloadClick = onDownloadClick,
+                                    onLoadMore = onLoadMore,
                                     modifier = Modifier.weight(1f)
                                 )
                             }

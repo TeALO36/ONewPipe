@@ -166,18 +166,20 @@ fun PlayerOverlay(
                                     }
                                 }
 
-                                // Fullscreen Toggle Button (real Material icon, not text)
+                                // Fullscreen Toggle Button — prominent, always visible
                                 IconButton(
                                     onClick = { isFullscreen = !isFullscreen },
                                     modifier = Modifier
                                         .align(Alignment.TopEnd)
-                                        .padding(16.dp)
-                                        .background(Color.Black.copy(alpha = 0.5f), shape = CircleShape)
+                                        .padding(12.dp)
+                                        .background(Color.Black.copy(alpha = 0.6f), shape = CircleShape)
+                                        .padding(4.dp)
                                 ) {
                                     Icon(
                                         imageVector = if (isFullscreen) Icons.Filled.FullscreenExit else Icons.Filled.Fullscreen,
                                         contentDescription = if (isFullscreen) "Exit fullscreen" else "Fullscreen",
-                                        tint = Color.White
+                                        tint = Color.White,
+                                        modifier = Modifier.padding(4.dp)
                                     )
                                 }
                             }

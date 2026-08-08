@@ -31,25 +31,25 @@ class NewPipeMediaRepositoryTest {
 
     @Test
     fun `all category returns items via fallback`() = runBlocking {
-        val items = repository().getTrending(0, TrendingCategory.ALL)
-        assertTrue(items.isNotEmpty(), "Expected trending items for 'All' category")
-        println("All: got ${items.size} items")
-        items.take(3).forEach { println("  - ${it.title} [${it.uploaderName}]") }
+        val result = repository().getTrending(0, TrendingCategory.ALL)
+        assertTrue(result.items.isNotEmpty(), "Expected trending items for 'All' category")
+        println("All: got ${result.items.size} items, hasMore=${result.nextPageToken != null}")
+        result.items.take(3).forEach { println("  - ${it.title} [${it.uploaderName}]") }
     }
 
     @Test
     fun `gaming category returns items`() = runBlocking {
-        val items = repository().getTrending(0, TrendingCategory.GAMING)
-        assertTrue(items.isNotEmpty(), "Expected trending items for 'Gaming' category")
-        println("Gaming: got ${items.size} items")
-        items.take(3).forEach { println("  - ${it.title} [${it.uploaderName}]") }
+        val result = repository().getTrending(0, TrendingCategory.GAMING)
+        assertTrue(result.items.isNotEmpty(), "Expected trending items for 'Gaming' category")
+        println("Gaming: got ${result.items.size} items, hasMore=${result.nextPageToken != null}")
+        result.items.take(3).forEach { println("  - ${it.title} [${it.uploaderName}]") }
     }
 
     @Test
     fun `search returns items`() = runBlocking {
-        val items = repository().search(0, "Linus Tech Tips")
-        assertTrue(items.isNotEmpty(), "Expected search results")
-        println("Search: got ${items.size} items")
-        items.take(3).forEach { println("  - ${it.title} [${it.uploaderName}]") }
+        val result = repository().search(0, "Linus Tech Tips")
+        assertTrue(result.items.isNotEmpty(), "Expected search results")
+        println("Search: got ${result.items.size} items, hasMore=${result.nextPageToken != null}")
+        result.items.take(3).forEach { println("  - ${it.title} [${it.uploaderName}]") }
     }
 }

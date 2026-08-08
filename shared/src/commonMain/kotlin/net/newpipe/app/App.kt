@@ -98,6 +98,8 @@ fun App(startDestination: Screen? = null) {
                         onCategorySelected = homeViewModel::selectCategory,
                         onMediaClick = { media -> playerViewModel.loadVideo(media.url, media.title) },
                         onDownloadClick = { media -> downloadViewModel.loadStreams(media.url, media.title) },
+                        onLoadMore = homeViewModel::loadMore,
+                        isLoadingMore = homeViewModel.isLoadingMore,
                         modifier = Modifier.weight(1f)
                     )
                 }

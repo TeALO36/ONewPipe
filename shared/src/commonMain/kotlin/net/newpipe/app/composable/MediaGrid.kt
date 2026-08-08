@@ -40,9 +40,7 @@ fun MediaGrid(
     modifier: Modifier = Modifier
 ) {
     if (isLoading) {
-        Box(modifier = modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
-            CircularProgressIndicator(color = currentServiceScheme().primary)
-        }
+        MediaGridSkeleton(modifier = modifier.fillMaxSize())
         return
     }
 

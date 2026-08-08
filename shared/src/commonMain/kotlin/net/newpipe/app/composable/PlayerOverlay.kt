@@ -21,7 +21,6 @@ import androidx.compose.material.icons.filled.ArrowBack
 import androidx.compose.material.icons.filled.Fullscreen
 import androidx.compose.material.icons.filled.FullscreenExit
 import androidx.compose.material3.Button
-import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.Divider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
@@ -63,18 +62,8 @@ fun PlayerOverlay(
         ) { state ->
         when (state) {
             is PlayerState.Loading -> {
-                Column(
-                    modifier = Modifier.align(Alignment.Center),
-                    horizontalAlignment = Alignment.CenterHorizontally
-                ) {
-                    CircularProgressIndicator()
-                    Spacer(modifier = Modifier.height(16.dp))
-                    Text(
-                        text = "Loading video…",
-                        color = Color.White,
-                        style = MaterialTheme.typography.bodyLarge
-                    )
-                }
+                // YouTube-style skeleton while the stream is being extracted.
+                PlayerSkeleton(modifier = Modifier.fillMaxSize())
             }
             is PlayerState.Playing -> {
                 var isFullscreen by remember { mutableStateOf(false) }

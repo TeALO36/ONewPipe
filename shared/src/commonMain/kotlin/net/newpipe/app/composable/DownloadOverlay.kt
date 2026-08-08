@@ -38,11 +38,15 @@ fun DownloadOverlay(
         is DownloadState.Ready -> {
             DownloadDialog(
                 videoStreams = state.videoStreams,
+                videoOnlyStreams = state.videoOnlyStreams,
                 audioStreams = state.audioStreams,
                 title = state.title,
                 onDismiss = { downloadViewModel.dismiss() },
                 onDownloadVideo = { stream ->
-                    stream.url?.let { url ->
+                    // The actual media URL lives in `content`; `url` is often null
+                    // for direct streams, which silently skipped downloads before.
+                    val url = stream.content ?: stream.url
+                    if (url != null) {
                         val safeTitle = state.title.replace(Regex("[\\\\/:*?\"<>|]"), "_")
                         val ext = if (stream.format?.name?.contains("webm", ignoreCase = true) == true) {
                             ".webm"
@@ -54,7 +58,8 @@ fun DownloadOverlay(
                     downloadViewModel.dismiss()
                 },
                 onDownloadAudio = { stream ->
-                    stream.url?.let { url ->
+                    val url = stream.content ?: stream.url
+                    if (url != null) {
                         val safeTitle = state.title.replace(Regex("[\\\\/:*?\"<>|]"), "_")
                         val ext = when {
                             stream.format?.name?.contains("webm", ignoreCase = true) == true -> ".webm"

@@ -27,6 +27,9 @@ class ComposeActivity : ComponentActivity() {
         super.onCreate(savedInstanceState)
         try {
             NewPipe.init(OkHttpDownloader(OkHttpClient.Builder().build()))
+            // YouTube throttles the plain WEB client to ~360p; the iOS client returns
+            // the full format range (720p/1080p/4K + audio) without a poToken.
+            org.schabi.newpipe.extractor.services.youtube.extractors.YoutubeStreamExtractor.setFetchIosClient(true)
             net.newpipe.app.di.KoinApp.init {
                 androidContext(this@ComposeActivity)
             }

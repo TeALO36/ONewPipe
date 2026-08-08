@@ -10,13 +10,17 @@ import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import org.schabi.newpipe.extractor.NewPipe
 import org.schabi.newpipe.extractor.stream.AudioStream
+import org.schabi.newpipe.extractor.stream.StreamInfo
 import org.schabi.newpipe.extractor.stream.VideoStream
 
 sealed class DownloadState {
     object Idle : DownloadState()
     object Loading : DownloadState()
     data class Ready(
+        /** Mixed streams (video + audio in one file), e.g. 360p MPEG-4. */
         val videoStreams: List<VideoStream>,
+        /** Video-only streams (no audio), e.g. 1080p WebM — the high resolutions. */
+        val videoOnlyStreams: List<VideoStream>,
         val audioStreams: List<AudioStream>,
         val title: String
     ) : DownloadState()
@@ -31,13 +35,21 @@ class DownloadViewModel : ViewModel() {
         _state.value = DownloadState.Loading
         viewModelScope.launch {
             try {
-                val (videos, audios) = withContext(Dispatchers.IO) {
+                val (videos, videoOnly, audios) = withContext(Dispatchers.IO) {
                     val service = NewPipe.getServiceByUrl(url) ?: throw Exception("Service not found")
-                    val extractor = service.getStreamExtractor(url)
-                    extractor.fetchPage()
-                    Pair(extractor.videoStreams ?: emptyList(), extractor.audioStreams ?: emptyList())
+                    // StreamInfo (not the raw extractor) resolves all video/audio formats
+                    // with their real content URLs, including higher resolutions.
+                    val info = StreamInfo.getInfo(service, url)
+                    // Keep mixed and video-only streams separate: on YouTube the WEB
+                    // client only lists ~360p mixed; the higher resolutions
+                    // (720p/1080p/4K) are all video-only streams.
+                    Triple(
+                        info.videoStreams ?: emptyList(),
+                        info.videoOnlyStreams ?: emptyList(),
+                        info.audioStreams ?: emptyList()
+                    )
                 }
-                _state.value = DownloadState.Ready(videos, audios, title)
+                _state.value = DownloadState.Ready(videos, videoOnly, audios, title)
             } catch (e: Exception) {
                 _state.value = DownloadState.Error(e.message ?: "Failed to fetch download links")
             }

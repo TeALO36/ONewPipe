@@ -18,6 +18,8 @@ import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.ArrowBack
+import androidx.compose.material.icons.filled.Fullscreen
+import androidx.compose.material.icons.filled.FullscreenExit
 import androidx.compose.material3.Button
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.Divider
@@ -26,6 +28,7 @@ import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -48,6 +51,7 @@ fun PlayerOverlay(
     state: PlayerState,
     playerViewModel: PlayerViewModel,
     downloadViewModel: DownloadViewModel,
+    isCovered: Boolean = false,
     modifier: Modifier = Modifier
 ) {
     Box(modifier = modifier.fillMaxSize().background(Color.Black.copy(alpha = 0.9f))) {
@@ -59,11 +63,29 @@ fun PlayerOverlay(
         ) { state ->
         when (state) {
             is PlayerState.Loading -> {
-                CircularProgressIndicator(modifier = Modifier.align(Alignment.Center))
+                Column(
+                    modifier = Modifier.align(Alignment.Center),
+                    horizontalAlignment = Alignment.CenterHorizontally
+                ) {
+                    CircularProgressIndicator()
+                    Spacer(modifier = Modifier.height(16.dp))
+                    Text(
+                        text = "Loading video…",
+                        color = Color.White,
+                        style = MaterialTheme.typography.bodyLarge
+                    )
+                }
             }
             is PlayerState.Playing -> {
                 var isFullscreen by remember { mutableStateOf(false) }
                 val scrollState = rememberScrollState()
+
+                // When another overlay (e.g. the download dialog) is on top, the native
+                // AWT video surface would paint above it. Hide the video surface and
+                // remember the position so playback resumes where it left off.
+                LaunchedEffect(isCovered) {
+                    if (isCovered) playerViewModel.rememberPlaybackPosition()
+                }
 
                 BoxWithConstraints(modifier = Modifier.fillMaxSize().background(Color(0xFF121212))) {
                     val isWide = maxWidth > 1000.dp
@@ -108,15 +130,29 @@ fun PlayerOverlay(
                                 Modifier.fillMaxWidth().aspectRatio(16f / 9f)
                             }
                             Box(modifier = playerModifier.background(Color.Black)) {
-                                VideoPlayer(
-                                    modifier = Modifier.fillMaxSize(),
-                                    videoUrl = state.streamUrl,
-                                    startPositionMs = state.resumePositionMs,
-                                    onPlaybackEnded = { playerViewModel.stop() },
-                                    onPositionChange = { positionMs -> playerViewModel.onPositionUpdate(positionMs, 0L) }
-                                )
+                                if (!isCovered) {
+                                    VideoPlayer(
+                                        modifier = Modifier.fillMaxSize(),
+                                        videoUrl = state.streamUrl,
+                                        startPositionMs = state.resumePositionMs,
+                                        onPlaybackEnded = { playerViewModel.stop() },
+                                        onPositionChange = { positionMs -> playerViewModel.onPositionUpdate(positionMs, 0L) }
+                                    )
+                                } else {
+                                    // Placeholder while the download dialog is open
+                                    Box(
+                                        modifier = Modifier.fillMaxSize(),
+                                        contentAlignment = Alignment.Center
+                                    ) {
+                                        Text(
+                                            text = "Download in progress…",
+                                            color = Color.Gray,
+                                            style = MaterialTheme.typography.titleMedium
+                                        )
+                                    }
+                                }
 
-                                // Fullscreen Toggle Button
+                                // Fullscreen Toggle Button (real Material icon, not text)
                                 IconButton(
                                     onClick = { isFullscreen = !isFullscreen },
                                     modifier = Modifier
@@ -124,10 +160,10 @@ fun PlayerOverlay(
                                         .padding(16.dp)
                                         .background(Color.Black.copy(alpha = 0.5f), shape = CircleShape)
                                 ) {
-                                    Text(
-                                        text = if (isFullscreen) "><" else "[ ]",
-                                        color = Color.White,
-                                        style = MaterialTheme.typography.titleMedium.copy(fontWeight = FontWeight.Bold)
+                                    Icon(
+                                        imageVector = if (isFullscreen) Icons.Filled.FullscreenExit else Icons.Filled.Fullscreen,
+                                        contentDescription = if (isFullscreen) "Exit fullscreen" else "Fullscreen",
+                                        tint = Color.White
                                     )
                                 }
                             }

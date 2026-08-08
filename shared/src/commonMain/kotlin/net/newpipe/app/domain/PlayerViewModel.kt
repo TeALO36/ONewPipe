@@ -90,11 +90,27 @@ class PlayerViewModel(
         if (durationMs > 0) lastDurationMs = durationMs
     }
 
+    /**
+     * Remember the current play position so the video resumes from here when its
+     * surface is hidden (e.g. while a download dialog is on top) and re-shown.
+     */
+    fun rememberPlaybackPosition() {
+        val current = _state.value
+        if (current is PlayerState.Playing && lastPositionMs > 0) {
+            _state.value = current.copy(resumePositionMs = lastPositionMs)
+        }
+    }
+
     private fun setInitialQuality(info: StreamInfo, resumePositionMs: Long) {
-        val videoStreams = info.videoStreams ?: emptyList()
+        // Prefer the highest-resolution mixed stream (video + audio in one URL):
+        // video-only streams (720p/1080p/4K) have no audio track, so they are
+        // only offered for downloads, not for direct playback.
+        val videoStreams = (info.videoStreams ?: emptyList())
+            .filter { !it.content.isNullOrEmpty() }
+            .sortedByDescending { resolutionHeight(it.resolution) }
         val audioStreams = info.audioStreams ?: emptyList()
         
-        val streamToPlay = videoStreams.firstOrNull { !it.content.isNullOrEmpty() }
+        val streamToPlay = videoStreams.firstOrNull()
                 ?: audioStreams.firstOrNull { !it.content.isNullOrEmpty() }
             
         val finalUrl = streamToPlay?.content ?: throw Exception("No stream found")
@@ -124,6 +140,10 @@ class PlayerViewModel(
             pushPosition()
         }
     }
+
+    /** Parse "1080p60" / "720p" into a comparable height; 0 when unknown. */
+    private fun resolutionHeight(resolution: String): Int =
+        resolution.filter { it.isDigit() }.toIntOrNull() ?: 0
 
     /** Push the last known play position to the server (no-op when not connected). */
     private fun pushPosition() {

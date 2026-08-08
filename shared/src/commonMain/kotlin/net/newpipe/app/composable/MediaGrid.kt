@@ -1,11 +1,7 @@
 package net.newpipe.app.composable
 
-import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.core.animateDpAsState
 import androidx.compose.animation.core.animateFloatAsState
-import androidx.compose.animation.core.tween
-import androidx.compose.animation.fadeIn
-import androidx.compose.animation.scaleIn
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.interaction.MutableInteractionSource
@@ -14,7 +10,7 @@ import androidx.compose.foundation.interaction.collectIsPressedAsState
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.grid.GridCells
 import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
-import androidx.compose.foundation.lazy.grid.itemsIndexed
+import androidx.compose.foundation.lazy.grid.items
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.PlayArrow
@@ -68,25 +64,15 @@ fun MediaGrid(
         verticalArrangement = Arrangement.spacedBy(24.dp),
         modifier = modifier.fillMaxSize()
     ) {
-        itemsIndexed(items, key = { _, media -> media.url }) { index, media ->
-            var visible by remember { mutableStateOf(false) }
-            LaunchedEffect(Unit) { visible = true }
-            AnimatedVisibility(
-                visible = visible,
-                // Staggered entrance: each card fades/scales in slightly after the previous one.
-                enter = fadeIn(
-                    animationSpec = tween(320, delayMillis = (index.coerceAtMost(14) * 35))
-                ) + scaleIn(
-                    initialScale = 0.96f,
-                    animationSpec = tween(320, delayMillis = (index.coerceAtMost(14) * 35))
-                )
-            ) {
-                MediaCard(
-                    media = media,
-                    onClick = { onMediaClick(media) },
-                    onDownloadClick = { onDownloadClick(media) }
-                )
-            }
+        // NOTE: no per-item entrance animation here — animating lazy items on scroll
+        // re-triggers on every item entering the viewport and causes visible flicker.
+        // The whole grid is animated once by the Crossfade in HomeContent instead.
+        items(items, key = { it.url }) { media ->
+            MediaCard(
+                media = media,
+                onClick = { onMediaClick(media) },
+                onDownloadClick = { onDownloadClick(media) }
+            )
         }
     }
 }

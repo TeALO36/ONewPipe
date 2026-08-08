@@ -34,6 +34,7 @@ import net.newpipe.app.domain.PlayerViewModel
 import net.newpipe.app.domain.ServerStatus
 import net.newpipe.app.domain.SettingsViewModel
 import net.newpipe.app.domain.SyncViewModel
+import net.newpipe.app.domain.TrendingCategory
 import net.newpipe.app.navigation.Screen
 import net.newpipe.app.theme.AppTheme
 import org.koin.compose.viewmodel.koinViewModel
@@ -74,7 +75,13 @@ fun App(startDestination: Screen? = null) {
                     // Left Sidebar
                     Sidebar(
                         selectedItem = selectedItem,
-                        onItemSelected = { selectedItem = it },
+                        onItemSelected = {
+                            selectedItem = it
+                            // Trending shows the plain feed: drop any category filter
+                            if (it == NavItem.TRENDING) {
+                                homeViewModel.selectCategory(TrendingCategory.ALL)
+                            }
+                        },
                         onServiceSelected = { settingsViewModel.setService(it) },
                         serverConnected = serverStatus is ServerStatus.Connected,
                         onServerClick = { showServerDialog = true }
@@ -106,7 +113,10 @@ fun App(startDestination: Screen? = null) {
                     PlayerOverlay(
                         state = playerState,
                         playerViewModel = playerViewModel,
-                        downloadViewModel = downloadViewModel
+                        downloadViewModel = downloadViewModel,
+                        // Hide the native video surface while the download dialog is open
+                        // so the dialog always paints on top of everything.
+                        isCovered = downloadState !is DownloadState.Idle
                     )
                 }
 

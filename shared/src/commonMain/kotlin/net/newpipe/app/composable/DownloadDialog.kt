@@ -19,6 +19,7 @@ import androidx.compose.ui.window.Dialog
 @Composable
 fun DownloadDialog(
     videoStreams: List<VideoStream>,
+    videoOnlyStreams: List<VideoStream>,
     audioStreams: List<AudioStream>,
     title: String,
     onDismiss: () -> Unit,
@@ -30,49 +31,53 @@ fun DownloadDialog(
             shape = androidx.compose.foundation.shape.RoundedCornerShape(12.dp),
             color = MaterialTheme.colorScheme.surface,
             tonalElevation = 8.dp,
-            modifier = Modifier.padding(16.dp).widthIn(max = 400.dp)
+            modifier = Modifier.padding(16.dp).widthIn(max = 420.dp)
         ) {
             Column(modifier = Modifier.padding(24.dp)) {
                 Text(text = "Download: $title", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold)
                 Spacer(modifier = Modifier.height(16.dp))
                 
                 Column(modifier = Modifier.fillMaxWidth().heightIn(max = 400.dp)) {
-                    Text("Video Formats", style = MaterialTheme.typography.titleSmall, color = MaterialTheme.colorScheme.primary)
-                    Spacer(modifier = Modifier.height(8.dp))
-                    LazyColumn(modifier = Modifier.weight(1f)) {
-                        items(videoStreams) { stream ->
-                            val res = stream.resolution
-                            val format = stream.format?.name ?: "Unknown"
-                            Row(
-                                modifier = Modifier
-                                    .fillMaxWidth()
-                                    .clickable { onDownloadVideo(stream) }
-                                    .padding(vertical = 8.dp),
-                                horizontalArrangement = Arrangement.SpaceBetween
-                            ) {
-                                Text("$res - $format")
-                                Text("Download", color = MaterialTheme.colorScheme.secondary)
+                    if (videoStreams.isNotEmpty()) {
+                        Text("Video (with audio)", style = MaterialTheme.typography.titleSmall, color = MaterialTheme.colorScheme.primary)
+                        Spacer(modifier = Modifier.height(8.dp))
+                        LazyColumn(modifier = Modifier.weight(1f)) {
+                            items(videoStreams) { stream ->
+                                FormatRow(
+                                    label = "${stream.resolution} - ${stream.format?.name}",
+                                    hint = "Ready to play",
+                                    onClick = { onDownloadVideo(stream) }
+                                )
                             }
                         }
+                        Spacer(modifier = Modifier.height(16.dp))
                     }
                     
-                    Spacer(modifier = Modifier.height(16.dp))
+                    if (videoOnlyStreams.isNotEmpty()) {
+                        Text("Video only (no audio)", style = MaterialTheme.typography.titleSmall, color = MaterialTheme.colorScheme.primary)
+                        Spacer(modifier = Modifier.height(8.dp))
+                        LazyColumn(modifier = Modifier.weight(1f)) {
+                            items(videoOnlyStreams) { stream ->
+                                FormatRow(
+                                    label = "${stream.resolution} - ${stream.format?.name}",
+                                    hint = "Combine with an audio track below",
+                                    onClick = { onDownloadVideo(stream) }
+                                )
+                            }
+                        }
+                        Spacer(modifier = Modifier.height(16.dp))
+                    }
                     
-                    Text("Audio Formats", style = MaterialTheme.typography.titleSmall, color = MaterialTheme.colorScheme.primary)
-                    Spacer(modifier = Modifier.height(8.dp))
-                    LazyColumn(modifier = Modifier.weight(1f)) {
-                        items(audioStreams) { stream ->
-                            val kbps = stream.averageBitrate
-                            val format = stream.format?.name ?: "Unknown"
-                            Row(
-                                modifier = Modifier
-                                    .fillMaxWidth()
-                                    .clickable { onDownloadAudio(stream) }
-                                    .padding(vertical = 8.dp),
-                                horizontalArrangement = Arrangement.SpaceBetween
-                            ) {
-                                Text("${kbps}kbps - $format")
-                                Text("Download", color = MaterialTheme.colorScheme.secondary)
+                    if (audioStreams.isNotEmpty()) {
+                        Text("Audio", style = MaterialTheme.typography.titleSmall, color = MaterialTheme.colorScheme.primary)
+                        Spacer(modifier = Modifier.height(8.dp))
+                        LazyColumn(modifier = Modifier.weight(1f)) {
+                            items(audioStreams) { stream ->
+                                FormatRow(
+                                    label = "${stream.averageBitrate}kbps - ${stream.format?.name}",
+                                    hint = "Audio only",
+                                    onClick = { onDownloadAudio(stream) }
+                                )
                             }
                         }
                     }
@@ -87,5 +92,27 @@ fun DownloadDialog(
                 }
             }
         }
+    }
+}
+
+@Composable
+private fun FormatRow(
+    label: String,
+    hint: String,
+    onClick: () -> Unit
+) {
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .clickable { onClick() }
+            .padding(vertical = 8.dp),
+        horizontalArrangement = Arrangement.SpaceBetween,
+        verticalAlignment = Alignment.CenterVertically
+    ) {
+        Column {
+            Text(label)
+            Text(hint, style = MaterialTheme.typography.bodySmall, color = Color.Gray)
+        }
+        Text("Download", color = MaterialTheme.colorScheme.secondary)
     }
 }

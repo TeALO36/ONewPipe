@@ -2,6 +2,10 @@ package net.newpipe.app.composable
 
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.Pause
+import androidx.compose.material.icons.filled.PlayArrow
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
@@ -124,11 +128,23 @@ actual fun VideoPlayer(
             modifier = Modifier.fillMaxWidth().height(60.dp).padding(horizontal = 16.dp),
             verticalAlignment = Alignment.CenterVertically
         ) {
-            IconButton(onClick = {
-                val player = mediaPlayerComponent.mediaPlayer()
-                if (player.status().isPlaying) player.controls().pause() else player.controls().play()
-            }) {
-                Text(if (isPlaying) "⏸" else "▶", color = Color.White, style = MaterialTheme.typography.titleLarge)
+            // Proper media button (YouTube-style): a translucent circle with a real
+            // Material vector icon — never a text emoji.
+            IconButton(
+                onClick = {
+                    val player = mediaPlayerComponent.mediaPlayer()
+                    if (player.status().isPlaying) player.controls().pause() else player.controls().play()
+                },
+                modifier = Modifier
+                    .size(44.dp)
+                    .background(Color.White.copy(alpha = 0.14f), CircleShape)
+            ) {
+                Icon(
+                    imageVector = if (isPlaying) Icons.Filled.Pause else Icons.Filled.PlayArrow,
+                    contentDescription = if (isPlaying) "Pause" else "Play",
+                    tint = Color.White,
+                    modifier = Modifier.size(28.dp)
+                )
             }
             
             Text(currentTime, color = Color.White, modifier = Modifier.padding(horizontal = 8.dp))

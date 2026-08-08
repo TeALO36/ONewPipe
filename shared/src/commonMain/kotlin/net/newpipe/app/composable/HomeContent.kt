@@ -117,8 +117,8 @@ fun HomeContent(
             label = "section"
         ) { item ->
             when (item) {
-                NavItem.HOME, NavItem.TRENDING -> {
-                    // Trending Category Tabs
+                NavItem.HOME -> {
+                    // Trending Category Tabs (Home only — Trending is the plain feed)
                     Row(
                         modifier = Modifier
                             .fillMaxWidth()
@@ -145,6 +145,33 @@ fun HomeContent(
                         targetState = homeState,
                         animationSpec = tween(250),
                         label = "homeState"
+                    ) { state ->
+                        when (state) {
+                            is HomeState.Loading -> {
+                                MediaGrid(items = emptyList(), isLoading = true, modifier = Modifier.weight(1f))
+                            }
+                            is HomeState.Success -> {
+                                MediaGrid(
+                                    items = state.items,
+                                    onMediaClick = onMediaClick,
+                                    onDownloadClick = onDownloadClick,
+                                    modifier = Modifier.weight(1f)
+                                )
+                            }
+                            is HomeState.Error -> {
+                                MediaGrid(items = emptyList(), errorMessage = state.message, modifier = Modifier.weight(1f))
+                            }
+                        }
+                    }
+                }
+                NavItem.TRENDING -> {
+                    // Pure trending feed, no category chips — visually distinct from Home
+                    Spacer(modifier = Modifier.height(12.dp))
+
+                    Crossfade(
+                        targetState = homeState,
+                        animationSpec = tween(250),
+                        label = "trendingState"
                     ) { state ->
                         when (state) {
                             is HomeState.Loading -> {

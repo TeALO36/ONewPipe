@@ -25,7 +25,8 @@ actual fun VideoPlayer(
     videoUrl: String,
     startPositionMs: Long,
     onPlaybackEnded: () -> Unit,
-    onPositionChange: (Long) -> Unit
+    onPositionChange: (Long) -> Unit,
+    playerActions: PlayerActions
 ) {
     val mediaPlayerComponent = remember { CallbackMediaPlayerComponent() }
     var isPlaying by remember { mutableStateOf(false) }
@@ -65,6 +66,38 @@ actual fun VideoPlayer(
             }
         })
 
+        // Wire the shared player actions (keyboard shortcuts, click-to-toggle)
+        // to this player instance while this video is attached.
+        playerActions.togglePlayPause = {
+            safe { if (player.status().isPlaying) player.controls().pause() else player.controls().play() }
+        }
+        playerActions.seekBy = { seconds ->
+            safe {
+                val length = player.status().length()
+                if (length > 0) {
+                    val target = (player.status().time() + seconds * 1000).coerceIn(0L, length)
+                    player.controls().setTime(target)
+                }
+            }
+        }
+        playerActions.seekToFraction = { fraction ->
+            safe {
+                val length = player.status().length()
+                if (length > 0) {
+                    player.controls().setTime((fraction * length).toLong().coerceIn(0L, length))
+                }
+            }
+        }
+        playerActions.adjustVolume = { delta ->
+            safe {
+                val current = player.audio().volume()
+                player.audio().setVolume((current + delta).coerceIn(0, 100))
+            }
+        }
+        playerActions.toggleMute = {
+            safe { player.audio().setMute(!player.audio().isMute) }
+        }
+
         safe { player.media().play(videoUrl) }
 
         val job = coroutineScope.launch {
@@ -94,10 +127,33 @@ actual fun VideoPlayer(
 
         onDispose {
             job.cancel()
+            // Unwire the shared actions so a stale video never controls the UI.
+            playerActions.togglePlayPause = {}
+            playerActions.seekBy = {}
+            playerActions.seekToFraction = {}
+            playerActions.adjustVolume = {}
+            playerActions.toggleMute = {}
             // Only stop playback here: the player is deliberately NOT released so that
             // switching videos (or quality) can reuse the same native player instance.
             safe { player.controls().stop() }
         }
+    }
+
+    // Click on the video toggles play/pause, double-click toggles fullscreen
+    // (YouTube behaviour). The native surface is an AWT component, so the
+    // listener goes directly on it.
+    DisposableEffect(Unit) {
+        val mouseListener = object : java.awt.event.MouseAdapter() {
+            override fun mouseClicked(e: java.awt.event.MouseEvent) {
+                if (e.clickCount >= 2) {
+                    playerActions.toggleFullscreen()
+                } else if (e.clickCount == 1) {
+                    playerActions.togglePlayPause()
+                }
+            }
+        }
+        mediaPlayerComponent.addMouseListener(mouseListener)
+        onDispose { mediaPlayerComponent.removeMouseListener(mouseListener) }
     }
 
     // Release the native player once, when this composable leaves composition for good.

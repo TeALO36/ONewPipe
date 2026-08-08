@@ -19,6 +19,9 @@ import net.newpipe.app.di.KoinApp
  */
 fun main() {
     NewPipe.init(OkHttpDownloader(OkHttpClient.Builder().build()), org.schabi.newpipe.extractor.localization.Localization("en", "US"))
+    // Geo-localize trending and search (YouTube gl/hl params) from the system
+    // locale, so a French user gets French content instead of US content.
+    net.newpipe.app.backend.applySystemGeoLocalization()
     // YouTube throttles the plain WEB client to ~360p; the iOS client returns
     // the full format range (720p/1080p/4K + audio) without a poToken.
     org.schabi.newpipe.extractor.services.youtube.extractors.YoutubeStreamExtractor.setFetchIosClient(true)

@@ -35,6 +35,15 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.input.key.Key
+import androidx.compose.ui.input.key.KeyEvent
+import androidx.compose.ui.input.key.KeyEventType
+import androidx.compose.ui.input.key.isAltPressed
+import androidx.compose.ui.input.key.isCtrlPressed
+import androidx.compose.ui.input.key.isMetaPressed
+import androidx.compose.ui.input.key.key
+import androidx.compose.ui.input.key.onPreviewKeyEvent
+import androidx.compose.ui.input.key.type
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import net.newpipe.app.domain.DownloadViewModel
@@ -53,7 +62,18 @@ fun PlayerOverlay(
     isCovered: Boolean = false,
     modifier: Modifier = Modifier
 ) {
-    Box(modifier = modifier.fillMaxSize().background(Color.Black.copy(alpha = 0.9f))) {
+    // Shared bridge between the UI (keyboard shortcuts, double-click, the
+    // fullscreen button) and the platform video player.
+    val playerActions = remember { PlayerActions() }
+
+    Box(
+        modifier = modifier
+            .fillMaxSize()
+            .background(Color.Black.copy(alpha = 0.9f))
+            .onPreviewKeyEvent { event ->
+                if (state is PlayerState.Playing) handlePlayerKey(event, playerActions) else false
+            }
+    ) {
         // Smooth crossfade between loading / playing / error states
         Crossfade(
             targetState = state,
@@ -68,6 +88,10 @@ fun PlayerOverlay(
             is PlayerState.Playing -> {
                 var isFullscreen by remember { mutableStateOf(false) }
                 val scrollState = rememberScrollState()
+
+                // Wire the shared fullscreen action (double-click / F key) to
+                // this branch's fullscreen state.
+                playerActions.toggleFullscreen = { isFullscreen = !isFullscreen }
 
                 // When another overlay (e.g. the download dialog) is on top, the native
                 // AWT video surface would paint above it. Hide the video surface and
@@ -125,7 +149,8 @@ fun PlayerOverlay(
                                         videoUrl = state.streamUrl,
                                         startPositionMs = state.resumePositionMs,
                                         onPlaybackEnded = { playerViewModel.stop() },
-                                        onPositionChange = { positionMs -> playerViewModel.onPositionUpdate(positionMs, 0L) }
+                                        onPositionChange = { positionMs -> playerViewModel.onPositionUpdate(positionMs, 0L) },
+                                        playerActions = playerActions
                                     )
                                 } else {
                                     // Placeholder while the download dialog is open
@@ -198,5 +223,36 @@ fun PlayerOverlay(
             else -> {}
         }
         }
+    }
+}
+
+/**
+ * YouTube-style keyboard shortcuts for the player: Space play/pause, arrows
+ * (5s seek, volume), 0-9 jump to a tenth of the video, F fullscreen, M mute.
+ * Returns true when the event was consumed.
+ */
+private fun handlePlayerKey(event: KeyEvent, actions: PlayerActions): Boolean {
+    if (event.type != KeyEventType.KeyDown) return false
+    if (event.isCtrlPressed || event.isAltPressed || event.isMetaPressed) return false
+
+    return when (event.key) {
+        Key.Spacebar -> { actions.togglePlayPause(); true }
+        Key.DirectionLeft -> { actions.seekBy(-5); true }
+        Key.DirectionRight -> { actions.seekBy(5); true }
+        Key.DirectionUp -> { actions.adjustVolume(5); true }
+        Key.DirectionDown -> { actions.adjustVolume(-5); true }
+        Key.F -> { actions.toggleFullscreen(); true }
+        Key.M -> { actions.toggleMute(); true }
+        Key.Zero -> { actions.seekToFraction(0f); true }
+        Key.One -> { actions.seekToFraction(0.1f); true }
+        Key.Two -> { actions.seekToFraction(0.2f); true }
+        Key.Three -> { actions.seekToFraction(0.3f); true }
+        Key.Four -> { actions.seekToFraction(0.4f); true }
+        Key.Five -> { actions.seekToFraction(0.5f); true }
+        Key.Six -> { actions.seekToFraction(0.6f); true }
+        Key.Seven -> { actions.seekToFraction(0.7f); true }
+        Key.Eight -> { actions.seekToFraction(0.8f); true }
+        Key.Nine -> { actions.seekToFraction(0.9f); true }
+        else -> false
     }
 }

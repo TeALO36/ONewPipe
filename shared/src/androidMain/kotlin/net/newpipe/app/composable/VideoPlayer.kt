@@ -23,7 +23,8 @@ actual fun VideoPlayer(
     videoUrl: String,
     startPositionMs: Long,
     onPlaybackEnded: () -> Unit,
-    onPositionChange: (Long) -> Unit
+    onPositionChange: (Long) -> Unit,
+    playerActions: PlayerActions
 ) {
     val context = LocalContext.current
     val coroutineScope = rememberCoroutineScope()
@@ -44,6 +45,31 @@ actual fun VideoPlayer(
     }
 
     DisposableEffect(Unit) {
+        // Wire the shared player actions (e.g. keyboard shortcuts on devices
+        // with a keyboard) to this ExoPlayer instance.
+        playerActions.togglePlayPause = {
+            if (exoPlayer.isPlaying) exoPlayer.pause() else exoPlayer.play()
+        }
+        playerActions.seekBy = { seconds ->
+            val duration = exoPlayer.duration.coerceAtLeast(0L)
+            if (duration > 0) {
+                exoPlayer.seekTo((exoPlayer.currentPosition + seconds * 1000).coerceIn(0L, duration))
+            }
+        }
+        playerActions.seekToFraction = { fraction ->
+            val duration = exoPlayer.duration.coerceAtLeast(0L)
+            if (duration > 0) {
+                exoPlayer.seekTo((fraction * duration).toLong().coerceIn(0L, duration))
+            }
+        }
+        playerActions.adjustVolume = { delta ->
+            val target = exoPlayer.volume + delta / 100f
+            exoPlayer.volume = target.coerceIn(0f, 1f)
+        }
+        playerActions.toggleMute = {
+            exoPlayer.volume = if (exoPlayer.volume > 0f) 0f else 1f
+        }
+
         val job = coroutineScope.launch {
             while (true) {
                 if (exoPlayer.isPlaying) {
@@ -54,6 +80,11 @@ actual fun VideoPlayer(
         }
         onDispose {
             job.cancel()
+            playerActions.togglePlayPause = {}
+            playerActions.seekBy = {}
+            playerActions.seekToFraction = {}
+            playerActions.adjustVolume = {}
+            playerActions.toggleMute = {}
             exoPlayer.release()
         }
     }

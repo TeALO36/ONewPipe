@@ -31,10 +31,17 @@ fun main() {
     val jwtSecret = System.getenv("JWT_SECRET")
         ?: "dev-secret-change-me-${System.getProperty("user.name")}-${System.getenv("COMPUTERNAME") ?: "local"}"
 
+    // Geo-localize trending and search (YouTube gl/hl params). Defaults to the
+    // server's system locale; override with CONTENT_COUNTRY / CONTENT_LANGUAGE
+    // (e.g. "FR" / "fr") to serve a specific region regardless of the host.
+    val contentCountry = (System.getenv("CONTENT_COUNTRY") ?: java.util.Locale.getDefault().country)
+        .takeIf { it.isNotBlank() } ?: "US"
+    val contentLanguage = (System.getenv("CONTENT_LANGUAGE") ?: java.util.Locale.getDefault().language)
+        .takeIf { it.isNotBlank() } ?: "en"
     NewPipe.init(
         OkHttpDownloader(okhttp3.OkHttpClient.Builder().build()),
-        Localization("en", "US"),
-        ContentCountry("US")
+        Localization(contentLanguage, contentCountry),
+        ContentCountry(contentCountry)
     )
     // YouTube throttles the plain WEB client to ~360p; the iOS client returns
     // the full format range (720p/1080p/4K + audio) without a poToken.

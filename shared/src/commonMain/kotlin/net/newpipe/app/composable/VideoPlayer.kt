@@ -9,5 +9,6 @@ expect fun VideoPlayer(
     videoUrl: String,
     startPositionMs: Long = 0L,
     onPlaybackEnded: () -> Unit = {},
-    onPositionChange: (Long) -> Unit = {}
+    onPositionChange: (Long) -> Unit = {},
+    playerActions: PlayerActions = PlayerActions()
 )

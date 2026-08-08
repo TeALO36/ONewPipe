@@ -1,5 +1,7 @@
 package net.newpipe.app.composable
 
+import androidx.compose.animation.Crossfade
+import androidx.compose.animation.core.tween
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.BoxWithConstraints
@@ -49,6 +51,12 @@ fun PlayerOverlay(
     modifier: Modifier = Modifier
 ) {
     Box(modifier = modifier.fillMaxSize().background(Color.Black.copy(alpha = 0.9f))) {
+        // Smooth crossfade between loading / playing / error states
+        Crossfade(
+            targetState = state,
+            animationSpec = tween(260),
+            label = "playerState"
+        ) { state ->
         when (state) {
             is PlayerState.Loading -> {
                 CircularProgressIndicator(modifier = Modifier.align(Alignment.Center))
@@ -163,6 +171,7 @@ fun PlayerOverlay(
                 }
             }
             else -> {}
+        }
         }
     }
 }

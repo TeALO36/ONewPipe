@@ -1,5 +1,13 @@
 package net.newpipe.app.composable
 
+import androidx.compose.animation.AnimatedContent
+import androidx.compose.animation.Crossfade
+import androidx.compose.animation.core.tween
+import androidx.compose.animation.fadeIn
+import androidx.compose.animation.fadeOut
+import androidx.compose.animation.slideInHorizontally
+import androidx.compose.animation.slideOutHorizontally
+import androidx.compose.animation.togetherWith
 import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -81,72 +89,97 @@ fun HomeContent(
             Spacer(modifier = Modifier.height(16.dp))
         }
 
-        // Dynamic Title
-        Text(
-            text = "${selectedItem.title} - ${service.serviceName}",
-            style = MaterialTheme.typography.headlineMedium.copy(fontWeight = FontWeight.Bold),
-            color = MaterialTheme.colorScheme.onBackground,
-            modifier = Modifier.padding(horizontal = 24.dp, vertical = 8.dp)
-        )
+        // Dynamic Title (crossfades when switching sections)
+        AnimatedContent(
+            targetState = selectedItem,
+            transitionSpec = { fadeIn(tween(180)) togetherWith fadeOut(tween(120)) },
+            label = "title"
+        ) { item ->
+            Text(
+                text = "${item.title} - ${service.serviceName}",
+                style = MaterialTheme.typography.headlineMedium.copy(fontWeight = FontWeight.Bold),
+                color = MaterialTheme.colorScheme.onBackground,
+                modifier = Modifier.padding(horizontal = 24.dp, vertical = 8.dp)
+            )
+        }
 
         Spacer(modifier = Modifier.height(8.dp))
 
-        when (selectedItem) {
-            NavItem.HOME, NavItem.TRENDING -> {
-                // Trending Category Tabs
-                Row(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .horizontalScroll(rememberScrollState())
-                        .padding(horizontal = 24.dp),
-                    horizontalArrangement = Arrangement.spacedBy(8.dp)
-                ) {
-                    TrendingCategory.entries.forEach { category ->
-                        FilterChip(
-                            selected = selectedCategory == category,
-                            onClick = { onCategorySelected(category) },
-                            label = { Text(category.label) },
-                            colors = FilterChipDefaults.filterChipColors(
-                                selectedContainerColor = MaterialTheme.colorScheme.primary.copy(alpha = 0.25f)
+        // Section content (slides + fades when switching sidebar items)
+        AnimatedContent(
+            targetState = selectedItem,
+            transitionSpec = {
+                (fadeIn(tween(240)) + slideInHorizontally(initialOffsetX = { it / 10 }, animationSpec = tween(240)))
+                    .togetherWith(
+                        fadeOut(tween(140)) + slideOutHorizontally(targetOffsetX = { -it / 10 }, animationSpec = tween(140))
+                    )
+            },
+            label = "section"
+        ) { item ->
+            when (item) {
+                NavItem.HOME, NavItem.TRENDING -> {
+                    // Trending Category Tabs
+                    Row(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .horizontalScroll(rememberScrollState())
+                            .padding(horizontal = 24.dp),
+                        horizontalArrangement = Arrangement.spacedBy(8.dp)
+                    ) {
+                        TrendingCategory.entries.forEach { category ->
+                            FilterChip(
+                                selected = selectedCategory == category,
+                                onClick = { onCategorySelected(category) },
+                                label = { Text(category.label) },
+                                colors = FilterChipDefaults.filterChipColors(
+                                    selectedContainerColor = MaterialTheme.colorScheme.primary.copy(alpha = 0.25f)
+                                )
                             )
-                        )
+                        }
+                    }
+
+                    Spacer(modifier = Modifier.height(12.dp))
+
+                    // Crossfade between loading / content / error states
+                    Crossfade(
+                        targetState = homeState,
+                        animationSpec = tween(250),
+                        label = "homeState"
+                    ) { state ->
+                        when (state) {
+                            is HomeState.Loading -> {
+                                MediaGrid(items = emptyList(), isLoading = true, modifier = Modifier.weight(1f))
+                            }
+                            is HomeState.Success -> {
+                                MediaGrid(
+                                    items = state.items,
+                                    onMediaClick = onMediaClick,
+                                    onDownloadClick = onDownloadClick,
+                                    modifier = Modifier.weight(1f)
+                                )
+                            }
+                            is HomeState.Error -> {
+                                MediaGrid(items = emptyList(), errorMessage = state.message, modifier = Modifier.weight(1f))
+                            }
+                        }
                     }
                 }
-
-                Spacer(modifier = Modifier.height(12.dp))
-
-                when (homeState) {
-                    is HomeState.Loading -> {
-                        MediaGrid(items = emptyList(), isLoading = true, modifier = Modifier.weight(1f))
-                    }
-                    is HomeState.Success -> {
-                        MediaGrid(
-                            items = homeState.items,
-                            onMediaClick = onMediaClick,
-                            onDownloadClick = onDownloadClick,
-                            modifier = Modifier.weight(1f)
-                        )
-                    }
-                    is HomeState.Error -> {
-                        MediaGrid(items = emptyList(), errorMessage = homeState.message, modifier = Modifier.weight(1f))
-                    }
+                NavItem.SUBSCRIPTIONS -> {
+                    EmptySection(
+                        icon = { Icon(Icons.Filled.Cloud, contentDescription = null, modifier = Modifier.size(56.dp)) },
+                        title = "No subscriptions yet",
+                        message = "Connect to your ONewPipe server (cloud icon, bottom left) to sync your " +
+                            "channels and subscriptions across devices."
+                    )
                 }
-            }
-            NavItem.SUBSCRIPTIONS -> {
-                EmptySection(
-                    icon = { Icon(Icons.Filled.Cloud, contentDescription = null, modifier = Modifier.size(56.dp)) },
-                    title = "No subscriptions yet",
-                    message = "Connect to your ONewPipe server (cloud icon, bottom left) to sync your " +
-                        "channels and subscriptions across devices."
-                )
-            }
-            NavItem.LIBRARY -> {
-                EmptySection(
-                    icon = { Icon(Icons.Filled.VideoLibrary, contentDescription = null, modifier = Modifier.size(56.dp)) },
-                    title = "Your library is empty",
-                    message = "Watch history, playlists and downloads will appear here. " +
-                        "Played videos are saved and synchronized through your server."
-                )
+                NavItem.LIBRARY -> {
+                    EmptySection(
+                        icon = { Icon(Icons.Filled.VideoLibrary, contentDescription = null, modifier = Modifier.size(56.dp)) },
+                        title = "Your library is empty",
+                        message = "Watch history, playlists and downloads will appear here. " +
+                            "Played videos are saved and synchronized through your server."
+                    )
+                }
             }
         }
     }

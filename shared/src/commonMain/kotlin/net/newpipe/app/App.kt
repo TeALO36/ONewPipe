@@ -1,5 +1,13 @@
 package net.newpipe.app
 
+import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.animation.core.tween
+import androidx.compose.animation.fadeIn
+import androidx.compose.animation.fadeOut
+import androidx.compose.animation.scaleIn
+import androidx.compose.animation.scaleOut
+import androidx.compose.animation.slideInVertically
+import androidx.compose.animation.slideOutVertically
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxSize
@@ -87,8 +95,14 @@ fun App(startDestination: Screen? = null) {
                     )
                 }
 
-                // Player Overlay
-                if (playerState !is PlayerState.Idle) {
+                // Player Overlay — slides up from the bottom, fades out on close
+                AnimatedVisibility(
+                    visible = playerState !is PlayerState.Idle,
+                    enter = slideInVertically(initialOffsetY = { it }, animationSpec = tween(300)) +
+                        fadeIn(animationSpec = tween(300)),
+                    exit = slideOutVertically(targetOffsetY = { it }, animationSpec = tween(220)) +
+                        fadeOut(animationSpec = tween(220))
+                ) {
                     PlayerOverlay(
                         state = playerState,
                         playerViewModel = playerViewModel,
@@ -96,8 +110,14 @@ fun App(startDestination: Screen? = null) {
                     )
                 }
 
-                // Download Dialog Overlay
-                if (downloadState !is DownloadState.Idle) {
+                // Download Dialog Overlay — gently scales in, fades out
+                AnimatedVisibility(
+                    visible = downloadState !is DownloadState.Idle,
+                    enter = scaleIn(initialScale = 0.94f, animationSpec = tween(220)) +
+                        fadeIn(animationSpec = tween(220)),
+                    exit = scaleOut(targetScale = 0.94f, animationSpec = tween(160)) +
+                        fadeOut(animationSpec = tween(160))
+                ) {
                     DownloadOverlay(
                         state = downloadState,
                         downloadViewModel = downloadViewModel

@@ -1,5 +1,6 @@
 package net.newpipe.app.composable
 
+import androidx.compose.animation.animateColorAsState
 import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
@@ -97,12 +98,18 @@ fun Sidebar(
         Spacer(modifier = Modifier.weight(1f))
 
         // Server sync entry (bottom of the rail)
+        val cloudBackground by animateColorAsState(
+            if (serverConnected) serviceColor.copy(alpha = 0.3f) else Color.Transparent
+        )
+        val cloudTint by animateColorAsState(
+            if (serverConnected) serviceColor else MaterialTheme.colorScheme.onSurfaceVariant
+        )
         Box(
             modifier = Modifier
                 .padding(vertical = 12.dp)
                 .size(56.dp)
                 .clip(RoundedCornerShape(16.dp))
-                .background(if (serverConnected) serviceColor.copy(alpha = 0.25f) else Color.Transparent)
+                .background(cloudBackground)
                 .clickable { onServerClick() },
             contentAlignment = Alignment.Center
         ) {
@@ -110,7 +117,7 @@ fun Sidebar(
                 Icon(
                     imageVector = Icons.Filled.Cloud,
                     contentDescription = "Server sync",
-                    tint = if (serverConnected) serviceColor else MaterialTheme.colorScheme.onSurfaceVariant
+                    tint = cloudTint
                 )
             }
         }
@@ -125,14 +132,19 @@ fun SidebarItem(
     onClick: () -> Unit
 ) {
     val scale by animateFloatAsState(if (isSelected) 1.1f else 1.0f)
-    val color = if (isSelected) selectedColor else MaterialTheme.colorScheme.onSurfaceVariant
+    val color by animateColorAsState(
+        if (isSelected) selectedColor else MaterialTheme.colorScheme.onSurfaceVariant
+    )
+    val background by animateColorAsState(
+        if (isSelected) selectedColor.copy(alpha = 0.18f) else Color.Transparent
+    )
 
     Box(
         modifier = Modifier
             .padding(vertical = 12.dp)
             .size(56.dp)
             .clip(RoundedCornerShape(16.dp))
-            .background(if (isSelected) selectedColor.copy(alpha = 0.15f) else Color.Transparent)
+            .background(background)
             .clickable { onClick() },
         contentAlignment = Alignment.Center
     ) {

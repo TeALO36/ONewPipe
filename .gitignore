@@ -38,3 +38,4 @@ node_modules/
 bastet-lastline/
 *.log
 *.hprof
+Inspect.kt

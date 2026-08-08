@@ -16,13 +16,16 @@ import net.newpipe.app.composable.DownloadOverlay
 import net.newpipe.app.composable.HomeContent
 import net.newpipe.app.composable.NavItem
 import net.newpipe.app.composable.PlayerOverlay
+import net.newpipe.app.composable.ServerDialog
 import net.newpipe.app.composable.Sidebar
 import net.newpipe.app.domain.DownloadState
 import net.newpipe.app.domain.DownloadViewModel
 import net.newpipe.app.domain.HomeViewModel
 import net.newpipe.app.domain.PlayerState
 import net.newpipe.app.domain.PlayerViewModel
+import net.newpipe.app.domain.ServerStatus
 import net.newpipe.app.domain.SettingsViewModel
+import net.newpipe.app.domain.SyncViewModel
 import net.newpipe.app.navigation.Screen
 import net.newpipe.app.theme.AppTheme
 import org.koin.compose.viewmodel.koinViewModel
@@ -42,14 +45,17 @@ fun App(startDestination: Screen? = null) {
         val settingsViewModel = koinViewModel<SettingsViewModel>()
         val playerViewModel = koinViewModel<PlayerViewModel>()
         val downloadViewModel = koinViewModel<DownloadViewModel>()
+        val syncViewModel = koinViewModel<SyncViewModel>()
 
         val homeState by homeViewModel.state.collectAsState()
         val service by settingsViewModel.currentService.collectAsState()
         val playerState by playerViewModel.state.collectAsState()
         val downloadState by downloadViewModel.state.collectAsState()
         val selectedCategory by homeViewModel.selectedCategory.collectAsState()
+        val serverStatus by syncViewModel.status.collectAsState()
 
         var selectedItem by remember { mutableStateOf(NavItem.HOME) }
+        var showServerDialog by remember { mutableStateOf(false) }
 
         Surface(
             modifier = Modifier.fillMaxSize(),
@@ -61,7 +67,9 @@ fun App(startDestination: Screen? = null) {
                     Sidebar(
                         selectedItem = selectedItem,
                         onItemSelected = { selectedItem = it },
-                        onServiceSelected = { settingsViewModel.setService(it) }
+                        onServiceSelected = { settingsViewModel.setService(it) },
+                        serverConnected = serverStatus is ServerStatus.Connected,
+                        onServerClick = { showServerDialog = true }
                     )
 
                     // Main Content Area
@@ -93,6 +101,15 @@ fun App(startDestination: Screen? = null) {
                     DownloadOverlay(
                         state = downloadState,
                         downloadViewModel = downloadViewModel
+                    )
+                }
+
+                // Server Connection Dialog
+                if (showServerDialog) {
+                    ServerDialog(
+                        status = serverStatus,
+                        syncViewModel = syncViewModel,
+                        onDismiss = { showServerDialog = false }
                     )
                 }
             }

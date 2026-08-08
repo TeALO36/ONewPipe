@@ -7,5 +7,7 @@ import androidx.compose.ui.Modifier
 expect fun VideoPlayer(
     modifier: Modifier = Modifier,
     videoUrl: String,
-    onPlaybackEnded: () -> Unit = {}
+    startPositionMs: Long = 0L,
+    onPlaybackEnded: () -> Unit = {},
+    onPositionChange: (Long) -> Unit = {}
 )

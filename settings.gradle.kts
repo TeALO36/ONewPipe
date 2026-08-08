@@ -24,6 +24,7 @@ dependencyResolutionManagement {
 include(":app") // androidApp
 include(":desktopApp")
 include("shared")
+include(":server")
 
 // Use a local copy of NewPipe Extractor by uncommenting the lines below.
 // We assume, that NewPipe and NewPipe Extractor have the same parent directory.

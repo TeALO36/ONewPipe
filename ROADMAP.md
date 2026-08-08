@@ -6,8 +6,8 @@
 
 **Ordre des phases (validé avec l'utilisateur) :**
 1. 🟢 **Phase 1 — Apps mobile (Android) + PC** *(en cours)*
-2. 🔵 **Phase 2 — Serveur de compte** (recommandations, likes, enregistrements, playlists, sync multi-appareils)
-3. 🟣 **Phase 3 — Serveur YouTube local** (un vrai site YouTube accessible via navigateur)
+2. 🔵 **Phase 2 — Serveur de compte** (recommandations, likes, enregistrements, playlists, sync multi-appareils) *(bases posées : compte + JWT + sync positions de lecture)*
+3. 🟣 **Phase 3 — Serveur YouTube local** (un vrai site YouTube accessible via navigateur) *(base posée : web UI servie par le serveur)*
 4. ⚫ **Phase 4 — MCP + plugins** (connexion MCP pour modèles d'IA, plugins Home Assistant, Jellyfin, etc.)
 
 ---
@@ -60,22 +60,34 @@
 - [ ] Export/import (abonnements OPML, historique…)
 
 ### 1.6 Apps PC & mobile
-- [ ] Installateurs : MSI/EXE Windows, DEB/AppImage Linux, DMG macOS (déjà ciblés par Compose)
+- [x] Installateurs : MSI/EXE Windows, DEB Linux (ciblés par Compose + workflow CI)
+- [ ] DMG macOS, AppImage Linux
 - [ ] App iOS (`iosApp`) — secondaire, à valider
 - [ ] Notifications de nouveaux contenus des abonnements
 - [ ] Tester l'APK sur un vrai appareil Android
+
+### 1.7 Connexion au serveur (menu dans les apps)
+- [x] Bouton « serveur » dans la sidebar (icône nuage) + dialogue de connexion (URL, identifiant, mot de passe)
+- [x] Inscription + connexion + déconnexion, token JWT persisté localement
+- [x] **Sync des positions de lecture** : reprise à la position sauvegardée à l'ouverture, push à la fermeture
+- [x] Client multiplateforme (ktor-client, okhttp/darwin) + test d'intégration contre un serveur live (register → push → pull, 0 échec)
+- [ ] Sync des likes, playlists, abonnements, historique (API prête à étendre)
+- [ ] Indicateur visuel d'état de connexion + message d'erreur réseau dans le dialogue
 
 ---
 
 ## 🔵 PHASE 2 — Système de compte (serveur)
 
 ### 2.1 Serveur d'authentification & compte
-- [ ] Choix du stack (Ktor multiplateforme recommandé — même langage que l'app)
-- [ ] Inscription / connexion (email ou anonyme + code), JWT/sessions
+- [x] Stack : **Ktor 3.5** (même langage que l'app) + Netty, module Gradle `server`
+- [x] Inscription / connexion (username + mot de passe salé), **JWT HMAC-SHA256** sans dépendance externe
+- [x] Stockage fichiers JSON (`DATA_DIR`, atomique), env `PORT`/`HOST`/`JWT_SECRET`/`DATA_DIR`
+- [x] **Synchronisation multi-appareils** des positions de lecture (`/api/watchstate` GET/POST)
 - [ ] Gestion de profil (avatar, nom, préférences)
-- [ ] **Synchronisation multi-appareils** des données utilisateur
+- [ ] Email ou anonyme + code
 
 ### 2.2 Données synchronisées
+- [x] **Positions de lecture** (reprise d'une lecture sur un autre appareil — mobile ↔ PC ↔ web)
 - [ ] Likes / « J'aime »
 - [ ] Enregistrements (« plus tard » / favoris)
 - [ ] Playlists (création, partage, collaboration)
@@ -92,11 +104,13 @@
 
 ## 🟣 PHASE 3 — Serveur YouTube local (web)
 
-- [ ] Le même serveur que la Phase 2 sert aussi une **interface web**
-- [ ] « Son propre YouTube » : recherche, lecture, abonnements, tendances dans le navigateur
+- [x] Le même serveur que la Phase 2 sert aussi une **interface web** (vanilla JS, servie sur `/`)
+- [x] « Son propre YouTube » : recherche, tendances par catégories, lecture, comptes, reprise des lectures dans le navigateur
+- [x] API REST du serveur consommée par le web (`/api/trending`, `/api/search`, `/api/video`, `/api/register`, `/api/login`, `/api/watchstate`)
+- [x] Hébergement : **Docker** (`server/Dockerfile` + `docker-compose.yml`, volume persistant) + jar autonome
 - [ ] Raccourci navigateur → un clic et on est sur son YouTube
-- [ ] API REST du serveur consommée par les apps (mobile/PC) et le web
-- [ ] Hébergement : Docker, installation locale simple
+- [ ] Abonnements, playlists dans la web UI
+- [ ] Mode « serveur web » installable (barre d'outils / exe serveur pour Windows)
 
 ---
 
@@ -123,8 +137,9 @@
 
 ## 🔧 Suivi technique (dette / infrastructure)
 
+- [x] **Workflow CI** `.github/workflows/build.yml` : APK Android + MSI Windows + exe portable + .deb Linux + jar serveur + image Docker (poussée sur GHCR sur `main`)
+- [x] Poussé sur GitHub (`main`)
 - [ ] Tests automatisés (unitaires UI `shared`, tests extractor)
-- [ ] CI/CD : builds Android + desktop + iOS sur chaque push
 - [ ] Signature APK et mises à jour
 - [ ] Telemetry/CRASH reporting (opt-in)
 - [ ] Documentation développeur + utilisateur
@@ -134,12 +149,15 @@
 
 ### État actuel (août 2026)
 
-- ✅ L'app Android **compile** et produit un APK debug (31 Mo) — 5 bugs de build corrigés (namespace R/BuildConfig, tri toml, bugs compilateur Kotlin 2.3, build `shared` Android)
-- ✅ L'app PC **compile** et se lance (MSI Windows 136 Mo + distribution décompactée)
+- ✅ Poussé sur GitHub (`main`) — tout le travail consolidé et commité
+- ✅ **Serveur ONewPipe** : module `server` (Ktor) — comptes (register/login JWT), sync des positions de lecture, **web UI complète** (recherche, tendances par catégories, lecteur, reprise des lectures), **Docker** (Dockerfile + compose), jar autonome. Testé de bout en bout (register → push → pull watchstate, trending/search/video OK)
+- ✅ **Sync dans les apps** : menu « connecter au serveur » dans la sidebar (mobile + PC), client ktor multiplateforme, reprise à la position sauvegardée + push à la fermeture
+- ✅ **Workflow CI** : APK Android, MSI Windows + exe portable, .deb Linux, jar serveur + image Docker (GHCR sur `main`)
+- ✅ L'app Android **compile** et produit un APK debug — 5 bugs de build corrigés (namespace R/BuildConfig, tri toml, bugs compilateur Kotlin 2.3, build `shared` Android)
+- ✅ L'app PC **compile** et se lance (MSI Windows + distribution décompactée)
 - ✅ NewPipeExtractor mis à jour vers la dernière version upstream
-- ✅ **Tendances par catégories** fonctionnelles (Tout/Gaming/Musique/Films & Séries/Podcasts) : 20 items par catégorie, triées par popularité, vues affichées sur les cartes
-- ✅ **Crash du lecteur corrigé** (vlcj « Invalid memory access » au stop — course entre threads). Lecture testée de bout en bout : lecture, fermeture, changement de vidéo, dialogue de téléchargement (formats réels 360p/m4a/opus)
+- ✅ **Tendances par catégories** fonctionnelles (Tout/Gaming/Musique/Films & Séries/Podcasts) : triées par popularité, vues affichées sur les cartes
+- ✅ **Crash du lecteur corrigé** (vlcj « Invalid memory access » au stop — course entre threads)
 - ✅ UI modulaire : `App.kt` éclaté en `HomeContent` / `PlayerOverlay` / `DownloadOverlay`
 - ⚠️ Warnings vlcj « sun.misc.Unsafe » au démarrage du lecteur (non fatals, la lecture fonctionne) — à corriger via un runtime configuré ou un autre pipeline vidéo
 - ⚠️ Le kiosk tendances officiel de YouTube est bloqué côté upstream (issue #12805) → poToken à implémenter pour le retrouver
-- ⚠️ Travail en cours non commité (branche `main`) — à consolider dans des commits propres

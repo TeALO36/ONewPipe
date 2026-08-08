@@ -1,0 +1,134 @@
+name: Build all apps
+
+on:
+  workflow_dispatch:
+  pull_request:
+    branches: [master, main, dev]
+  push:
+    branches: [master, main]
+
+jobs:
+  # ---- Android app (mobile) ----
+  android:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+
+    steps:
+      - uses: actions/checkout@v6
+      - uses: gradle/actions/wrapper-validation@v6
+
+      - name: Set up JDK
+        uses: actions/setup-java@v5
+        with:
+          java-version: 21
+          distribution: "temurin"
+          cache: "gradle"
+
+      - name: Build debug APK
+        run: ./gradlew :app:assembleDebug --stacktrace
+
+      - name: Upload APK
+        uses: actions/upload-artifact@v7
+        with:
+          name: android-apk
+          path: app/build/outputs/apk/debug/*.apk
+
+  # ---- Desktop app - Windows (MSI installer + portable exe) ----
+  desktop-windows:
+    runs-on: windows-latest
+    permissions:
+      contents: read
+
+    steps:
+      - uses: actions/checkout@v6
+
+      - name: Set up JDK
+        uses: actions/setup-java@v5
+        with:
+          java-version: 21
+          distribution: "temurin"
+          cache: "gradle"
+
+      # jpackage needs WiX to build the MSI on Windows
+      - name: Install WiX Toolset
+        uses: wixtoolset/setup-wixtoolset-action@v1
+
+      - name: Build MSI installer
+        run: ./gradlew :desktopApp:packageDistributionForCurrentOS --stacktrace
+
+      - name: Build portable exe (unpacked app)
+        run: ./gradlew :desktopApp:createDistributable --stacktrace
+
+      - name: Upload MSI
+        uses: actions/upload-artifact@v7
+        with:
+          name: windows-msi
+          path: desktopApp/build/compose/binaries/main/msi/*
+
+      - name: Upload portable exe
+        uses: actions/upload-artifact@v7
+        with:
+          name: windows-portable
+          path: desktopApp/build/compose/binaries/main/app/**
+
+  # ---- Desktop app - Linux (.deb) ----
+  desktop-linux:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+
+    steps:
+      - uses: actions/checkout@v6
+
+      - name: Set up JDK
+        uses: actions/setup-java@v5
+        with:
+          java-version: 21
+          distribution: "temurin"
+          cache: "gradle"
+
+      - name: Build .deb package
+        run: ./gradlew :desktopApp:packageDistributionForCurrentOS --stacktrace
+
+      - name: Upload deb
+        uses: actions/upload-artifact@v7
+        with:
+          name: linux-deb
+          path: desktopApp/build/compose/binaries/main/deb/*
+
+  # ---- Server (jar + Docker image) ----
+  server:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      packages: write
+
+    steps:
+      - uses: actions/checkout@v6
+
+      - name: Set up JDK
+        uses: actions/setup-java@v5
+        with:
+          java-version: 21
+          distribution: "temurin"
+          cache: "gradle"
+
+      - name: Build server fat jar
+        run: ./gradlew :server:fatJar --stacktrace
+
+      - name: Upload server jar
+        uses: actions/upload-artifact@v7
+        with:
+          name: server-jar
+          path: server/build/libs/onewpipe-server-all.jar
+
+      - name: Build Docker image
+        run: docker build -f server/Dockerfile -t onewpipe-server:latest .
+
+      - name: Push image to GHCR (main only)
+        if: github.ref == 'refs/heads/main'
+        run: |
+          echo "${{ secrets.GITHUB_TOKEN }}" | docker login ghcr.io -u ${{ github.actor }} --password-stdin
+          docker tag onewpipe-server:latest ghcr.io/${{ github.repository }}:latest
+          docker push ghcr.io/${{ github.repository }}:latest

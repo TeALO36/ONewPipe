@@ -19,7 +19,9 @@ import uk.co.caprica.vlcj.player.component.CallbackMediaPlayerComponent
 actual fun VideoPlayer(
     modifier: Modifier,
     videoUrl: String,
-    onPlaybackEnded: () -> Unit
+    startPositionMs: Long,
+    onPlaybackEnded: () -> Unit,
+    onPositionChange: (Long) -> Unit
 ) {
     val mediaPlayerComponent = remember { CallbackMediaPlayerComponent() }
     var isPlaying by remember { mutableStateOf(false) }
@@ -30,6 +32,7 @@ actual fun VideoPlayer(
 
     DisposableEffect(videoUrl) {
         val player = mediaPlayerComponent.mediaPlayer()
+        val hasSeeked = java.util.concurrent.atomic.AtomicBoolean(false)
 
         // libvlc is NOT thread-safe: every native call must happen on the same thread
         // (the AWT event dispatch thread, on which Compose Desktop runs). Calling into
@@ -44,7 +47,12 @@ actual fun VideoPlayer(
         }
 
         player.events().addMediaPlayerEventListener(object : MediaPlayerEventAdapter() {
-            override fun playing(mediaPlayer: MediaPlayer?) { isPlaying = true }
+            override fun playing(mediaPlayer: MediaPlayer?) {
+                isPlaying = true
+                if (startPositionMs > 0 && hasSeeked.compareAndSet(false, true)) {
+                    safe { player.controls().setTime(startPositionMs) }
+                }
+            }
             override fun paused(mediaPlayer: MediaPlayer?) { isPlaying = false }
             override fun stopped(mediaPlayer: MediaPlayer?) { isPlaying = false }
             override fun finished(mediaPlayer: MediaPlayer?) { 
@@ -66,6 +74,7 @@ actual fun VideoPlayer(
                     try {
                         val time = player.status().time()
                         val length = player.status().length()
+                        onPositionChange(time)
                         if (length > 0) {
                             progress = time.toFloat() / length.toFloat()
                             currentTime = formatTime(time)

@@ -6,6 +6,7 @@ import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.Cloud
 import androidx.compose.material.icons.filled.Home
 import androidx.compose.material.icons.filled.LocalFireDepartment
 import androidx.compose.material.icons.filled.PlayArrow
@@ -34,7 +35,9 @@ fun Sidebar(
     modifier: Modifier = Modifier,
     selectedItem: NavItem,
     onItemSelected: (NavItem) -> Unit,
-    onServiceSelected: (net.newpipe.app.theme.Service) -> Unit
+    onServiceSelected: (net.newpipe.app.theme.Service) -> Unit,
+    serverConnected: Boolean = false,
+    onServerClick: () -> Unit = {}
 ) {
     val serviceColor = currentServiceScheme().primaryContainer
 
@@ -90,6 +93,26 @@ fun Sidebar(
                 selectedColor = serviceColor,
                 onClick = { onItemSelected(item) }
             )
+        }
+        Spacer(modifier = Modifier.weight(1f))
+
+        // Server sync entry (bottom of the rail)
+        Box(
+            modifier = Modifier
+                .padding(vertical = 12.dp)
+                .size(56.dp)
+                .clip(RoundedCornerShape(16.dp))
+                .background(if (serverConnected) serviceColor.copy(alpha = 0.25f) else Color.Transparent)
+                .clickable { onServerClick() },
+            contentAlignment = Alignment.Center
+        ) {
+            Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                Icon(
+                    imageVector = Icons.Filled.Cloud,
+                    contentDescription = "Server sync",
+                    tint = if (serverConnected) serviceColor else MaterialTheme.colorScheme.onSurfaceVariant
+                )
+            }
         }
     }
 }

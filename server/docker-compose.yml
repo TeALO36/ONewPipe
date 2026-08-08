@@ -1,0 +1,18 @@
+services:
+  onewpipe:
+    build: ..
+    image: onewpipe-server:latest
+    container_name: onewpipe-server
+    restart: unless-stopped
+    ports:
+      - "8080:8080"
+    environment:
+      PORT: "8080"
+      DATA_DIR: /app/data
+      # Set a fixed secret in production, e.g. via .env: JWT_SECRET=change-me
+      JWT_SECRET: ${JWT_SECRET:-dev-secret-change-me}
+    volumes:
+      - onewpipe-data:/app/data
+
+volumes:
+  onewpipe-data:

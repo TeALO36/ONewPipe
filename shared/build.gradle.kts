@@ -83,6 +83,7 @@ kotlin {
             isStatic = true
         }
     }
+    applyDefaultHierarchyTemplate()
 
     jvm()
 
@@ -108,6 +109,10 @@ kotlin {
 
                 implementation(libs.russhwolf.settings.core)
                 implementation(libs.coil.compose)
+
+                implementation(libs.ktor.client.core)
+                implementation(libs.ktor.client.content.negotiation)
+                implementation(libs.ktor.serialization.kotlinx.json)
             }
         }
         commonTest.dependencies {
@@ -125,12 +130,19 @@ kotlin {
             implementation(libs.koin.android)
             implementation(libs.media3.exoplayer)
             implementation(libs.media3.ui)
+            implementation(libs.ktor.client.okhttp)
+        }
+        val iosMain by getting {
+            dependencies {
+                implementation(libs.ktor.client.darwin)
+            }
         }
         val jvmMain by getting {
             dependencies {
                 api(libs.newpipe.extractor)
                 api(libs.squareup.okhttp)
                 api(libs.coil.network.okhttp)
+                implementation(libs.ktor.client.okhttp)
                 
                 val osName = System.getProperty("os.name").lowercase()
                 val osClassifier = when {

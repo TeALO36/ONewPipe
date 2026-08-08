@@ -28,14 +28,27 @@ sealed class PlayerState {
         val viewCount: Long,
         val relatedItems: List<StreamInfoItem>,
         val videoStreams: List<VideoStream>,
-        val audioStreams: List<AudioStream>
+        val audioStreams: List<AudioStream>,
+        val resumePositionMs: Long = 0
     ) : PlayerState()
     data class Error(val message: String) : PlayerState()
 }
 
-class PlayerViewModel : ViewModel() {
+/**
+ * Controls the currently played video. When a server connection is configured
+ * (see [SyncViewModel]), the play position is synced: we resume from the saved
+ * position when a video opens and push the position back when it closes.
+ */
+class PlayerViewModel(
+    private val syncViewModel: SyncViewModel? = null
+) : ViewModel() {
     private val _state = MutableStateFlow<PlayerState>(PlayerState.Idle)
     val state: StateFlow<PlayerState> = _state.asStateFlow()
+
+    private var currentUrl = ""
+    private var currentTitle = ""
+    private var lastPositionMs = 0L
+    private var lastDurationMs = 0L
 
     fun loadVideo(url: String, title: String) {
         _state.value = PlayerState.Loading
@@ -45,8 +58,19 @@ class PlayerViewModel : ViewModel() {
                     val service = NewPipe.getServiceByUrl(url) ?: throw Exception("Service not found for URL")
                     StreamInfo.getInfo(service, url)
                 }
-                
-                setInitialQuality(info)
+
+                currentUrl = info.url ?: url
+                currentTitle = info.name ?: title
+                lastPositionMs = 0L
+                lastDurationMs = info.duration ?: 0L
+
+                // Resume from the position saved on the server (if any).
+                val resumePosition = syncViewModel?.resumePositionFor(currentUrl)
+                    ?.takeIf { it.positionMs in 5_000..(it.durationMs - 10_000).coerceAtLeast(5_000) }
+                    ?.positionMs
+                    ?: 0L
+
+                setInitialQuality(info, resumePosition)
             } catch (e: Exception) {
                 _state.value = PlayerState.Error(e.message ?: "Failed to load video")
             }
@@ -60,7 +84,13 @@ class PlayerViewModel : ViewModel() {
         }
     }
 
-    private fun setInitialQuality(info: StreamInfo) {
+    /** Called by the video player ~every 500 ms while playing. */
+    fun onPositionUpdate(positionMs: Long, durationMs: Long) {
+        lastPositionMs = positionMs
+        if (durationMs > 0) lastDurationMs = durationMs
+    }
+
+    private fun setInitialQuality(info: StreamInfo, resumePositionMs: Long) {
         val videoStreams = info.videoStreams ?: emptyList()
         val audioStreams = info.audioStreams ?: emptyList()
         
@@ -82,11 +112,40 @@ class PlayerViewModel : ViewModel() {
             viewCount = info.viewCount ?: 0L,
             relatedItems = relatedItems,
             videoStreams = videoStreams,
-            audioStreams = audioStreams
+            audioStreams = audioStreams,
+            resumePositionMs = resumePositionMs
         )
     }
 
     fun stop() {
+        val wasPlaying = _state.value is PlayerState.Playing
         _state.value = PlayerState.Idle
+        if (wasPlaying) {
+            pushPosition()
+        }
+    }
+
+    /** Push the last known play position to the server (no-op when not connected). */
+    private fun pushPosition() {
+        val position = lastPositionMs
+        val duration = lastDurationMs
+        if (position <= 0 || duration <= 0) return
+        val url = currentUrl
+        val title = currentTitle
+        viewModelScope.launch {
+            runCatching {
+                syncViewModel?.pushWatchState(
+                    listOf(
+                        WatchStateItem(
+                            url = url,
+                            title = title,
+                            positionMs = position,
+                            durationMs = duration,
+                            updatedAt = System.currentTimeMillis()
+                        )
+                    )
+                )
+            }
+        }
     }
 }

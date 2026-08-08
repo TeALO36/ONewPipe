@@ -103,7 +103,9 @@ fun PlayerOverlay(
                                 VideoPlayer(
                                     modifier = Modifier.fillMaxSize(),
                                     videoUrl = state.streamUrl,
-                                    onPlaybackEnded = { playerViewModel.stop() }
+                                    startPositionMs = state.resumePositionMs,
+                                    onPlaybackEnded = { playerViewModel.stop() },
+                                    onPositionChange = { positionMs -> playerViewModel.onPositionUpdate(positionMs, 0L) }
                                 )
 
                                 // Fullscreen Toggle Button

@@ -63,9 +63,10 @@
 ### 1.6 Apps PC & mobile
 - [x] Installateurs : MSI/EXE Windows, DEB Linux (ciblés par Compose + workflow CI)
 - [ ] DMG macOS, AppImage Linux
-- [ ] App iOS (`iosApp`) — secondaire, à valider
+- [x] App iOS (`iosApp`) — utilise la nouvelle UI `shared` (MainViewController)
 - [ ] Notifications de nouveaux contenus des abonnements
 - [ ] Tester l'APK sur un vrai appareil Android
+- [ ] **Porter la nouvelle UI `shared` sur Android** : l'app Android actuelle (`app`) est l'app NewPipe d'origine et ne dépend pas de `shared` — la refonte UI (tendances par catégories, navigation, sync serveur) n'est donc pour l'instant disponible que sur PC et iOS. Brancher `ComposeActivity` (déjà dans `shared/androidMain`) dans un launcher Android
 
 ### 1.7 Connexion au serveur (menu dans les apps)
 - [x] Bouton « serveur » dans la sidebar (icône nuage) + dialogue de connexion (URL, identifiant, mot de passe)
@@ -163,4 +164,5 @@
 - ✅ **Navigation vérifiée en conditions réelles** : Home → grille, Subscriptions → état vide, retour → grille
 - ✅ UI modulaire : `App.kt` éclaté en `HomeContent` / `PlayerOverlay` / `DownloadOverlay`
 - ⚠️ Warnings vlcj « stale plugins cache » au démarrage (inoffensifs, liés à l'installation VLC locale)
+- ⚠️ **Architecture Android** : l'app mobile (`app`, NewPipe d'origine) ne consomme pas encore la nouvelle UI `shared` (tendances, sync serveur, navigation) — à brancher (voir 1.6)
 - ⚠️ Le kiosk tendances officiel de YouTube est bloqué côté upstream (issue #12805) → poToken à implémenter pour le retrouver

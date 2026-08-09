@@ -135,8 +135,10 @@ configure<ApplicationExtension> {
                 applicationIdSuffix = suffix
                 resValue("string", "app_name", "ONewPipe $suffix")
             }
-            isMinifyEnabled = true
-            isShrinkResources = true
+            // Minify/shrink disabled for faster test builds. Re-enable before
+            // shipping to production: isMinifyEnabled = true; isShrinkResources = true
+            isMinifyEnabled = false
+            isShrinkResources = false
             signingConfig = signingConfigs.findByName("release") ?: signingConfigs.findByName("debug")
             proguardFiles(
                 getDefaultProguardFile("proguard-android-optimize.txt"),

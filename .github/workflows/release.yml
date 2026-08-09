@@ -158,7 +158,7 @@ jobs:
         run: |
           mkdir -p artifacts
           for a in Android-APK Desktop-ubuntu-latest Desktop-windows-latest Desktop-Portable-Windows Server-jar; do
-            gh run download "${{ github.run_id }}" --dir artifacts --name "$a"
+            gh run download "${{ github.run_id }}" -R "${{ github.repository }}" --dir artifacts --name "$a"
           done
 
       - name: Flatten artifacts

@@ -152,10 +152,11 @@ jobs:
     needs: [build-android, build-desktop, build-desktop-portable, build-server]
     runs-on: ubuntu-latest
     steps:
-      - name: Download all artifacts
+      - name: Download build artifacts
         uses: actions/download-artifact@v4
         with:
           path: artifacts
+          pattern: Android-APK|Desktop-*|Server-jar
 
       - name: Flatten artifacts
         run: |

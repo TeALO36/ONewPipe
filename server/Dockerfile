@@ -1,6 +1,8 @@
 # ---- Build stage ----
 FROM eclipse-temurin:21-jdk AS build
 WORKDIR /build
+# git is required because app/build.gradle.kts runs `git rev-parse`
+RUN apt-get update && apt-get install -y --no-install-recommends git && rm -rf /var/lib/apt/lists/*
 COPY . .
 RUN ./gradlew :server:fatJar --no-daemon --console=plain
 

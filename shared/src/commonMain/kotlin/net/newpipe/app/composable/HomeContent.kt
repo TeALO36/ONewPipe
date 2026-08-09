@@ -98,14 +98,14 @@ fun HomeContent(
             label = "title"
         ) { item ->
             Text(
-                text = "${item.title} - ${service.serviceName}",
+                text = item.title,
                 style = MaterialTheme.typography.headlineMedium.copy(fontWeight = FontWeight.Bold),
                 color = MaterialTheme.colorScheme.onBackground,
                 modifier = Modifier.padding(horizontal = 24.dp, vertical = 8.dp)
             )
         }
 
-        Spacer(modifier = Modifier.height(8.dp))
+        Spacer(modifier = Modifier.height(4.dp))
 
         // Section content (slides + fades when switching sidebar items)
         AnimatedContent(

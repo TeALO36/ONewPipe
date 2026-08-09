@@ -33,7 +33,6 @@ fun GlassSearchBar(
         modifier = modifier
             .fillMaxWidth()
             .height(56.dp)
-            .padding(horizontal = 24.dp)
             .clip(CircleShape)
             .background(MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.6f)),
         verticalAlignment = Alignment.CenterVertically

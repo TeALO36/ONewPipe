@@ -177,10 +177,22 @@ jobs:
             gh run download "${{ github.run_id }}" -R "${{ github.repository }}" --dir artifacts --name "$a"
           done
 
-      - name: Flatten artifacts
+      - name: Flatten artifacts with clear names
+        env:
+          VERSION: ${{ github.ref_name }}
         run: |
           mkdir -p release-files
-          find artifacts -type f \( -name "*.apk" -o -name "*.msi" -o -name "*.deb" -o -name "*.jar" -o -name "*.zip" \) -exec cp {} release-files/ \;
+          for f in $(find artifacts -type f \( -name "*.apk" -o -name "*.msi" -o -name "*.deb" -o -name "*.jar" -o -name "*.zip" \)); do
+            case "$f" in
+              *.apk)  dest="ONewPipe-${VERSION}-android.apk" ;;
+              *.msi)  dest="ONewPipe-${VERSION}-windows-setup.msi" ;;
+              *.zip)  dest="ONewPipe-${VERSION}-windows-portable.zip" ;;
+              *.deb)  dest="ONewPipe-${VERSION}-linux.deb" ;;
+              *.jar)  dest="ONewPipe-${VERSION}-server.jar" ;;
+              *)      dest="$(basename "$f")" ;;
+            esac
+            cp "$f" "release-files/$dest"
+          done
           ls -la release-files/
 
       - name: Create Release

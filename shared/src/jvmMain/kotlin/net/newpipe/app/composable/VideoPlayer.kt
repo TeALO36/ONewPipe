@@ -28,7 +28,23 @@ actual fun VideoPlayer(
     onPositionChange: (Long) -> Unit,
     playerActions: PlayerActions
 ) {
-    val mediaPlayerComponent = remember { CallbackMediaPlayerComponent() }
+    // libvlc options that make video output reliable on Windows desktops:
+    // - --avcodec-hw=none: force software decoding. The callback video surface
+    //   used by vlcj often stays black (sound but no image) with hardware
+    //   acceleration enabled, which was the "black video for seconds" bug.
+    // - --network-caching=400: cap the network buffer so playback starts faster.
+    // - --no-video-title-show: remove libvlc's own overlay text.
+    val mediaPlayerComponent = remember {
+        CallbackMediaPlayerComponent(
+            "--no-video-title-show",
+            "--avcodec-hw=none",
+            "--network-caching=400",
+            "--drop-late-frames"
+        )
+    }
+    // True once the first video frame has been rendered; drives the buffering
+    // spinner so the user sees feedback instead of a silent black rectangle.
+    var hasVideoFrame by remember { mutableStateOf(false) }
     var isPlaying by remember { mutableStateOf(false) }
     var progress by remember { mutableStateOf(0f) }
     var currentTime by remember { mutableStateOf("0:00") }
@@ -51,9 +67,13 @@ actual fun VideoPlayer(
             }
         }
 
+        // New video: show the buffering spinner until the first frame arrives.
+        hasVideoFrame = false
+
         player.events().addMediaPlayerEventListener(object : MediaPlayerEventAdapter() {
             override fun playing(mediaPlayer: MediaPlayer?) {
                 isPlaying = true
+                hasVideoFrame = true
                 if (startPositionMs > 0 && hasSeeked.compareAndSet(false, true)) {
                     safe { player.controls().setTime(startPositionMs) }
                 }
@@ -110,6 +130,7 @@ actual fun VideoPlayer(
                 if (isPlayingNow) {
                     try {
                         val time = player.status().time()
+                        if (time > 0) hasVideoFrame = true
                         val length = player.status().length()
                         onPositionChange(time)
                         if (length > 0) {
@@ -174,10 +195,26 @@ actual fun VideoPlayer(
     }
 
     Column(modifier = modifier.background(Color.Black)) {
-        SwingPanel(
-            factory = { mediaPlayerComponent },
-            modifier = Modifier.weight(1f).fillMaxWidth()
-        )
+        Box(modifier = Modifier.weight(1f).fillMaxWidth()) {
+            SwingPanel(
+                factory = { mediaPlayerComponent },
+                modifier = Modifier.fillMaxSize()
+            )
+
+            // Buffering spinner while audio plays but no frame is visible yet.
+            if (!hasVideoFrame) {
+                Box(
+                    modifier = Modifier.fillMaxSize(),
+                    contentAlignment = Alignment.Center
+                ) {
+                    CircularProgressIndicator(
+                        modifier = Modifier.size(48.dp),
+                        color = Color.White,
+                        strokeWidth = 4.dp
+                    )
+                }
+            }
+        }
         
         // Video Controls
         Row(

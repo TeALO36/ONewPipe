@@ -107,7 +107,36 @@ fun HomeContent(
 
         Spacer(modifier = Modifier.height(4.dp))
 
-        // Section content (slides + fades when switching sidebar items)
+        // Trending category chips — pinned between the title and the content,
+        // OUTSIDE the animated section. AnimatedContent stacks its children in
+        // a Box, so a grid inside it would paint over the chips. Keeping the
+        // chips here guarantees they are never covered by the video grid.
+        if (selectedItem == NavItem.HOME) {
+            Row(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .horizontalScroll(rememberScrollState())
+                    .padding(horizontal = 24.dp),
+                horizontalArrangement = Arrangement.spacedBy(8.dp)
+            ) {
+                TrendingCategory.entries.forEach { category ->
+                    FilterChip(
+                        selected = selectedCategory == category,
+                        onClick = { onCategorySelected(category) },
+                        label = { Text(category.label) },
+                        colors = FilterChipDefaults.filterChipColors(
+                            selectedContainerColor = MaterialTheme.colorScheme.primary.copy(alpha = 0.25f)
+                        )
+                    )
+                }
+            }
+
+            Spacer(modifier = Modifier.height(12.dp))
+        }
+
+        // Section content (slides + fades when switching sidebar items).
+        // weight(1f) bounds the content to the remaining height so the grid
+        // scrolls internally instead of overflowing over the header/chips.
         AnimatedContent(
             targetState = selectedItem,
             transitionSpec = {
@@ -116,32 +145,11 @@ fun HomeContent(
                         fadeOut(tween(140)) + slideOutHorizontally(targetOffsetX = { -it / 10 }, animationSpec = tween(140))
                     )
             },
+            modifier = Modifier.weight(1f).fillMaxWidth(),
             label = "section"
         ) { item ->
             when (item) {
-                NavItem.HOME -> {
-                    // Trending Category Tabs (Home only — Trending is the plain feed)
-                    Row(
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .horizontalScroll(rememberScrollState())
-                            .padding(horizontal = 24.dp),
-                        horizontalArrangement = Arrangement.spacedBy(8.dp)
-                    ) {
-                        TrendingCategory.entries.forEach { category ->
-                            FilterChip(
-                                selected = selectedCategory == category,
-                                onClick = { onCategorySelected(category) },
-                                label = { Text(category.label) },
-                                colors = FilterChipDefaults.filterChipColors(
-                                    selectedContainerColor = MaterialTheme.colorScheme.primary.copy(alpha = 0.25f)
-                                )
-                            )
-                        }
-                    }
-
-                    Spacer(modifier = Modifier.height(12.dp))
-
+                NavItem.HOME, NavItem.TRENDING -> {
                     // Crossfade between loading / content / error states
                     Crossfade(
                         targetState = homeState,
@@ -150,7 +158,7 @@ fun HomeContent(
                     ) { state ->
                         when (state) {
                             is HomeState.Loading -> {
-                                MediaGrid(items = emptyList(), isLoading = true, modifier = Modifier.weight(1f))
+                                MediaGrid(items = emptyList(), isLoading = true, modifier = Modifier.fillMaxSize())
                             }
                             is HomeState.Success -> {
                                 MediaGrid(
@@ -159,40 +167,11 @@ fun HomeContent(
                                     onMediaClick = onMediaClick,
                                     onDownloadClick = onDownloadClick,
                                     onLoadMore = onLoadMore,
-                                    modifier = Modifier.weight(1f)
+                                    modifier = Modifier.fillMaxSize()
                                 )
                             }
                             is HomeState.Error -> {
-                                MediaGrid(items = emptyList(), errorMessage = state.message, modifier = Modifier.weight(1f))
-                            }
-                        }
-                    }
-                }
-                NavItem.TRENDING -> {
-                    // Pure trending feed, no category chips — visually distinct from Home
-                    Spacer(modifier = Modifier.height(12.dp))
-
-                    Crossfade(
-                        targetState = homeState,
-                        animationSpec = tween(250),
-                        label = "trendingState"
-                    ) { state ->
-                        when (state) {
-                            is HomeState.Loading -> {
-                                MediaGrid(items = emptyList(), isLoading = true, modifier = Modifier.weight(1f))
-                            }
-                            is HomeState.Success -> {
-                                MediaGrid(
-                                    items = state.items,
-                                    isLoadingMore = isLoadingMore,
-                                    onMediaClick = onMediaClick,
-                                    onDownloadClick = onDownloadClick,
-                                    onLoadMore = onLoadMore,
-                                    modifier = Modifier.weight(1f)
-                                )
-                            }
-                            is HomeState.Error -> {
-                                MediaGrid(items = emptyList(), errorMessage = state.message, modifier = Modifier.weight(1f))
+                                MediaGrid(items = emptyList(), errorMessage = state.message, modifier = Modifier.fillMaxSize())
                             }
                         }
                     }

@@ -63,13 +63,12 @@ jobs:
           Expand-Archive "$env:TEMP\wix.zip" -DestinationPath $wix -Force
           echo "$wix" | Out-File -FilePath $env:GITHUB_PATH -Encoding utf8 -Append
       - name: Build Desktop Distribution
-        run: ./gradlew :desktopApp:packageReleaseDistributionForCurrentOS
+        run: ./gradlew :desktopApp:packageDistributionForCurrentOS
       - name: Upload Desktop Installer
         uses: actions/upload-artifact@v4
         with:
           name: Desktop-${{ matrix.os }}
           path: |
-            desktopApp/build/compose/binaries/main/release/**/*.${{ matrix.ext }}
             desktopApp/build/compose/binaries/main/**/*.${{ matrix.ext }}
 
   build-desktop-portable:
@@ -84,10 +83,10 @@ jobs:
           distribution: 'temurin'
           cache: gradle
       - name: Build portable distributable
-        run: ./gradlew :desktopApp:createReleaseDistributable
+        run: ./gradlew :desktopApp:createDistributable
       - name: Zip portable app
         run: |
-          powershell Compress-Archive -Path desktopApp/build/compose/binaries/main/release/app -DestinationPath "ONewPipe-portable-win.zip" -Force
+          powershell Compress-Archive -Path desktopApp/build/compose/binaries/main/app -DestinationPath "ONewPipe-portable-win.zip" -Force
       - name: Upload Portable ZIP
         uses: actions/upload-artifact@v4
         with:

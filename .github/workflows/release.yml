@@ -153,10 +153,13 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - name: Download build artifacts
-        uses: actions/download-artifact@v4
-        with:
-          path: artifacts
-          pattern: Android-APK|Desktop-*|Server-jar
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          mkdir -p artifacts
+          for a in Android-APK Desktop-ubuntu-latest Desktop-windows-latest Desktop-Portable-Windows Server-jar; do
+            gh run download "${{ github.run_id }}" --dir artifacts --name "$a"
+          done
 
       - name: Flatten artifacts
         run: |

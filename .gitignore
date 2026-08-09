@@ -39,3 +39,7 @@ bastet-lastline/
 *.log
 *.hprof
 Inspect.kt
+
+# Release signing keystore (NEVER commit)
+keystore/
+keystore.properties

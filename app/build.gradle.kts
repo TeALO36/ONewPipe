@@ -4,6 +4,8 @@
  */
 
 import com.android.build.api.dsl.ApplicationExtension
+import java.util.Base64
+import java.util.Properties
 
 plugins {
     alias(libs.plugins.android.application)
@@ -29,7 +31,59 @@ kotlin {
     }
 }
 
+// ---- Release signing ----
+// Priority: 1) keystore.properties at repo root (local, gitignored)
+//          2) CI environment variables (KEYSTORE_BASE64 + passwords, set as GitHub secrets)
+//          3) fallback: debug keystore, so assembleRelease still works on dev machines
+data class ReleaseKey(
+    val storeFile: File,
+    val storePassword: String,
+    val keyAlias: String,
+    val keyPassword: String
+)
+
+val releaseKey: ReleaseKey? = run {
+    val propsFile = rootProject.file("keystore.properties")
+    if (propsFile.exists()) {
+        val props = Properties().apply { propsFile.inputStream().use { load(it) } }
+        val storeFile = rootProject.file(props.getProperty("storeFile") ?: "keystore/onewpipe-release.jks")
+        if (storeFile.exists()) {
+            ReleaseKey(
+                storeFile,
+                props.getProperty("storePassword"),
+                props.getProperty("keyAlias"),
+                props.getProperty("keyPassword")
+            )
+        } else null
+    } else {
+        val base64 = System.getenv("KEYSTORE_BASE64")
+        if (!base64.isNullOrBlank()) {
+            val decoded = Base64.getDecoder().decode(base64)
+            val storeFile = File(project.layout.buildDirectory.get().asFile, "release.jks")
+            storeFile.parentFile.mkdirs()
+            storeFile.writeBytes(decoded)
+            ReleaseKey(
+                storeFile,
+                System.getenv("KEYSTORE_PASSWORD") ?: "",
+                System.getenv("KEY_ALIAS") ?: "onewpipe",
+                System.getenv("KEY_PASSWORD") ?: System.getenv("KEYSTORE_PASSWORD") ?: ""
+            )
+        } else null
+    }
+}
+
 configure<ApplicationExtension> {
+    signingConfigs {
+        if (releaseKey != null) {
+            create("release") {
+                storeFile = releaseKey.storeFile
+                storePassword = releaseKey.storePassword
+                keyAlias = releaseKey.keyAlias
+                keyPassword = releaseKey.keyPassword
+            }
+        }
+    }
+
     compileSdk {
         version = release(NEWPIPE_VERSION_SDK_COMPILE_MAJOR) {
             minorApiLevel = NEWPIPE_VERSION_SDK_COMPILE_MINOR
@@ -83,6 +137,7 @@ configure<ApplicationExtension> {
             }
             isMinifyEnabled = true
             isShrinkResources = true
+            signingConfig = signingConfigs.findByName("release") ?: signingConfigs.findByName("debug")
             proguardFiles(
                 getDefaultProguardFile("proguard-android-optimize.txt"),
                 "proguard-rules.pro"

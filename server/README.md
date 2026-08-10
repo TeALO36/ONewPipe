@@ -42,3 +42,14 @@ GET http://SERVER_IP:8080/          -> ONewPipe web interface
 ```
 
 The server does not need a separate frontend process. The root route serves the bundled site, while API routes remain under `/api/`.
+
+## Local-only administration (optional)
+
+The administration page is **disabled by default**, is not linked from the normal site, and answers `404` to non-loopback clients. Enable it only for local maintenance on the server computer:
+
+```text
+ADMIN_PANEL_ENABLED=true
+HOST=127.0.0.1
+```
+
+Then open `http://127.0.0.1:8080/__local_admin`. The first account created on a new data directory is the administrator. Existing installations migrate their oldest account as administrator. The local panel can inspect accounts, revoke sessions, delete non-administrator accounts, change the administrator password, and download a JSON backup. It is intentionally not enabled in the Docker compose defaults and adds nothing to the normal Android, desktop, or public web navigation.

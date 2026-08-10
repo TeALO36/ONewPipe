@@ -41,29 +41,41 @@ object Jwt {
     @Serializable
     data class Claims(
         val sub: String,
-        val exp: Long
+        val exp: Long,
+        /** Token issue time, used by the local admin session revocation control. */
+        val iat: Long = 0
     )
 
     fun sign(secret: String, username: String, ttlMillis: Long = 30L * 24 * 3600 * 1000): String {
+        val issuedAt = System.currentTimeMillis()
+        val expiresAt = issuedAt + ttlMillis
+        return signWithClaims(secret, Claims(sub = username, exp = expiresAt, iat = issuedAt))
+    }
+
+    private fun signWithClaims(secret: String, claims: Claims): String {
         val header = encoder.encodeToString("{\"alg\":\"HS256\",\"typ\":\"JWT\"}".toByteArray())
         val payload = encoder.encodeToString(
-            json.encodeToString(Claims(username, System.currentTimeMillis() + ttlMillis)).toByteArray()
+            json.encodeToString(claims).toByteArray()
         )
         val signature = hmac(secret, "$header.$payload")
         return "$header.$payload.$signature"
     }
 
-    fun verify(secret: String, token: String): String? {
+    fun verifyClaims(secret: String, token: String): Claims? {
         val parts = token.split(".")
         if (parts.size != 3) return null
         val expected = hmac(secret, "${parts[0]}.${parts[1]}")
         if (!MessageDigest.isEqual(expected.toByteArray(), parts[2].toByteArray())) return null
         return try {
             val claims = json.decodeFromString<Claims>(String(decoder.decode(parts[1])))
-            if (claims.exp < System.currentTimeMillis()) null else claims.sub
+            if (claims.exp < System.currentTimeMillis()) null else claims
         } catch (e: Exception) {
             null
         }
+    }
+
+    fun verify(secret: String, token: String): String? {
+        return verifyClaims(secret, token)?.sub
     }
 
     private fun hmac(secret: String, data: String): String {

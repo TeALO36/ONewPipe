@@ -46,6 +46,31 @@ data class AuthResponse(
 )
 
 @Serializable
+data class AdminAccountDto(
+    val username: String,
+    val createdAt: Long,
+    val isAdmin: Boolean,
+    val watchStateCount: Int
+)
+
+@Serializable
+data class AdminOverviewDto(
+    val currentUsername: String,
+    val accounts: List<AdminAccountDto>,
+    val storeFileBytes: Long
+)
+
+@Serializable
+data class AdminPasswordRequest(
+    val password: String
+)
+
+@Serializable
+data class AdminAccountRequest(
+    val username: String
+)
+
+@Serializable
 data class ErrorResponse(
     val error: String
 )

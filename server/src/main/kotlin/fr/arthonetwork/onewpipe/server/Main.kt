@@ -1,5 +1,6 @@
 package fr.arthonetwork.onewpipe.server
 
+import io.ktor.http.ContentType
 import io.ktor.http.HttpStatusCode
 import io.ktor.serialization.kotlinx.json.json
 import io.ktor.server.application.Application
@@ -55,7 +56,11 @@ fun main() {
     }.start(wait = true)
 }
 
-fun Application.module(store: Store, jwtSecret: String) {
+fun Application.module(
+    store: Store,
+    jwtSecret: String,
+    adminPanelEnabled: Boolean = System.getenv("ADMIN_PANEL_ENABLED")?.equals("true", ignoreCase = true) == true
+) {
     install(ContentNegotiation) {
         json(Json { ignoreUnknownKeys = true })
     }
@@ -71,9 +76,77 @@ fun Application.module(store: Store, jwtSecret: String) {
     }
 
     routing {
-        // Web UI (same origin as the API: no CORS needed)
-        staticResources("/", "web") {
-            default("index.html")
+        // The admin surface is deliberately not part of the public web UI.
+        // It is disabled by default and returns 404 to every non-loopback client.
+        get("/__local_admin") {
+            if (!call.requireLocalAdmin(adminPanelEnabled)) return@get
+            val page = Thread.currentThread().contextClassLoader
+                .getResourceAsStream("web/admin.html")
+                ?: error("Missing local admin page")
+            call.respondBytes(page.use { it.readBytes() }, ContentType.Text.Html)
+        }
+
+        get("/api/admin/overview") {
+            if (!call.requireLocalAdmin(adminPanelEnabled)) return@get
+            val username = call.authenticateAdmin(jwtSecret, store) ?: return@get
+            call.respond(
+                AdminOverviewDto(
+                    currentUsername = username,
+                    accounts = store.adminAccounts().map { account ->
+                        AdminAccountDto(
+                            username = account.username,
+                            createdAt = account.createdAt,
+                            isAdmin = store.isAdmin(account.username),
+                            watchStateCount = store.watchStateCount(account.username)
+                        )
+                    },
+                    storeFileBytes = store.storeFileBytes()
+                )
+            )
+        }
+
+        post("/api/admin/password") {
+            if (!call.requireLocalAdmin(adminPanelEnabled)) return@post
+            val username = call.authenticateAdmin(jwtSecret, store) ?: return@post
+            val request = call.receive<AdminPasswordRequest>()
+            if (request.password.length < 6) {
+                call.respond(HttpStatusCode.BadRequest, ErrorResponse("Password must contain at least 6 characters"))
+                return@post
+            }
+            store.updatePassword(username, request.password)
+            call.respond(mapOf("status" to "password-updated", "message" to "Sign in again"))
+        }
+
+        post("/api/admin/revoke-sessions") {
+            if (!call.requireLocalAdmin(adminPanelEnabled)) return@post
+            call.authenticateAdmin(jwtSecret, store) ?: return@post
+            val request = call.receive<AdminAccountRequest>()
+            if (!store.revokeSessions(request.username.trim())) {
+                call.respond(HttpStatusCode.NotFound, ErrorResponse("Account not found"))
+                return@post
+            }
+            call.respond(mapOf("status" to "sessions-revoked"))
+        }
+
+        post("/api/admin/account/delete") {
+            if (!call.requireLocalAdmin(adminPanelEnabled)) return@post
+            val currentUsername = call.authenticateAdmin(jwtSecret, store) ?: return@post
+            val username = call.receive<AdminAccountRequest>().username.trim()
+            if (username.isBlank() || username == currentUsername || store.isAdmin(username)) {
+                call.respond(HttpStatusCode.BadRequest, ErrorResponse("The administrator account cannot be deleted"))
+                return@post
+            }
+            if (!store.deleteAccount(username)) {
+                call.respond(HttpStatusCode.NotFound, ErrorResponse("Account not found"))
+                return@post
+            }
+            call.respond(mapOf("status" to "account-deleted"))
+        }
+
+        get("/api/admin/backup") {
+            if (!call.requireLocalAdmin(adminPanelEnabled)) return@get
+            call.authenticateAdmin(jwtSecret, store) ?: return@get
+            call.respondBytes(store.backupJson(), ContentType.Application.Json)
         }
 
         // ---- Extraction API ----
@@ -150,6 +223,12 @@ fun Application.module(store: Store, jwtSecret: String) {
         get("/health") {
             call.respond(mapOf("status" to "ok"))
         }
+
+        // Web UI (same origin as the API: no CORS needed). Keep this catch-all
+        // after every API/admin route so missing static files do not swallow them.
+        staticResources("/", "web") {
+            default("index.html")
+        }
     }
 }
 
@@ -159,10 +238,41 @@ private suspend fun io.ktor.server.application.ApplicationCall.authenticate(
 ): String? {
     val header = request.headers["Authorization"] ?: ""
     val token = header.removePrefix("Bearer ").trim()
-    val username = Jwt.verify(jwtSecret, token)
-    if (username == null || store.findAccount(username) == null) {
+    val claims = Jwt.verifyClaims(jwtSecret, token)
+    val username = claims?.sub
+    if (claims == null || username == null || store.findAccount(username) == null ||
+        !store.isSessionValid(username, claims.iat)
+    ) {
         respond(HttpStatusCode.Unauthorized, ErrorResponse("Missing or invalid token"))
         return null
     }
     return username
+}
+
+private suspend fun io.ktor.server.application.ApplicationCall.authenticateAdmin(
+    jwtSecret: String,
+    store: Store
+): String? {
+    val username = authenticate(jwtSecret, store)
+    if (username == null || !store.isAdmin(username)) {
+        respond(HttpStatusCode.Forbidden, ErrorResponse("Administrator access required"))
+        return null
+    }
+    return username
+}
+
+private suspend fun io.ktor.server.application.ApplicationCall.requireLocalAdmin(enabled: Boolean): Boolean {
+    if (!enabled) {
+        respond(HttpStatusCode.NotFound, ErrorResponse("Not found"))
+        return false
+    }
+    val remoteAddress = request.local.remoteAddress
+    val loopback = remoteAddress == "127.0.0.1" ||
+        remoteAddress == "::1" ||
+        remoteAddress == "0:0:0:0:0:0:0:1"
+    if (!loopback) {
+        respond(HttpStatusCode.NotFound, ErrorResponse("Not found"))
+        return false
+    }
+    return true
 }

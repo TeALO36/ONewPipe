@@ -13,13 +13,15 @@ data class AccountRecord(
     val username: String,
     val salt: String,
     val hash: String,
-    val createdAt: Long = System.currentTimeMillis()
+    val createdAt: Long = System.currentTimeMillis(),
+    val isAdmin: Boolean = false
 )
 
 @Serializable
 data class StoreFile(
     val accounts: List<AccountRecord> = emptyList(),
-    val watchState: Map<String, Map<String, WatchStateItem>> = emptyMap()
+    val watchState: Map<String, Map<String, WatchStateItem>> = emptyMap(),
+    val sessionRevokedBefore: Map<String, Long> = emptyMap()
 )
 
 /**
@@ -35,6 +37,7 @@ class Store(dataDir: File) {
 
     private val accounts = ConcurrentHashMap<String, AccountRecord>()
     private val watchState = ConcurrentHashMap<String, ConcurrentHashMap<String, WatchStateItem>>()
+    private val sessionRevokedBefore = ConcurrentHashMap<String, Long>()
 
     init {
         dataDir.mkdirs()
@@ -50,6 +53,7 @@ class Store(dataDir: File) {
                 data.watchState.forEach { (user, items) ->
                     watchState[user] = ConcurrentHashMap(items)
                 }
+                sessionRevokedBefore.putAll(data.sessionRevokedBefore)
             } catch (e: Exception) {
                 System.err.println("WARNING: could not read $file: ${e.message}")
             }
@@ -60,7 +64,8 @@ class Store(dataDir: File) {
         synchronized(lock) {
             val data = StoreFile(
                 accounts = accounts.values.sortedBy { it.createdAt },
-                watchState = watchState.mapValues { it.value.toMap() }
+                watchState = watchState.mapValues { it.value.toMap() },
+                sessionRevokedBefore = sessionRevokedBefore.toMap()
             )
             val tmp = File(file.path + ".tmp")
             tmp.writeText(json.encodeToString(data))
@@ -75,10 +80,67 @@ class Store(dataDir: File) {
     fun createAccount(record: AccountRecord): Boolean {
         synchronized(lock) {
             if (accounts.containsKey(record.username)) return false
-            accounts[record.username] = record
+            val firstAccount = accounts.isEmpty()
+            accounts[record.username] = record.copy(isAdmin = firstAccount || record.isAdmin)
             persist()
             return true
         }
+    }
+
+    fun isAdmin(username: String): Boolean {
+        val account = accounts[username] ?: return false
+        // Existing installations predate the role field: migrate the oldest
+        // account as administrator without rewriting their credentials.
+        return account.isAdmin || accounts.values.minByOrNull { it.createdAt }?.username == username
+    }
+
+    fun adminAccounts(): List<AccountRecord> =
+        accounts.values.sortedBy { it.createdAt }
+
+    fun watchStateCount(username: String): Int = watchState[username]?.size ?: 0
+
+    fun updatePassword(username: String, password: String): Boolean {
+        synchronized(lock) {
+            val account = accounts[username] ?: return false
+            val salt = Passwords.newSalt()
+            accounts[username] = account.copy(salt = salt, hash = Passwords.hash(password, salt))
+            sessionRevokedBefore[username] = System.currentTimeMillis()
+            persist()
+            return true
+        }
+    }
+
+    fun deleteAccount(username: String): Boolean {
+        synchronized(lock) {
+            if (accounts.remove(username) == null) return false
+            watchState.remove(username)
+            sessionRevokedBefore.remove(username)
+            persist()
+            return true
+        }
+    }
+
+    fun revokeSessions(username: String): Boolean {
+        synchronized(lock) {
+            if (!accounts.containsKey(username)) return false
+            sessionRevokedBefore[username] = System.currentTimeMillis()
+            persist()
+            return true
+        }
+    }
+
+    fun isSessionValid(username: String, issuedAt: Long): Boolean =
+        issuedAt > sessionRevokedBefore.getOrDefault(username, 0L)
+
+    fun storeFileBytes(): Long = file.length()
+
+    fun backupJson(): ByteArray = synchronized(lock) {
+        val data = StoreFile(
+            accounts = accounts.values.sortedBy { it.createdAt },
+            watchState = watchState.mapValues { it.value.toMap() },
+            sessionRevokedBefore = sessionRevokedBefore.toMap()
+        )
+        json.encodeToString(data).toByteArray(Charsets.UTF_8)
     }
 
     // ---- Watch state ----

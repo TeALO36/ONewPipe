@@ -1,0 +1,159 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>ONewPipe local administration</title>
+  <style>
+    :root { color-scheme: dark; --bg:#0d1320; --card:#151e2e; --muted:#aab6c8; --text:#eef4ff; --accent:#50e3c2; --danger:#ff758f; --border:#334158; }
+    * { box-sizing:border-box; }
+    body { margin:0; padding:24px; background:var(--bg); color:var(--text); font:15px system-ui,sans-serif; }
+    main { max-width:920px; margin:0 auto; }
+    .card { background:var(--card); border:1px solid var(--border); border-radius:14px; padding:20px; margin:16px 0; }
+    h1 { margin:0 0 6px; }
+    h2 { margin-top:0; font-size:20px; }
+    p { color:var(--muted); line-height:1.5; }
+    input,button { border-radius:8px; border:1px solid var(--border); padding:10px 12px; font:inherit; }
+    input { display:block; width:100%; margin:8px 0; background:#202b3e; color:var(--text); }
+    button { background:#202b3e; color:var(--text); cursor:pointer; }
+    button.primary { background:#50e3c2; border-color:#50e3c2; color:#101827; font-weight:700; }
+    button.danger { color:var(--danger); }
+    button:disabled { opacity:.55; cursor:not-allowed; }
+    .row { display:flex; gap:8px; flex-wrap:wrap; align-items:center; }
+    .status { min-height:22px; color:var(--muted); }
+    .error { color:var(--danger); }
+    .ok { color:var(--accent); }
+    table { width:100%; border-collapse:collapse; }
+    th,td { text-align:left; padding:11px 8px; border-bottom:1px solid var(--border); vertical-align:middle; }
+    th { color:var(--muted); font-weight:600; }
+    td.actions { white-space:nowrap; }
+    .badge { display:inline-block; padding:3px 7px; border-radius:999px; background:#263650; color:var(--accent); font-size:12px; }
+    #dashboard { display:none; }
+    @media (max-width:620px) { body { padding:12px; } th:nth-child(2),td:nth-child(2) { display:none; } }
+  </style>
+</head>
+<body>
+<main>
+  <header>
+    <h1>ONewPipe local administration</h1>
+    <p>This page is available only when enabled and from the server computer itself. It is not linked from the normal application.</p>
+  </header>
+
+  <section class="card" id="loginCard">
+    <h2>Administrator sign in</h2>
+    <form id="loginForm">
+      <input id="username" autocomplete="username" placeholder="Username" required>
+      <input id="password" type="password" autocomplete="current-password" placeholder="Password" required>
+      <button class="primary" type="submit">Open local administration</button>
+    </form>
+    <div class="status" id="loginStatus"></div>
+  </section>
+
+  <section id="dashboard">
+    <section class="card">
+      <div class="row" style="justify-content:space-between">
+        <div>
+          <h2>Server overview</h2>
+          <div class="status" id="overviewStatus"></div>
+        </div>
+        <div class="row">
+          <button id="backupBtn">Download local backup</button>
+          <button id="logoutBtn">Sign out</button>
+        </div>
+      </div>
+      <div class="status" id="actionStatus"></div>
+    </section>
+
+    <section class="card">
+      <h2>Accounts</h2>
+      <table>
+        <thead><tr><th>Username</th><th>Created</th><th>Watch positions</th><th>Role</th><th>Actions</th></tr></thead>
+        <tbody id="accounts"></tbody>
+      </table>
+    </section>
+
+    <section class="card">
+      <h2>Change administrator password</h2>
+      <form id="passwordForm" class="row">
+        <input id="newPassword" type="password" autocomplete="new-password" placeholder="New password (6+ characters)" required style="max-width:360px">
+        <button class="primary" type="submit">Change password</button>
+      </form>
+      <p>All existing sessions for this administrator are invalidated. Sign in again after changing it.</p>
+    </section>
+  </section>
+</main>
+<script>
+let token = '';
+const $ = id => document.getElementById(id);
+function status(id, message, good = false) {
+  const node = $(id); node.textContent = message; node.className = 'status ' + (good ? 'ok' : 'error');
+}
+async function api(path, options = {}) {
+  const headers = Object.assign({ 'Content-Type': 'application/json' }, options.headers || {});
+  if (token) headers.Authorization = 'Bearer ' + token;
+  const response = await fetch(path, Object.assign({}, options, { headers }));
+  const text = await response.text();
+  let data = {};
+  try { data = text ? JSON.parse(text) : {}; } catch (_) { data = { error: text }; }
+  if (!response.ok) throw new Error(data.error || 'Request failed (' + response.status + ')');
+  return data;
+}
+$('loginForm').onsubmit = async event => {
+  event.preventDefault();
+  status('loginStatus', 'Signing in…', true);
+  try {
+    const data = await api('/api/login', { method:'POST', body:JSON.stringify({ username:$('username').value.trim(), password:$('password').value }) });
+    token = data.token;
+    $('loginCard').style.display = 'none';
+    $('dashboard').style.display = 'block';
+    await refresh();
+  } catch (error) { status('loginStatus', error.message); }
+};
+async function refresh() {
+  try {
+    const data = await api('/api/admin/overview');
+    $('overviewStatus').textContent = data.accounts.length + ' account(s), store size ' + data.storeFileBytes + ' bytes';
+    $('overviewStatus').className = 'status ok';
+    const tbody = $('accounts'); tbody.replaceChildren();
+    data.accounts.forEach(account => {
+      const row = document.createElement('tr');
+      const cells = [account.username, new Date(account.createdAt).toLocaleString(), String(account.watchStateCount)];
+      cells.forEach(value => { const cell = document.createElement('td'); cell.textContent = value; row.appendChild(cell); });
+      const role = document.createElement('td'); role.innerHTML = account.isAdmin ? '<span class="badge">Administrator</span>' : 'User'; row.appendChild(role);
+      const actions = document.createElement('td'); actions.className = 'actions';
+      const revoke = document.createElement('button'); revoke.textContent = 'Revoke sessions'; revoke.onclick = () => revokeSessions(account.username);
+      actions.appendChild(revoke);
+      if (!account.isAdmin) {
+        const remove = document.createElement('button'); remove.className = 'danger'; remove.textContent = 'Delete'; remove.onclick = () => deleteAccount(account.username); actions.appendChild(remove);
+      }
+      row.appendChild(actions); tbody.appendChild(row);
+    });
+  } catch (error) { status('overviewStatus', error.message); }
+}
+async function revokeSessions(username) {
+  if (!confirm('Revoke all sessions for ' + username + '?')) return;
+  try { await api('/api/admin/revoke-sessions', { method:'POST', body:JSON.stringify({ username }) }); status('actionStatus', 'Sessions revoked for ' + username, true); if (username === $('username').value.trim()) token = ''; }
+  catch (error) { status('actionStatus', error.message); }
+}
+async function deleteAccount(username) {
+  if (!confirm('Delete account ' + username + ' and its watch positions?')) return;
+  try { await api('/api/admin/account/delete', { method:'POST', body:JSON.stringify({ username }) }); status('actionStatus', 'Account deleted.', true); await refresh(); }
+  catch (error) { status('actionStatus', error.message); }
+}
+$('passwordForm').onsubmit = async event => {
+  event.preventDefault();
+  try { await api('/api/admin/password', { method:'POST', body:JSON.stringify({ password:$('newPassword').value }) }); token = ''; status('actionStatus', 'Password changed. Sign in again.', true); $('dashboard').style.display = 'none'; $('loginCard').style.display = 'block'; }
+  catch (error) { status('actionStatus', error.message); }
+};
+$('backupBtn').onclick = async () => {
+  try {
+    const response = await fetch('/api/admin/backup', { headers:{ Authorization:'Bearer ' + token } });
+    if (!response.ok) throw new Error('Backup failed (' + response.status + ')');
+    const blob = await response.blob(); const link = document.createElement('a'); link.href = URL.createObjectURL(blob); link.download = 'onewpipe-store-backup.json'; link.click(); URL.revokeObjectURL(link.href);
+    status('actionStatus', 'Backup downloaded locally.', true);
+  } catch (error) { status('actionStatus', error.message); }
+};
+$('logoutBtn').onclick = () => { token = ''; $('dashboard').style.display = 'none'; $('loginCard').style.display = 'block'; status('loginStatus', 'Signed out.', true); };
+</script>
+</body>
+</html>

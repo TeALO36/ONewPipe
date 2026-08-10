@@ -5,6 +5,7 @@ import androidx.compose.foundation.clickable
 import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
@@ -20,6 +21,7 @@ import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalClipboardManager
 import androidx.compose.ui.text.AnnotatedString
 import androidx.compose.ui.text.style.TextOverflow
+import androidx.compose.ui.unit.DpOffset
 import androidx.compose.ui.unit.dp
 import coil3.compose.AsyncImage
 import net.newpipe.app.domain.DownloadViewModel
@@ -92,9 +94,15 @@ fun VideoDetailsContent(
         }
         
         var expandedQuality by remember { mutableStateOf(false) }
+        val qualityProfiles = remember(state.videoStreams, state.videoOnlyStreams, state.audioStreams) {
+            buildQualityProfiles(state)
+        }
         Box {
             OutlinedButton(
-                onClick = { expandedQuality = true },
+                onClick = {
+                    playerViewModel.loadFullQuality(state.originalUrl)
+                    expandedQuality = true
+                },
                 colors = ButtonDefaults.outlinedButtonColors(contentColor = Color.White)
             ) {
                 Icon(imageVector = Icons.Default.Settings, contentDescription = null, modifier = Modifier.size(18.dp))
@@ -104,30 +112,136 @@ fun VideoDetailsContent(
             DropdownMenu(
                 expanded = expandedQuality,
                 onDismissRequest = { expandedQuality = false },
-                modifier = Modifier.background(Color.DarkGray)
+                offset = DpOffset(0.dp, 8.dp),
+                modifier = Modifier
+                    .width(250.dp)
+                    .heightIn(max = 360.dp)
+                    .background(Color(0xFF2D2D2D))
+                    .verticalScroll(rememberScrollState())
             ) {
-                state.videoStreams.forEach { stream ->
+                if (qualityProfiles.isEmpty()) {
                     DropdownMenuItem(
-                        text = { Text("${stream.resolution} (${stream.format?.name})", color = Color.White) },
-                        onClick = {
-                            playerViewModel.changeQuality(stream.content ?: "")
-                            expandedQuality = false
-                        }
+                        text = { Text("No video quality available", color = Color.LightGray) },
+                        onClick = { expandedQuality = false }
                     )
-                }
-                state.audioStreams.forEach { stream ->
-                    DropdownMenuItem(
-                        text = { Text("Audio Only (${stream.format?.name})", color = Color.White) },
-                        onClick = {
-                            playerViewModel.changeQuality(stream.content ?: "")
-                            expandedQuality = false
-                        }
-                    )
+                } else {
+                    qualityProfiles.forEach { profile ->
+                        DropdownMenuItem(
+                            text = {
+                                Column {
+                                    Text(profile.label, color = Color.White)
+                                    Text(
+                                        profile.description,
+                                        color = Color.LightGray,
+                                        style = MaterialTheme.typography.labelSmall
+                                    )
+                                }
+                            },
+                            onClick = {
+                                playerViewModel.changeQuality(profile.videoUrl, profile.audioUrl)
+                                expandedQuality = false
+                            }
+                        )
+                    }
                 }
             }
         }
     }
 }
+
+private data class QualityCandidate(
+    val bucket: Int,
+    val height: Int,
+    val videoUrl: String,
+    val audioUrl: String?,
+    val adaptive: Boolean
+)
+
+private data class QualityProfile(
+    val label: String,
+    val description: String,
+    val videoUrl: String,
+    val audioUrl: String?
+)
+
+/**
+ * Collapse every extractor format into at most five user-facing profiles.
+ * YouTube exposes many codecs/bitrates for the same resolution; users should
+ * choose 360p/480p/720p/1080p, not inspect every raw stream.
+ */
+private fun buildQualityProfiles(state: PlayerState.Playing): List<QualityProfile> {
+    val bestAudio = state.audioStreams.maxByOrNull { it.averageBitrate }
+    val candidates = buildList {
+        state.videoOnlyStreams.forEach { stream ->
+            val videoUrl = stream.content ?: stream.url
+            if (!videoUrl.isNullOrBlank()) {
+                val height = resolutionHeight(stream.resolution)
+                add(
+                    QualityCandidate(
+                        bucket = qualityBucket(height),
+                        height = height,
+                        videoUrl = videoUrl,
+                        audioUrl = bestAudio?.content ?: bestAudio?.url,
+                        adaptive = true
+                    )
+                )
+            }
+        }
+        state.videoStreams.forEach { stream ->
+            val videoUrl = stream.content ?: stream.url
+            if (!videoUrl.isNullOrBlank()) {
+                val height = resolutionHeight(stream.resolution)
+                add(
+                    QualityCandidate(
+                        bucket = qualityBucket(height),
+                        height = height,
+                        videoUrl = videoUrl,
+                        audioUrl = null,
+                        adaptive = false
+                    )
+                )
+            }
+        }
+    }
+
+    return candidates
+        .groupBy { it.bucket }
+        .values
+        .mapNotNull { group ->
+            // Prefer adaptive streams for HD, then the highest resolution in
+            // the profile. This removes duplicate 1080p/360p codec variants.
+            val selected = group.maxWithOrNull(
+                compareBy<QualityCandidate> { it.height }
+                    .thenBy { if (it.adaptive) 1 else 0 }
+            ) ?: return@mapNotNull null
+            val profileName = when (selected.bucket) {
+                240 -> "Low"
+                360 -> "Standard"
+                480 -> "Enhanced"
+                720 -> "HD"
+                else -> "Full HD"
+            }
+            QualityProfile(
+                label = "${selected.height}p · $profileName",
+                description = if (selected.adaptive) "Video + audio" else "Progressive video",
+                videoUrl = selected.videoUrl,
+                audioUrl = selected.audioUrl
+            )
+        }
+        .sortedBy { qualityBucket(resolutionHeight(it.label)) }
+        .take(5)
+}
+
+private fun qualityBucket(height: Int): Int = when {
+    height <= 240 -> 240
+    height <= 360 -> 360
+    height <= 480 -> 480
+    height <= 720 -> 720
+    else -> 1080
+}
+
+private fun resolutionHeight(value: String): Int =
+    value.filter { it.isDigit() }.toIntOrNull() ?: 0
 
 @Composable
 fun RelatedVideosContent(

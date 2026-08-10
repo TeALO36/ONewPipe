@@ -11,6 +11,7 @@ import androidx.compose.animation.togetherWith
 import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
@@ -67,29 +68,46 @@ fun HomeContent(
     onCategorySelected: (TrendingCategory) -> Unit,
     onMediaClick: (MediaItem) -> Unit,
     onDownloadClick: (MediaItem) -> Unit,
+    onPrefetch: (MediaItem) -> Unit = {},
     onLoadMore: () -> Unit = {},
     isLoadingMore: Boolean = false,
     modifier: Modifier = Modifier
 ) {
-    Column(modifier = modifier.fillMaxSize()) {
-        Spacer(modifier = Modifier.height(24.dp))
+    BoxWithConstraints(modifier = modifier.fillMaxSize()) {
+        val isCompact = maxWidth < 600.dp
 
-        val isMediaSection = selectedItem == NavItem.HOME || selectedItem == NavItem.TRENDING
-        if (isMediaSection) {
-            Row(
-                modifier = Modifier.fillMaxWidth().padding(horizontal = 24.dp),
-                verticalAlignment = Alignment.CenterVertically
-            ) {
-                GlassSearchBar(
-                    onSearch = onSearch,
-                    modifier = Modifier.weight(1f)
-                )
-                Spacer(modifier = Modifier.width(16.dp))
+        Column(modifier = Modifier.fillMaxSize()) {
+            Spacer(modifier = Modifier.height(if (isCompact) 12.dp else 24.dp))
 
-                ServiceSwitcher(service = service, onServiceSelected = onServiceSelected)
+            val isMediaSection = selectedItem == NavItem.HOME || selectedItem == NavItem.TRENDING
+            if (isMediaSection) {
+                if (isCompact) {
+                    Column(
+                        modifier = Modifier.padding(horizontal = 16.dp),
+                        verticalArrangement = Arrangement.spacedBy(10.dp)
+                    ) {
+                        GlassSearchBar(onSearch = onSearch, modifier = Modifier.fillMaxWidth())
+                        ServiceSwitcher(
+                            service = service,
+                            onServiceSelected = onServiceSelected,
+                            modifier = Modifier.fillMaxWidth()
+                        )
+                    }
+                } else {
+                    Row(
+                        modifier = Modifier.fillMaxWidth().padding(horizontal = 24.dp),
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        GlassSearchBar(
+                            onSearch = onSearch,
+                            modifier = Modifier.weight(1f)
+                        )
+                        Spacer(modifier = Modifier.width(16.dp))
+                        ServiceSwitcher(service = service, onServiceSelected = onServiceSelected)
+                    }
+                }
+                Spacer(modifier = Modifier.height(if (isCompact) 10.dp else 16.dp))
             }
-            Spacer(modifier = Modifier.height(16.dp))
-        }
 
         // Dynamic Title (crossfades when switching sections)
         AnimatedContent(
@@ -101,7 +119,10 @@ fun HomeContent(
                 text = item.title,
                 style = MaterialTheme.typography.headlineMedium.copy(fontWeight = FontWeight.Bold),
                 color = MaterialTheme.colorScheme.onBackground,
-                modifier = Modifier.padding(horizontal = 24.dp, vertical = 8.dp)
+                modifier = Modifier.padding(
+                    horizontal = if (isCompact) 16.dp else 24.dp,
+                    vertical = 8.dp
+                )
             )
         }
 
@@ -116,7 +137,7 @@ fun HomeContent(
                 modifier = Modifier
                     .fillMaxWidth()
                     .horizontalScroll(rememberScrollState())
-                    .padding(horizontal = 24.dp),
+                    .padding(horizontal = if (isCompact) 16.dp else 24.dp),
                 horizontalArrangement = Arrangement.spacedBy(8.dp)
             ) {
                 TrendingCategory.entries.forEach { category ->
@@ -166,6 +187,7 @@ fun HomeContent(
                                     isLoadingMore = isLoadingMore,
                                     onMediaClick = onMediaClick,
                                     onDownloadClick = onDownloadClick,
+                                    onPrefetch = onPrefetch,
                                     onLoadMore = onLoadMore,
                                     modifier = Modifier.fillMaxSize()
                                 )
@@ -181,17 +203,18 @@ fun HomeContent(
                         icon = { Icon(Icons.Filled.Cloud, contentDescription = null, modifier = Modifier.size(56.dp)) },
                         title = "No subscriptions yet",
                         message = "Connect to your ONewPipe server (cloud icon, bottom left) to sync your " +
-                            "channels and subscriptions across devices."
+                            "watch positions across devices. Subscription sync is not available yet."
                     )
                 }
                 NavItem.LIBRARY -> {
                     EmptySection(
                         icon = { Icon(Icons.Filled.VideoLibrary, contentDescription = null, modifier = Modifier.size(56.dp)) },
                         title = "Your library is empty",
-                        message = "Watch history, playlists and downloads will appear here. " +
-                            "Played videos are saved and synchronized through your server."
+                        message = "Watch history and local downloads will appear here. " +
+                            "Played video positions are synchronized through your server."
                     )
                 }
+            }
             }
         }
     }
@@ -228,11 +251,15 @@ private fun EmptySection(
 @Composable
 private fun ServiceSwitcher(
     service: Service,
-    onServiceSelected: (Service) -> Unit
+    onServiceSelected: (Service) -> Unit,
+    modifier: Modifier = Modifier
 ) {
     var expanded by remember { mutableStateOf(false) }
     Box {
-        OutlinedButton(onClick = { expanded = true }) {
+        OutlinedButton(
+            onClick = { expanded = true },
+            modifier = modifier
+        ) {
             Text(service.serviceName)
             Icon(Icons.Default.ArrowDropDown, contentDescription = "Switch Service")
         }

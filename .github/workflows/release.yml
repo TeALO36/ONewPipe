@@ -17,6 +17,15 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
+      - name: Verify release signing key
+        if: startsWith(github.ref, 'refs/tags/v')
+        env:
+          KEYSTORE_BASE64: ${{ secrets.KEYSTORE_BASE64 }}
+        run: |
+          if [ -z "$KEYSTORE_BASE64" ]; then
+            echo "::error::A release tag requires KEYSTORE_BASE64 so GitHub APK updates remain installable."
+            exit 1
+          fi
       - name: Set up JDK 21
         uses: actions/setup-java@v4
         with:
@@ -40,7 +49,9 @@ jobs:
             echo "::warning::No KEYSTORE_BASE64 secret - APK will be signed with the debug key"
           fi
       - name: Build Android Release APK
-        run: ./gradlew :app:assembleRelease --stacktrace
+        env:
+          VERSION: ${{ github.ref_name }}
+        run: ./gradlew :app:assembleRelease -DversionNameOverride="${VERSION#v}" --stacktrace
       - name: Rename APK with version
         run: |
           VERSION_NAME="${{ github.ref_name }}"
@@ -62,6 +73,8 @@ jobs:
             ext: msi
           - os: ubuntu-latest
             ext: deb
+          - os: macos-latest
+            ext: dmg
     runs-on: ${{ matrix.os }}
     steps:
       - uses: actions/checkout@v4
@@ -80,7 +93,10 @@ jobs:
           Expand-Archive "$env:TEMP\wix.zip" -DestinationPath $wix -Force
           echo "$wix" | Out-File -FilePath $env:GITHUB_PATH -Encoding utf8 -Append
       - name: Build Desktop Distribution
-        run: ./gradlew :desktopApp:packageDistributionForCurrentOS
+        shell: bash
+        env:
+          VERSION: ${{ github.ref_name }}
+        run: ./gradlew :desktopApp:packageDistributionForCurrentOS -DversionNameOverride="${VERSION#v}"
       - name: Upload Desktop Installer
         uses: actions/upload-artifact@v4
         with:
@@ -100,7 +116,10 @@ jobs:
           distribution: 'temurin'
           cache: gradle
       - name: Build portable distributable
-        run: ./gradlew :desktopApp:createDistributable
+        shell: bash
+        env:
+          VERSION: ${{ github.ref_name }}
+        run: ./gradlew :desktopApp:createDistributable -DversionNameOverride="${VERSION#v}"
       - name: Zip portable app
         run: |
           powershell Compress-Archive -Path desktopApp/build/compose/binaries/main/app -DestinationPath "ONewPipe-portable-win.zip" -Force
@@ -109,6 +128,40 @@ jobs:
         with:
           name: Desktop-Portable-Windows
           path: ONewPipe-portable-win.zip
+
+  build-server-windows:
+    name: Build Windows server launcher
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Set up JDK 21
+        uses: actions/setup-java@v4
+        with:
+          java-version: '21'
+          distribution: 'temurin'
+          cache: gradle
+      - name: Build server fat jar
+        shell: bash
+        run: ./gradlew :server:fatJar
+      - name: Package Windows server executable
+        shell: pwsh
+        env:
+          VERSION: ${{ github.ref_name }}
+        run: |
+          $version = $env:VERSION.TrimStart('v')
+          jpackage `
+            --type app-image `
+            --name ONewPipeServer `
+            --app-version "$version" `
+            --input server/build/libs `
+            --main-jar onewpipe-server-all.jar `
+            --dest server-dist
+          Compress-Archive -Path server-dist/ONewPipeServer -DestinationPath ONewPipe-server-windows.zip -Force
+      - name: Upload Windows server
+        uses: actions/upload-artifact@v4
+        with:
+          name: Server-Windows
+          path: ONewPipe-server-windows.zip
 
   build-server:
     name: Build Server fat jar
@@ -165,7 +218,7 @@ jobs:
 
   release:
     name: Create GitHub Release
-    needs: [build-android, build-desktop, build-desktop-portable, build-server]
+    needs: [build-android, build-desktop, build-desktop-portable, build-server, build-server-windows]
     runs-on: ubuntu-latest
     steps:
       - name: Download build artifacts
@@ -173,7 +226,7 @@ jobs:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
           mkdir -p artifacts
-          for a in Android-APK Desktop-ubuntu-latest Desktop-windows-latest Desktop-Portable-Windows Server-jar; do
+          for a in Android-APK Desktop-ubuntu-latest Desktop-windows-latest Desktop-macos-latest Desktop-Portable-Windows Server-jar Server-Windows; do
             gh run download "${{ github.run_id }}" -R "${{ github.repository }}" --dir artifacts --name "$a"
           done
 
@@ -182,12 +235,14 @@ jobs:
           VERSION: ${{ github.ref_name }}
         run: |
           mkdir -p release-files
-          for f in $(find artifacts -type f \( -name "*.apk" -o -name "*.msi" -o -name "*.deb" -o -name "*.jar" -o -name "*.zip" \)); do
+          for f in $(find artifacts -type f \( -name "*.apk" -o -name "*.msi" -o -name "*.deb" -o -name "*.dmg" -o -name "*.jar" -o -name "*.zip" \)); do
             case "$f" in
               *.apk)  dest="ONewPipe-${VERSION}-android.apk" ;;
               *.msi)  dest="ONewPipe-${VERSION}-windows-setup.msi" ;;
+              *server-windows.zip) dest="ONewPipe-${VERSION}-windows-server.zip" ;;
               *.zip)  dest="ONewPipe-${VERSION}-windows-portable.zip" ;;
               *.deb)  dest="ONewPipe-${VERSION}-linux.deb" ;;
+              *.dmg)  dest="ONewPipe-${VERSION}-macos.dmg" ;;
               *.jar)  dest="ONewPipe-${VERSION}-server.jar" ;;
               *)      dest="$(basename "$f")" ;;
             esac

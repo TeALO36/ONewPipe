@@ -4,8 +4,11 @@ import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.Fullscreen
+import androidx.compose.material.icons.filled.FullscreenExit
 import androidx.compose.material.icons.filled.Pause
 import androidx.compose.material.icons.filled.PlayArrow
+import androidx.compose.material.icons.filled.Theaters
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
@@ -23,27 +26,30 @@ import uk.co.caprica.vlcj.player.component.CallbackMediaPlayerComponent
 actual fun VideoPlayer(
     modifier: Modifier,
     videoUrl: String,
+    audioUrl: String?,
     startPositionMs: Long,
     onPlaybackEnded: () -> Unit,
     onPositionChange: (Long) -> Unit,
     playerActions: PlayerActions
 ) {
-    // libvlc options that make video output reliable on Windows desktops:
-    // - --avcodec-hw=none: force software decoding. The callback video surface
-    //   used by vlcj often stays black (sound but no image) with hardware
-    //   acceleration enabled, which was the "black video for seconds" bug.
-    // - --network-caching=400: cap the network buffer so playback starts faster.
-    // - --no-video-title-show: remove libvlc's own overlay text.
+    // Software decoding avoids the black-frame/audio-only issue seen with the
+    // vlcj callback surface on Windows. A modest network cache gets playback
+    // started without the old multi-second buffer.
     val mediaPlayerComponent = remember {
         CallbackMediaPlayerComponent(
             "--no-video-title-show",
             "--avcodec-hw=none",
             "--network-caching=400",
             "--drop-late-frames"
-        )
+        ).also { component ->
+            // AWT heavyweight surfaces otherwise flash their default white
+            // background during a Windows resize/repaint.
+            component.background = java.awt.Color.BLACK
+            component.isOpaque = true
+            component.videoSurfaceComponent().background = java.awt.Color.BLACK
+            component.videoSurfaceComponent().isOpaque = true
+        }
     }
-    // True once the first video frame has been rendered; drives the buffering
-    // spinner so the user sees feedback instead of a silent black rectangle.
     var hasVideoFrame by remember { mutableStateOf(false) }
     var isPlaying by remember { mutableStateOf(false) }
     var progress by remember { mutableStateOf(0f) }
@@ -51,24 +57,21 @@ actual fun VideoPlayer(
     var totalTime by remember { mutableStateOf("0:00") }
     val coroutineScope = rememberCoroutineScope()
 
-    DisposableEffect(videoUrl) {
+    DisposableEffect(videoUrl, audioUrl) {
         val player = mediaPlayerComponent.mediaPlayer()
         val hasSeeked = java.util.concurrent.atomic.AtomicBoolean(false)
 
-        // libvlc is NOT thread-safe: every native call must happen on the same thread
-        // (the AWT event dispatch thread, on which Compose Desktop runs). Calling into
-        // the native player from other threads - e.g. a background executor - raises
-        // "Invalid memory access" java.lang.Errors that kill the whole JVM.
         fun safe(block: () -> Unit) {
             try {
                 block()
             } catch (_: Throwable) {
-                // The player may already have been stopped/ended natively.
+                // Native player can be stopping while Compose disposes the surface.
             }
         }
 
-        // New video: show the buffering spinner until the first frame arrives.
         hasVideoFrame = false
+        progress = 0f
+        currentTime = "0:00"
 
         player.events().addMediaPlayerEventListener(object : MediaPlayerEventAdapter() {
             override fun playing(mediaPlayer: MediaPlayer?) {
@@ -80,16 +83,16 @@ actual fun VideoPlayer(
             }
             override fun paused(mediaPlayer: MediaPlayer?) { isPlaying = false }
             override fun stopped(mediaPlayer: MediaPlayer?) { isPlaying = false }
-            override fun finished(mediaPlayer: MediaPlayer?) { 
-                isPlaying = false 
+            override fun finished(mediaPlayer: MediaPlayer?) {
+                isPlaying = false
                 onPlaybackEnded()
             }
         })
 
-        // Wire the shared player actions (keyboard shortcuts, click-to-toggle)
-        // to this player instance while this video is attached.
         playerActions.togglePlayPause = {
-            safe { if (player.status().isPlaying) player.controls().pause() else player.controls().play() }
+            safe {
+                if (player.status().isPlaying) player.controls().pause() else player.controls().play()
+            }
         }
         playerActions.seekBy = { seconds ->
             safe {
@@ -97,6 +100,9 @@ actual fun VideoPlayer(
                 if (length > 0) {
                     val target = (player.status().time() + seconds * 1000).coerceIn(0L, length)
                     player.controls().setTime(target)
+                    progress = target.toFloat() / length.toFloat()
+                    currentTime = formatTime(target)
+                    playerActions.reportSeek(seconds)
                 }
             }
         }
@@ -104,7 +110,10 @@ actual fun VideoPlayer(
             safe {
                 val length = player.status().length()
                 if (length > 0) {
-                    player.controls().setTime((fraction * length).toLong().coerceIn(0L, length))
+                    val target = (fraction * length).toLong().coerceIn(0L, length)
+                    player.controls().setTime(target)
+                    progress = target.toFloat() / length.toFloat()
+                    currentTime = formatTime(target)
                 }
             }
         }
@@ -118,79 +127,68 @@ actual fun VideoPlayer(
             safe { player.audio().setMute(!player.audio().isMute) }
         }
 
-        safe { player.media().play(videoUrl) }
+        // VLC accepts a second media as an input slave. This pairs a 720p/1080p
+        // adaptive video-only URL with the best audio URL from NewPipe.
+        safe {
+            if (!audioUrl.isNullOrBlank()) {
+                player.media().play(videoUrl, ":input-slave=$audioUrl")
+            } else {
+                player.media().play(videoUrl)
+            }
+        }
 
         val job = coroutineScope.launch {
             while (true) {
-                val isPlayingNow = try {
-                    player.status().isPlaying
-                } catch (_: Throwable) {
-                    false
-                }
-                if (isPlayingNow) {
-                    try {
-                        val time = player.status().time()
-                        if (time > 0) hasVideoFrame = true
-                        val length = player.status().length()
-                        onPositionChange(time)
-                        if (length > 0) {
-                            progress = time.toFloat() / length.toFloat()
-                            currentTime = formatTime(time)
-                            totalTime = formatTime(length)
-                        }
-                    } catch (_: Throwable) {
-                        // Ignore transient native errors; the player may be stopping.
+                try {
+                    // Read position even while paused, so a keyboard seek or a
+                    // click on the timeline is immediately reflected in the UI.
+                    val time = player.status().time().coerceAtLeast(0L)
+                    val length = player.status().length()
+                    if (time > 0) hasVideoFrame = true
+                    onPositionChange(time)
+                    if (length > 0) {
+                        progress = (time.toFloat() / length.toFloat()).coerceIn(0f, 1f)
+                        currentTime = formatTime(time)
+                        totalTime = formatTime(length)
                     }
+                } catch (_: Throwable) {
+                    // Ignore transient native errors during load/stop.
                 }
-                delay(500)
+                delay(250)
             }
         }
 
         onDispose {
             job.cancel()
-            // Unwire the shared actions so a stale video never controls the UI.
             playerActions.togglePlayPause = {}
             playerActions.seekBy = {}
             playerActions.seekToFraction = {}
             playerActions.adjustVolume = {}
             playerActions.toggleMute = {}
-            // Only stop playback here: the player is deliberately NOT released so that
-            // switching videos (or quality) can reuse the same native player instance.
+            playerActions.reportSeek = {}
             safe { player.controls().stop() }
         }
     }
 
-    // Click on the video toggles play/pause, double-click toggles fullscreen
-    // (YouTube behaviour). The native surface is an AWT component, so the
-    // listener goes directly on it.
+    // The callback component itself is not the video child on every VLCJ
+    // backend. Attach to the actual video surface so a center click always
+    // toggles play/pause; double-click remains the fullscreen gesture.
     DisposableEffect(Unit) {
+        val surface = mediaPlayerComponent.videoSurfaceComponent()
         val mouseListener = object : java.awt.event.MouseAdapter() {
             override fun mouseClicked(e: java.awt.event.MouseEvent) {
-                if (e.clickCount >= 2) {
-                    playerActions.toggleFullscreen()
-                } else if (e.clickCount == 1) {
-                    playerActions.togglePlayPause()
-                }
+                if (e.clickCount >= 2) playerActions.toggleFullscreen()
+                else if (e.clickCount == 1) playerActions.togglePlayPause()
             }
         }
-        mediaPlayerComponent.addMouseListener(mouseListener)
-        onDispose { mediaPlayerComponent.removeMouseListener(mouseListener) }
+        surface.addMouseListener(mouseListener)
+        onDispose { surface.removeMouseListener(mouseListener) }
     }
 
-    // Release the native player once, when this composable leaves composition for good.
     DisposableEffect(Unit) {
         onDispose {
-            try {
-                mediaPlayerComponent.mediaPlayer().controls().stop()
-            } catch (_: Throwable) {
-            }
-            try {
-                mediaPlayerComponent.mediaPlayer().release()
-            } catch (_: Throwable) {
-            }
-            // Intentionally NOT releasing mediaPlayerComponent here to avoid fatal JVM
-            // crash inside libvlc_media_player_set_equalizer when running on background
-            // threads.
+            try { mediaPlayerComponent.mediaPlayer().controls().stop() } catch (_: Throwable) { }
+            try { mediaPlayerComponent.mediaPlayer().release() } catch (_: Throwable) { }
         }
     }
 
@@ -200,13 +198,8 @@ actual fun VideoPlayer(
                 factory = { mediaPlayerComponent },
                 modifier = Modifier.fillMaxSize()
             )
-
-            // Buffering spinner while audio plays but no frame is visible yet.
             if (!hasVideoFrame) {
-                Box(
-                    modifier = Modifier.fillMaxSize(),
-                    contentAlignment = Alignment.Center
-                ) {
+                Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
                     CircularProgressIndicator(
                         modifier = Modifier.size(48.dp),
                         color = Color.White,
@@ -215,22 +208,14 @@ actual fun VideoPlayer(
                 }
             }
         }
-        
-        // Video Controls
+
         Row(
             modifier = Modifier.fillMaxWidth().height(60.dp).padding(horizontal = 16.dp),
             verticalAlignment = Alignment.CenterVertically
         ) {
-            // Proper media button (YouTube-style): a translucent circle with a real
-            // Material vector icon — never a text emoji.
             IconButton(
-                onClick = {
-                    val player = mediaPlayerComponent.mediaPlayer()
-                    if (player.status().isPlaying) player.controls().pause() else player.controls().play()
-                },
-                modifier = Modifier
-                    .size(44.dp)
-                    .background(Color.White.copy(alpha = 0.14f), CircleShape)
+                onClick = { playerActions.togglePlayPause() },
+                modifier = Modifier.size(44.dp).background(Color.White.copy(alpha = 0.14f), CircleShape)
             ) {
                 Icon(
                     imageVector = if (isPlaying) Icons.Filled.Pause else Icons.Filled.PlayArrow,
@@ -239,22 +224,30 @@ actual fun VideoPlayer(
                     modifier = Modifier.size(28.dp)
                 )
             }
-            
             Text(currentTime, color = Color.White, modifier = Modifier.padding(horizontal = 8.dp))
-            
             Slider(
                 value = progress,
                 onValueChange = { newProgress ->
                     val player = mediaPlayerComponent.mediaPlayer()
-                    val length = player.status().length()
-                    if (length > 0) {
-                        player.controls().setTime((newProgress * length).toLong())
-                    }
+                    try {
+                        val length = player.status().length()
+                        if (length > 0) {
+                            val target = (newProgress * length).toLong()
+                            player.controls().setTime(target)
+                            progress = newProgress
+                            currentTime = formatTime(target)
+                        }
+                    } catch (_: Throwable) { }
                 },
                 modifier = Modifier.weight(1f)
             )
-            
             Text(totalTime, color = Color.White, modifier = Modifier.padding(horizontal = 8.dp))
+            IconButton(onClick = { playerActions.toggleCinema() }) {
+                Icon(Icons.Filled.Theaters, contentDescription = "Cinema mode", tint = Color.White)
+            }
+            IconButton(onClick = { playerActions.toggleFullscreen() }) {
+                Icon(Icons.Filled.Fullscreen, contentDescription = "Fullscreen", tint = Color.White)
+            }
         }
     }
 }
@@ -262,10 +255,7 @@ actual fun VideoPlayer(
 private fun formatTime(millis: Long): String {
     val seconds = (millis / 1000) % 60
     val minutes = (millis / (1000 * 60)) % 60
-    val hours = (millis / (1000 * 60 * 60))
-    return if (hours > 0) {
-        String.format("%d:%02d:%02d", hours, minutes, seconds)
-    } else {
-        String.format("%d:%02d", minutes, seconds)
-    }
+    val hours = millis / (1000 * 60 * 60)
+    return if (hours > 0) String.format("%d:%02d:%02d", hours, minutes, seconds)
+    else String.format("%d:%02d", minutes, seconds)
 }

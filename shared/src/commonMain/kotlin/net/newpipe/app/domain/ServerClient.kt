@@ -67,7 +67,19 @@ class ServerClient {
         }
     }
 
-    private fun baseUrl(serverUrl: String): String = serverUrl.trim().trimEnd('/')
+    /** Accepts a full URL or the common self-hosted form `192.168.1.10:8080`. */
+    fun normalizeServerUrl(serverUrl: String): String {
+        var value = serverUrl.trim().trimEnd('/')
+        if (value.isBlank()) return value
+        if (!value.contains("://")) value = "http://$value"
+        val authority = value.substringAfter("://").substringBefore('/')
+        // The bundled server listens on 8080 by default, so a bare LAN host
+        // is useful without forcing users to type the port every time.
+        if (!authority.contains(':')) value += ":8080"
+        return value.trimEnd('/')
+    }
+
+    private fun baseUrl(serverUrl: String): String = normalizeServerUrl(serverUrl)
 
     suspend fun register(serverUrl: String, username: String, password: String): AuthResponse =
         auth("/api/register", serverUrl, username, password)

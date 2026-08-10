@@ -3,49 +3,91 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>ONewPipe Web</title>
+<meta name="theme-color" content="#101827">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-title" content="ONewPipe">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<link rel="manifest" href="/manifest.webmanifest">
+<link rel="apple-touch-icon" href="/onewpipe-icon.svg">
+<title>ONewPipe — private streaming</title>
 <style>
-  :root { --bg:#0f1115; --card:#171a21; --card2:#1f242e; --text:#e8eaed; --muted:#9aa0a6; --accent:#ff0033; }
+  :root { --bg:#f6f7fb; --card:#ffffff; --card2:#edf0f7; --text:#101827; --muted:#667085; --accent:#7c5cfc; --accent-strong:#50e3c2; --border:#d9deea; --shadow:0 8px 24px rgba(16,24,39,.08); color-scheme:light; }
+  :root[data-theme="dark"] { --bg:#0d1320; --card:#151e2e; --card2:#202b3e; --text:#eef4ff; --muted:#aab6c8; --accent:#9a82ff; --accent-strong:#50e3c2; --border:#334158; --shadow:0 8px 24px rgba(0,0,0,.28); color-scheme:dark; }
+  @media (prefers-color-scheme: dark) {
+    :root:not([data-theme="light"]) { --bg:#0d1320; --card:#151e2e; --card2:#202b3e; --text:#eef4ff; --muted:#aab6c8; --accent:#9a82ff; --accent-strong:#50e3c2; --border:#334158; --shadow:0 8px 24px rgba(0,0,0,.28); color-scheme:dark; }
+  }
   * { box-sizing:border-box; margin:0; padding:0; }
-  body { background:var(--bg); color:var(--text); font-family:'Segoe UI',system-ui,sans-serif; }
-  header { display:flex; align-items:center; gap:12px; padding:10px 16px; background:var(--card); position:sticky; top:0; z-index:10; flex-wrap:nowrap; }
-  .logo { font-weight:700; font-size:18px; color:var(--accent); white-space:nowrap; }
-  #search { flex:1; min-width:120px; padding:10px 14px; border-radius:24px; border:1px solid #333; background:var(--card2); color:var(--text); font-size:14px; outline:none; }
+  body { background:var(--bg); color:var(--text); font-family:'Segoe UI',system-ui,sans-serif; transition:background .2s,color .2s; }
+  header { display:flex; align-items:center; gap:12px; padding:10px 16px; background:var(--card); box-shadow:var(--shadow); position:sticky; top:0; z-index:10; flex-wrap:nowrap; }
+  .logo { display:flex; align-items:center; gap:9px; font-weight:750; font-size:18px; color:var(--text); white-space:nowrap; letter-spacing:-.02em; }
+  .logo svg { width:34px; height:34px; flex:none; }
+  #search { flex:1; min-width:120px; padding:10px 14px; border-radius:24px; border:1px solid var(--border); background:var(--card2); color:var(--text); font-size:14px; outline:none; }
   #search:focus { border-color:var(--accent); }
-  .btn { padding:8px 14px; border-radius:8px; border:none; background:var(--card2); color:var(--text); cursor:pointer; font-size:14px; }
-  .btn:hover { background:#2a303c; }
-  .btn.primary { background:var(--accent); color:#fff; }
+  .btn { padding:8px 14px; border-radius:8px; border:1px solid var(--border); background:var(--card2); color:var(--text); cursor:pointer; font-size:14px; }
+  .btn:hover { background:var(--border); }
+  .btn.primary { background:var(--accent); border-color:var(--accent); color:#fff; }
+  #themeBtn { width:38px; height:38px; padding:0; border-radius:50%; font-size:18px; flex:none; }
   /* Category chips: stick below the header with an opaque background and a
      higher z-index than the grid, so videos never paint over them. */
   .chips { display:flex; gap:8px; padding:10px 16px; overflow-x:auto; position:sticky; top:58px; background:var(--bg); z-index:9; }
-  .chip { padding:7px 16px; border-radius:20px; border:1px solid #3a414d; background:var(--card2); color:var(--text); cursor:pointer; font-size:13px; white-space:nowrap; transition:background .15s; }
-  .chip:hover { background:#2a303c; }
+  .chip { padding:7px 16px; border-radius:20px; border:1px solid var(--border); background:var(--card2); color:var(--text); cursor:pointer; font-size:13px; white-space:nowrap; transition:background .15s,transform .15s; }
+  .chip:hover { background:var(--border); transform:translateY(-1px); }
   .chip.active { background:var(--accent); border-color:var(--accent); color:#fff; }
   #grid { display:grid; grid-template-columns:repeat(auto-fill,minmax(240px,1fr)); gap:18px; padding:16px 16px 40px; }
-  .card { cursor:pointer; }
-  .thumb { position:relative; border-radius:10px; overflow:hidden; background:#000; aspect-ratio:16/9; }
+  .card { cursor:pointer; transition:transform .18s; }
+  .card:hover { transform:translateY(-3px); }
+  .thumb { position:relative; border-radius:10px; overflow:hidden; background:#000; aspect-ratio:16/9; box-shadow:var(--shadow); }
   .thumb img { width:100%; height:100%; object-fit:cover; display:block; }
   .dur { position:absolute; bottom:6px; right:6px; background:rgba(0,0,0,.8); padding:2px 6px; border-radius:4px; font-size:12px; }
   .card h3 { font-size:14px; margin:8px 2px 4px; display:-webkit-box; -webkit-line-clamp:2; -webkit-box-orient:vertical; overflow:hidden; }
   .card .meta { color:var(--muted); font-size:12px; margin:0 2px; }
   #player { position:fixed; inset:0; background:rgba(0,0,0,.95); display:none; flex-direction:column; z-index:100; }
   #player video { width:100%; max-height:70vh; background:#000; }
-  .pinfo { padding:14px 20px; max-width:900px; margin:0 auto; }
-  #related { padding:20px; max-width:900px; margin:0 auto; display:grid; grid-template-columns:1fr; gap:12px; }
+  .pinfo { padding:14px 20px; max-width:900px; margin:0 auto; width:100%; }
+  .player-controls { display:flex; align-items:center; gap:10px; flex-wrap:wrap; margin-top:12px; }
+  .player-controls select { padding:8px 10px; border-radius:8px; border:1px solid var(--border); background:var(--card2); color:var(--text); }
+  .player-controls a { text-decoration:none; }
+  #related { padding:20px; max-width:900px; margin:0 auto; display:grid; grid-template-columns:1fr; gap:12px; width:100%; }
   .rel { display:flex; gap:10px; cursor:pointer; }
   .rel img { width:160px; aspect-ratio:16/9; object-fit:cover; border-radius:8px; }
   #modal { position:fixed; inset:0; background:rgba(0,0,0,.7); display:none; align-items:center; justify-content:center; z-index:200; }
   #modal .box { background:var(--card); padding:24px; border-radius:12px; width:320px; display:flex; flex-direction:column; gap:10px; }
   #modal input { padding:10px; border-radius:8px; border:1px solid #333; background:var(--card2); color:var(--text); }
   #toast { position:fixed; bottom:20px; left:50%; transform:translateX(-50%); background:#222; padding:10px 18px; border-radius:8px; display:none; z-index:300; }
+  #pwaInstallBtn { position:fixed; right:16px; bottom:18px; z-index:150; display:none; align-items:center; gap:7px; box-shadow:var(--shadow); }
+  #pwaInstallBtn.visible { display:inline-flex; }
+  #pwaInstallBtn::before { content:'＋'; font-size:18px; line-height:1; }
+  #pwaModal { position:fixed; inset:0; background:rgba(0,0,0,.7); display:none; align-items:center; justify-content:center; z-index:250; padding:20px; }
+  #pwaModal.visible { display:flex; }
+  #pwaModal .box { background:var(--card); color:var(--text); padding:24px; border-radius:16px; width:min(390px,100%); display:flex; flex-direction:column; gap:12px; box-shadow:var(--shadow); }
+  #pwaModal h3 { font-size:20px; }
+  #pwaModal p { color:var(--muted); line-height:1.5; font-size:14px; }
+  #pwaModal ol { padding-left:22px; color:var(--text); line-height:1.7; font-size:14px; }
+  #pwaModal strong { color:var(--accent-strong); }
+  #pwaModal .actions { display:flex; gap:8px; justify-content:flex-end; margin-top:4px; }
   #userbox { display:flex; align-items:center; gap:8px; }
+  @media (max-width:640px) {
+    header { gap:6px; padding:8px; }
+    .logo span { display:none; }
+    #searchBtn { width:38px; height:38px; padding:0; font-size:0; }
+    #searchBtn::after { content:'⌕'; font-size:20px; }
+    #userbox .btn { width:38px; height:38px; padding:0; font-size:0; }
+    #userbox .btn::after { content:'●'; font-size:14px; }
+    .chips { top:54px; padding:8px; }
+    #grid { grid-template-columns:1fr; padding:12px 10px 32px; }
+  }
 </style>
 </head>
 <body>
 <header>
-  <div class="logo">▶ ONewPipe</div>
+  <div class="logo" aria-label="ONewPipe">
+    <svg viewBox="0 0 128 128" aria-hidden="true"><rect width="128" height="128" rx="30" fill="#101827"/><circle cx="64" cy="64" r="39" fill="none" stroke="#50E3C2" stroke-width="13" stroke-linecap="round" stroke-dasharray="205 40" transform="rotate(-38 64 64)"/><path d="M54 46 85 64 54 82Z" fill="#7C5CFC"/></svg>
+    <span>ONewPipe</span>
+  </div>
   <input id="search" type="search" placeholder="Search videos, channels...">
   <button class="btn primary" id="searchBtn">Search</button>
+  <button class="btn" id="themeBtn" aria-label="Toggle dark mode" title="Toggle dark mode">☾</button>
   <div id="userbox">
     <button class="btn" id="accountBtn">Sign in</button>
   </div>
@@ -58,12 +100,18 @@
   <button class="chip" data-cat="podcasts">Podcasts</button>
 </div>
 <div id="grid"></div>
+<button class="btn primary" id="pwaInstallBtn" type="button" aria-haspopup="dialog">Install ONewPipe</button>
 
 <div id="player">
   <video id="video" controls autoplay></video>
   <div class="pinfo">
     <h2 id="ptitle"></h2>
     <div class="meta" id="pmeta"></div>
+    <div class="player-controls">
+      <label for="qualitySelect">Quality</label>
+      <select id="qualitySelect" aria-label="Video quality"></select>
+      <a class="btn" id="downloadBtn" href="#" download>Download</a>
+    </div>
   </div>
   <h3 style="padding:0 20px;">Related</h3>
   <div id="related"></div>
@@ -81,13 +129,126 @@
     <button class="btn" id="mClose">Cancel</button>
   </div>
 </div>
+<div id="pwaModal" role="dialog" aria-modal="true" aria-labelledby="pwaTitle">
+  <div class="box">
+    <h3 id="pwaTitle">Use ONewPipe like an app</h3>
+    <p id="pwaIntro">Add this self-hosted ONewPipe site to your iPhone home screen for a faster, app-like experience.</p>
+    <ol id="pwaSteps">
+      <li>Tap the <strong>Share</strong> button in Safari.</li>
+      <li>Choose <strong>Add to Home Screen</strong>.</li>
+      <li>Tap <strong>Add</strong> to confirm.</li>
+    </ol>
+    <div class="actions">
+      <button class="btn" id="pwaLater" type="button">Not now</button>
+      <button class="btn primary" id="pwaInstall" type="button">I understand</button>
+    </div>
+  </div>
+</div>
 <div id="toast"></div>
 
 <script>
 const CATS = ['all','gaming','music','movies','podcasts'];
 const state = { token: localStorage.getItem('token') || '', username: localStorage.getItem('username') || '' };
+const videoInfoCache = new Map();
 const $ = id => document.getElementById(id);
 const grid = $('grid'), chips = $('chips'), player = $('player'), video = $('video');
+const qualitySelect = $('qualitySelect'), downloadBtn = $('downloadBtn');
+const pwaInstallBtn = $('pwaInstallBtn'), pwaModal = $('pwaModal');
+const PWA_STATE_KEY = 'onewpipe-pwa-install-state';
+let deferredInstallPrompt = null;
+let pwaOfferArmed = false;
+
+function isIosDevice() {
+  const ua = navigator.userAgent || '';
+  return /iPhone|iPad|iPod/i.test(ua) ||
+    (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1);
+}
+
+function isStandalonePwa() {
+  return window.navigator.standalone === true ||
+    window.matchMedia('(display-mode: standalone)').matches;
+}
+
+function pwaState() {
+  return localStorage.getItem(PWA_STATE_KEY) || '';
+}
+
+function markPwaState(value) {
+  localStorage.setItem(PWA_STATE_KEY, value);
+  pwaInstallBtn.classList.remove('visible');
+}
+
+function canOfferPwa() {
+  return isIosDevice() || Boolean(deferredInstallPrompt);
+}
+
+function openPwaModal() {
+  if (!canOfferPwa() || pwaState() || isStandalonePwa()) return;
+  if (isIosDevice()) {
+    $('pwaIntro').textContent = 'Safari does not show an automatic install prompt. Add this self-hosted ONewPipe site to your iPhone home screen for a fast, app-like experience.';
+    $('pwaSteps').innerHTML = '<li>Tap the <strong>Share</strong> button in Safari.</li><li>Choose <strong>Add to Home Screen</strong>.</li><li>Tap <strong>Add</strong> to confirm.</li>';
+    $('pwaInstall').textContent = 'I understand';
+  } else {
+    $('pwaIntro').textContent = 'Install ONewPipe on this device for a faster, app-like experience.';
+    $('pwaSteps').innerHTML = '<li>Confirm the installation in your browser.</li><li>Launch ONewPipe from your home screen or app menu.</li>';
+    $('pwaInstall').textContent = 'Install';
+  }
+  pwaModal.classList.add('visible');
+}
+
+function closePwaModal() {
+  pwaModal.classList.remove('visible');
+}
+
+function offerPwaAfterFirstVideo() {
+  if (pwaOfferArmed || pwaState() || isStandalonePwa() || !canOfferPwa()) return;
+  pwaOfferArmed = true;
+  // Let the player open first, then show a small, non-blocking suggestion.
+  setTimeout(() => {
+    if (!pwaState() && !isStandalonePwa()) {
+      pwaInstallBtn.classList.add('visible');
+      openPwaModal();
+    }
+  }, 700);
+}
+
+pwaInstallBtn.onclick = openPwaModal;
+$('pwaLater').onclick = () => { markPwaState('dismissed'); closePwaModal(); };
+pwaModal.onclick = e => { if (e.target === pwaModal) closePwaModal(); };
+$('pwaInstall').onclick = async () => {
+  if (isIosDevice()) {
+    markPwaState('installed');
+    closePwaModal();
+    toast('Use Safari Share → Add to Home Screen to finish');
+    return;
+  }
+  if (!deferredInstallPrompt) return;
+  deferredInstallPrompt.prompt();
+  const result = await deferredInstallPrompt.userChoice;
+  deferredInstallPrompt = null;
+  markPwaState(result.outcome === 'accepted' ? 'installed' : 'dismissed');
+  closePwaModal();
+};
+window.addEventListener('beforeinstallprompt', event => {
+  event.preventDefault();
+  deferredInstallPrompt = event;
+});
+window.addEventListener('appinstalled', () => markPwaState('installed'));
+if (isStandalonePwa()) markPwaState('installed');
+if ('serviceWorker' in navigator) {
+  window.addEventListener('load', () => navigator.serviceWorker.register('/sw.js').catch(() => {}));
+}
+
+const savedTheme = localStorage.getItem('theme');
+if (savedTheme) document.documentElement.dataset.theme = savedTheme;
+function applyTheme(theme) {
+  document.documentElement.dataset.theme = theme;
+  localStorage.setItem('theme', theme);
+  $('themeBtn').textContent = theme === 'dark' ? '☀' : '☾';
+  $('themeBtn').title = theme === 'dark' ? 'Use light mode' : 'Use dark mode';
+}
+applyTheme(savedTheme || (window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light'));
+$('themeBtn').onclick = () => applyTheme(document.documentElement.dataset.theme === 'dark' ? 'light' : 'dark');
 
 function toast(msg) {
   const t = $('toast');
@@ -135,6 +296,22 @@ async function auth(path) {
 $('mLogin').onclick = () => auth('login');
 $('mRegister').onclick = () => auth('register');
 
+function prefetchVideo(url) {
+  if (!url) return Promise.reject(new Error('Missing video URL'));
+  const cached = videoInfoCache.get(url);
+  if (cached) return cached;
+  const request = fetch('/api/video?url=' + encodeURIComponent(url)).then(response => {
+    if (!response.ok) throw new Error('Video information unavailable');
+    return response.json();
+  });
+  videoInfoCache.set(url, request);
+  // A failed warm-up must not poison the cache or create an unhandled rejection.
+  request.catch(() => {
+    if (videoInfoCache.get(url) === request) videoInfoCache.delete(url);
+  });
+  return request;
+}
+
 function formatViews(n) {
   if (!n) return '';
   return n >= 1e9 ? (n/1e9).toFixed(1)+'B views' : n >= 1e6 ? (n/1e6).toFixed(1)+'M views' : n >= 1e3 ? (n/1e3).toFixed(1)+'K views' : n+' views';
@@ -149,6 +326,7 @@ function card(item) {
   c.querySelector('h3').textContent = item.title;
   const meta = c.querySelector('.meta');
   meta.textContent = [item.uploaderName, formatViews(item.viewCount)].filter(Boolean).join(' • ');
+  c.onpointerenter = () => prefetchVideo(item.url);
   c.onclick = () => openVideo(item.url, item.title);
   return c;
 }
@@ -160,6 +338,8 @@ async function loadTrending(cat) {
     const items = await res.json();
     grid.innerHTML = '';
     items.forEach(i => grid.appendChild(card(i)));
+    // Touch devices have no hover: warm the first visible videos immediately.
+    items.slice(0, 2).forEach(i => prefetchVideo(i.url));
   } catch (e) { grid.innerHTML = '<p style="color:var(--muted);padding:20px">Failed to load.</p>'; }
 }
 
@@ -170,6 +350,7 @@ async function doSearch(q) {
     const items = await res.json();
     grid.innerHTML = '';
     items.forEach(i => grid.appendChild(card(i)));
+    items.slice(0, 2).forEach(i => prefetchVideo(i.url));
   } catch (e) { grid.innerHTML = '<p style="color:var(--muted);padding:20px">Search failed.</p>'; }
 }
 
@@ -177,13 +358,38 @@ let currentVideoUrl = '';
 async function openVideo(url, title) {
   currentVideoUrl = url;
   player.style.display = 'flex';
+  offerPwaAfterFirstVideo();
   $('ptitle').textContent = title;
   $('pmeta').textContent = 'Loading…';
   $('related').innerHTML = '';
   try {
-    const info = await (await fetch('/api/video?url=' + encodeURIComponent(url))).json();
+    const info = await prefetchVideo(url);
     $('pmeta').textContent = [info.uploaderName, formatViews(info.viewCount), fmt(info.durationSeconds)].filter(Boolean).join(' • ');
-    video.src = info.streamUrl;
+    const formats = info.videoFormats || [];
+    qualitySelect.innerHTML = '';
+    formats.forEach((format, index) => {
+      const option = document.createElement('option');
+      option.value = format.url;
+      option.textContent = format.label;
+      qualitySelect.appendChild(option);
+      if (index === 0) qualitySelect.value = format.url;
+    });
+    if (!formats.length) {
+      const option = document.createElement('option');
+      option.textContent = 'Default';
+      qualitySelect.appendChild(option);
+    }
+    const selectedUrl = formats[0]?.url || info.streamUrl;
+    video.src = selectedUrl;
+    downloadBtn.href = selectedUrl;
+    downloadBtn.download = (info.title || 'ONewPipe-video').replace(/[\\\\/:*?"<>|]/g, '_') + '.mp4';
+    qualitySelect.onchange = () => {
+      const position = video.currentTime;
+      const wasPlaying = !video.paused;
+      video.src = qualitySelect.value;
+      video.addEventListener('loadedmetadata', () => { video.currentTime = position; if (wasPlaying) video.play().catch(() => {}); }, { once: true });
+      downloadBtn.href = qualitySelect.value;
+    };
     // resume from synced position
     if (state.token) {
       const saved = await (await fetch('/api/watchstate', { headers: { Authorization: 'Bearer ' + state.token } })).json();
@@ -241,7 +447,11 @@ chips.addEventListener('click', e => {
 });
 $('searchBtn').onclick = () => { const q = $('search').value.trim(); if (q) doSearch(q); };
 $('search').addEventListener('keydown', e => { if (e.key === 'Enter') $('searchBtn').click(); });
-document.addEventListener('keydown', e => { if (e.key === 'Escape') player.style.display = 'none'; });
+document.addEventListener('keydown', e => {
+  if (e.key !== 'Escape') return;
+  player.style.display = 'none';
+  closePwaModal();
+});
 
 updateUserBox();
 loadTrending('all');

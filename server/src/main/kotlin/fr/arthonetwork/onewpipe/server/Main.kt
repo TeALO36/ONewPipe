@@ -43,9 +43,9 @@ fun main() {
         Localization(contentLanguage, contentCountry),
         ContentCountry(contentCountry)
     )
-    // YouTube throttles the plain WEB client to ~360p; the iOS client returns
-    // the full format range (720p/1080p/4K + audio) without a poToken.
-    org.schabi.newpipe.extractor.services.youtube.extractors.YoutubeStreamExtractor.setFetchIosClient(true)
+    // The web player uses one progressive stream for the fastest first frame.
+    // Native clients enable the slower iOS response only from their quality menu.
+    org.schabi.newpipe.extractor.services.youtube.extractors.YoutubeStreamExtractor.setFetchIosClient(false)
 
     val store = Store(dataDir)
     println("ONewPipe server listening on http://$host:$port (data: ${dataDir.absolutePath})")

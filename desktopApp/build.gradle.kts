@@ -29,7 +29,7 @@ compose.desktop {
         nativeDistributions {
             targetFormats(TargetFormat.Dmg, TargetFormat.Msi, TargetFormat.Deb)
             packageName = NEWPIPE_APPLICATION_ID_NEW
-            packageVersion = NEWPIPE_VERSION_NAME
+            packageVersion = System.getProperty("versionNameOverride") ?: NEWPIPE_VERSION_NAME
 
             // vlcj's video surface needs sun.misc.Unsafe, which lives in the
             // jdk.unsupported module. jpackage/jlink omits it by default, which

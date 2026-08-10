@@ -11,9 +11,14 @@ import org.schabi.newpipe.extractor.services.youtube.linkHandler.YoutubeSearchQu
 import org.schabi.newpipe.extractor.stream.StreamInfo
 import org.schabi.newpipe.extractor.stream.StreamInfoItem
 import org.schabi.newpipe.extractor.stream.VideoStream
+import java.util.concurrent.ConcurrentHashMap
 
 /** Category names as used by the web UI and the apps. */
 val CATEGORIES = listOf("all", "gaming", "music", "movies", "podcasts")
+
+private data class CachedVideoInfo(val value: VideoInfoDto, val expiresAt: Long)
+private val videoInfoCache = ConcurrentHashMap<String, CachedVideoInfo>()
+private const val VIDEO_CACHE_TTL_MS = 5 * 60 * 1000L
 
 private fun categoryQuery(category: String): String = when (category) {
     "gaming" -> "trending gaming"
@@ -100,27 +105,41 @@ private fun buildQueryHandler(
     }
 }
 
-suspend fun fetchVideoInfo(url: String): VideoInfoDto = withContext(Dispatchers.IO) {
-    val service = NewPipe.getServiceByUrl(url)
-        ?: throw IllegalArgumentException("No service found for URL")
-    val info = StreamInfo.getInfo(service, url)
-    val streamUrl = info.videoStreams
-        ?.filter { !it.content.isNullOrEmpty() }
-        ?.maxByOrNull { it.resolutionHeight() }
-        ?.content
-        ?: info.audioStreams?.firstOrNull { !it.content.isNullOrEmpty() }?.content
-        ?: throw IllegalArgumentException("No playable stream found")
+suspend fun fetchVideoInfo(url: String): VideoInfoDto {
+    val now = System.currentTimeMillis()
+    videoInfoCache[url]?.takeIf { it.expiresAt > now }?.let { return it.value }
 
-    VideoInfoDto(
-        url = info.url ?: url,
-        title = info.name ?: "Unknown",
-        streamUrl = streamUrl,
-        uploaderName = info.uploaderName ?: "",
-        uploaderSubscriberCount = info.uploaderSubscriberCount ?: 0L,
-        viewCount = info.viewCount ?: 0L,
-        durationSeconds = info.duration ?: 0L,
-        relatedItems = info.relatedItems.mapNotNull { (it as? StreamInfoItem)?.toDto() }
-    )
+    val result = withContext(Dispatchers.IO) {
+        val service = NewPipe.getServiceByUrl(url)
+            ?: throw IllegalArgumentException("No service found for URL")
+        val info = StreamInfo.getInfo(service, url)
+        val progressiveStreams = info.videoStreams
+            ?.filter { !it.content.isNullOrEmpty() }
+            ?.sortedByDescending { it.resolutionHeight() }
+            ?: emptyList()
+        val streamUrl = progressiveStreams.firstOrNull()?.content
+            ?: info.audioStreams?.firstOrNull { !it.content.isNullOrEmpty() }?.content
+            ?: throw IllegalArgumentException("No playable stream found")
+
+        VideoInfoDto(
+            url = info.url ?: url,
+            title = info.name ?: "Unknown",
+            streamUrl = streamUrl,
+            uploaderName = info.uploaderName ?: "",
+            uploaderSubscriberCount = info.uploaderSubscriberCount ?: 0L,
+            viewCount = info.viewCount ?: 0L,
+            durationSeconds = info.duration ?: 0L,
+            relatedItems = info.relatedItems.mapNotNull { (it as? StreamInfoItem)?.toDto() },
+            videoFormats = progressiveStreams.map { stream ->
+                VideoFormatDto(
+                    label = stream.resolution.ifBlank { stream.format?.name ?: "Progressive" },
+                    url = stream.content!!
+                )
+            }
+        )
+    }
+    videoInfoCache[url] = CachedVideoInfo(result, System.currentTimeMillis() + VIDEO_CACHE_TTL_MS)
+    return result
 }
 
 private fun VideoStream.resolutionHeight(): Int =

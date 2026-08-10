@@ -16,6 +16,7 @@ import androidx.work.WorkManager
 import androidx.work.Worker
 import androidx.work.WorkerParameters
 import androidx.work.workDataOf
+import com.grack.nanojson.JsonObject
 import com.grack.nanojson.JsonParser
 import com.grack.nanojson.JsonParserException
 import java.io.IOException
@@ -38,10 +39,9 @@ class NewVersionWorker(
      */
     private fun compareAppVersionAndShowNotification(
         versionName: String,
-        apkLocationUrl: String?,
-        versionCode: Int
+        apkLocationUrl: String?
     ) {
-        if (BuildConfig.VERSION_CODE >= versionCode) {
+        if (apkLocationUrl == null || !isNewerVersion(versionName)) {
             if (inputData.getBoolean(IS_MANUAL, false)) {
                 // Show toast stating that the app is up-to-date if the update check was manual.
                 ContextCompat.getMainExecutor(applicationContext).execute {
@@ -56,7 +56,7 @@ class NewVersionWorker(
         }
 
         // A pending intent to open the apk location url in the browser.
-        val intent = Intent(Intent.ACTION_VIEW, apkLocationUrl?.toUri())
+        val intent = Intent(Intent.ACTION_VIEW, apkLocationUrl.toUri())
         intent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
         val pendingIntent = PendingIntentCompat.getActivity(
             applicationContext,
@@ -87,13 +87,22 @@ class NewVersionWorker(
         }
     }
 
+    private fun isNewerVersion(latestVersion: String): Boolean {
+        fun versionParts(version: String): List<Int> = version
+            .removePrefix("v")
+            .substringBefore('-')
+            .split('.')
+            .map { it.toIntOrNull() ?: 0 }
+
+        val latest = (versionParts(latestVersion) + List(3) { 0 }).take(3)
+        val current = (versionParts(BuildConfig.VERSION_NAME) + List(3) { 0 }).take(3)
+        return latest.indices.firstOrNull { latest[it] != current[it] }
+            ?.let { latest[it] > current[it] }
+            ?: false
+    }
+
     @Throws(IOException::class, ReCaptchaException::class)
     private fun checkNewVersion() {
-        // Check if the current apk is a github one or not.
-        if (!ReleaseVersionUtil.isReleaseApk) {
-            return
-        }
-
         if (!inputData.getBoolean(IS_MANUAL, false)) {
             val prefs = PreferenceManager.getDefaultSharedPreferences(applicationContext)
             // Check if the last request has happened a certain time ago
@@ -104,8 +113,8 @@ class NewVersionWorker(
             }
         }
 
-        // Make a network request to get latest NewPipe data.
-        val response = DownloaderImpl.getInstance().get(NEWPIPE_API_URL)
+        // Make a network request to get the latest public ONewPipe release.
+        val response = DownloaderImpl.getInstance().get(GITHUB_RELEASES_API_URL)
         handleResponse(response)
     }
 
@@ -126,16 +135,15 @@ class NewVersionWorker(
 
         // Parse the json from the response.
         try {
-            val newpipeVersionInfo = JsonParser.`object`()
-                .from(response.responseBody()).getObject("flavors")
-                .getObject("newpipe")
-
-            val versionName = newpipeVersionInfo.getString("version")
-            val versionCode = newpipeVersionInfo.getInt("version_code")
-            val apkLocationUrl = newpipeVersionInfo.getString("apk")
-            compareAppVersionAndShowNotification(versionName, apkLocationUrl, versionCode)
+            val release = JsonParser.`object`().from(response.responseBody())
+            val versionName = release.getString("tag_name").removePrefix("v")
+            val apkLocationUrl = release.getArray("assets")
+                .filterIsInstance<JsonObject>()
+                .firstOrNull { it.getString("name").endsWith(".apk") }
+                ?.getString("browser_download_url")
+            compareAppVersionAndShowNotification(versionName, apkLocationUrl)
         } catch (e: JsonParserException) {
-            // Most likely something is wrong in data received from NEWPIPE_API_URL.
+            // Most likely something is wrong in data received from the GitHub API.
             // Do not alarm user and fail silently.
             if (DEBUG) {
                 Log.w(TAG, "Could not get NewPipe API: invalid json", e)
@@ -159,7 +167,8 @@ class NewVersionWorker(
     companion object {
         private val DEBUG = MainActivity.DEBUG
         private val TAG = NewVersionWorker::class.java.simpleName
-        private const val NEWPIPE_API_URL = "https://newpipe.net/api/data.json"
+        private const val GITHUB_RELEASES_API_URL =
+            "https://api.github.com/repos/TeALO36/ONewPipe/releases/latest"
         private const val IS_MANUAL = "isManual"
 
         /**
@@ -169,8 +178,9 @@ class NewVersionWorker(
          * <br></br>
          * Following conditions need to be met, before data is requested from the server:
          *
-         *  *  The app is signed with the correct signing key (by TeamNewPipe / schabi).
-         * If the signing key differs from the one used upstream, the update cannot be installed.
+         *  *  The update is downloaded from the public ONewPipe GitHub repository.
+         * Android still verifies the signing key before installing the APK. F-Droid users
+         * must continue updating through F-Droid because F-Droid signs its own builds.
          *  * The user enabled searching for and notifying about updates in the settings.
          *  * The app did not recently check for updates.
          * We do not want to make unnecessary connections and DOS our servers.

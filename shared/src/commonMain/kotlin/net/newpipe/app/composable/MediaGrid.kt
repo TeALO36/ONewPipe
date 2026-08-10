@@ -10,7 +10,7 @@ import androidx.compose.foundation.interaction.collectIsPressedAsState
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.grid.GridCells
 import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
-import androidx.compose.foundation.lazy.grid.items
+import androidx.compose.foundation.lazy.grid.itemsIndexed
 import androidx.compose.foundation.lazy.grid.rememberLazyGridState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
@@ -27,6 +27,7 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import net.newpipe.app.theme.currentServiceScheme
+import kotlinx.coroutines.delay
 
 import net.newpipe.app.domain.MediaItem
 import coil3.compose.AsyncImage
@@ -39,6 +40,7 @@ fun MediaGrid(
     errorMessage: String? = null,
     onMediaClick: (MediaItem) -> Unit = {},
     onDownloadClick: (MediaItem) -> Unit = {},
+    onPrefetch: (MediaItem) -> Unit = {},
     onLoadMore: () -> Unit = {},
     modifier: Modifier = Modifier
 ) {
@@ -59,6 +61,16 @@ fun MediaGrid(
     }
 
     val gridState = rememberLazyGridState()
+
+    // Warm the first few visible videos on every platform. Desktop hover
+    // prefetch remains useful, but touch devices have no hover event; without
+    // this warm-up the extractor starts only after the user taps a card.
+    LaunchedEffect(items) {
+        items.take(2).forEachIndexed { index, media ->
+            if (index > 0) delay(100L)
+            onPrefetch(media)
+        }
+    }
 
     // Detect when the user scrolls near the bottom and trigger loadMore
     LaunchedEffect(gridState, items.size) {
@@ -81,10 +93,13 @@ fun MediaGrid(
         verticalArrangement = Arrangement.spacedBy(24.dp),
         modifier = modifier.fillMaxSize()
     ) {
-        items(items, key = { it.url }) { media ->
+        // Some feeds contain the same URL more than once. Include the item
+        // index in the key so Compose never crashes during a feed refresh.
+        itemsIndexed(items, key = { index, media -> "${media.url}#$index" }) { _, media ->
             MediaCard(
                 media = media,
                 onClick = { onMediaClick(media) },
+                onPrefetch = { onPrefetch(media) },
                 onDownloadClick = { onDownloadClick(media) }
             )
         }
@@ -110,10 +125,22 @@ fun MediaGrid(
 }
 
 @Composable
-fun MediaCard(media: MediaItem, onClick: () -> Unit = {}, onDownloadClick: () -> Unit = {}) {
+fun MediaCard(
+    media: MediaItem,
+    onClick: () -> Unit = {},
+    onPrefetch: () -> Unit = {},
+    onDownloadClick: () -> Unit = {}
+) {
     val interactionSource = remember { MutableInteractionSource() }
     val isHovered by interactionSource.collectIsHoveredAsState()
     val isPressed by interactionSource.collectIsPressedAsState()
+
+    // Start extraction as soon as the pointer enters the card. Waiting even a
+    // few hundred milliseconds here makes a fast click miss the prefetch and
+    // puts the full extractor latency back on the player overlay.
+    LaunchedEffect(isHovered) {
+        if (isHovered) onPrefetch()
+    }
 
     val scale by animateFloatAsState(
         targetValue = when {

@@ -1,8 +1,7 @@
 package net.newpipe.app.composable
 
 import android.net.Uri
-import android.view.ViewGroup
-import android.widget.FrameLayout
+import android.view.TextureView
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.remember
@@ -13,7 +12,8 @@ import androidx.compose.ui.viewinterop.AndroidView
 import androidx.media3.common.MediaItem
 import androidx.media3.common.Player
 import androidx.media3.exoplayer.ExoPlayer
-import androidx.media3.ui.PlayerView
+import androidx.media3.exoplayer.source.DefaultMediaSourceFactory
+import androidx.media3.exoplayer.source.MergingMediaSource
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 
@@ -21,6 +21,7 @@ import kotlinx.coroutines.launch
 actual fun VideoPlayer(
     modifier: Modifier,
     videoUrl: String,
+    audioUrl: String?,
     startPositionMs: Long,
     onPlaybackEnded: () -> Unit,
     onPositionChange: (Long) -> Unit,
@@ -28,11 +29,23 @@ actual fun VideoPlayer(
 ) {
     val context = LocalContext.current
     val coroutineScope = rememberCoroutineScope()
+    val textureView = remember(videoUrl, audioUrl) { TextureView(context) }
 
-    val exoPlayer = remember {
+    val exoPlayer = remember(videoUrl, audioUrl) {
         ExoPlayer.Builder(context).build().apply {
-            val mediaItem = MediaItem.fromUri(Uri.parse(videoUrl))
-            setMediaItem(mediaItem)
+            val mediaSourceFactory = DefaultMediaSourceFactory(context)
+            val videoSource = mediaSourceFactory.createMediaSource(
+                MediaItem.fromUri(Uri.parse(videoUrl))
+            )
+            val source = if (!audioUrl.isNullOrBlank()) {
+                val audioSource = mediaSourceFactory.createMediaSource(
+                    MediaItem.fromUri(Uri.parse(audioUrl))
+                )
+                MergingMediaSource(videoSource, audioSource)
+            } else {
+                videoSource
+            }
+            setMediaSource(source)
             if (startPositionMs > 0) seekTo(startPositionMs)
             prepare()
             playWhenReady = true
@@ -44,16 +57,23 @@ actual fun VideoPlayer(
         }
     }
 
-    DisposableEffect(Unit) {
-        // Wire the shared player actions (e.g. keyboard shortcuts on devices
-        // with a keyboard) to this ExoPlayer instance.
+    DisposableEffect(exoPlayer, textureView) {
+        // Do not use Media3 PlayerView here: the legacy Android module also
+        // contains com.google.android.exoplayer2 resources with the same names,
+        // which makes PlayerView inflate the wrong AspectRatioFrameLayout.
+        exoPlayer.setVideoTextureView(textureView)
+
         playerActions.togglePlayPause = {
             if (exoPlayer.isPlaying) exoPlayer.pause() else exoPlayer.play()
         }
         playerActions.seekBy = { seconds ->
             val duration = exoPlayer.duration.coerceAtLeast(0L)
             if (duration > 0) {
-                exoPlayer.seekTo((exoPlayer.currentPosition + seconds * 1000).coerceIn(0L, duration))
+                exoPlayer.seekTo(
+                    (exoPlayer.currentPosition + seconds * 1000)
+                        .coerceIn(0L, duration)
+                )
+                playerActions.reportSeek(seconds)
             }
         }
         playerActions.seekToFraction = { fraction ->
@@ -63,8 +83,7 @@ actual fun VideoPlayer(
             }
         }
         playerActions.adjustVolume = { delta ->
-            val target = exoPlayer.volume + delta / 100f
-            exoPlayer.volume = target.coerceIn(0f, 1f)
+            exoPlayer.volume = (exoPlayer.volume + delta / 100f).coerceIn(0f, 1f)
         }
         playerActions.toggleMute = {
             exoPlayer.volume = if (exoPlayer.volume > 0f) 0f else 1f
@@ -72,33 +91,25 @@ actual fun VideoPlayer(
 
         val job = coroutineScope.launch {
             while (true) {
-                if (exoPlayer.isPlaying) {
-                    onPositionChange(exoPlayer.currentPosition)
-                }
-                delay(500)
+                onPositionChange(exoPlayer.currentPosition)
+                delay(250)
             }
         }
         onDispose {
             job.cancel()
+            exoPlayer.clearVideoTextureView(textureView)
             playerActions.togglePlayPause = {}
             playerActions.seekBy = {}
             playerActions.seekToFraction = {}
             playerActions.adjustVolume = {}
             playerActions.toggleMute = {}
+            playerActions.reportSeek = {}
             exoPlayer.release()
         }
     }
 
     AndroidView(
-        factory = {
-            PlayerView(context).apply {
-                player = exoPlayer
-                layoutParams = FrameLayout.LayoutParams(
-                    ViewGroup.LayoutParams.MATCH_PARENT,
-                    ViewGroup.LayoutParams.MATCH_PARENT
-                )
-            }
-        },
+        factory = { textureView },
         modifier = modifier
     )
 }

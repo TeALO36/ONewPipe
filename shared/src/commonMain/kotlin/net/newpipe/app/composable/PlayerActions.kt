@@ -1,11 +1,8 @@
 package net.newpipe.app.composable
 
 /**
- * Live bridge between the player UI (keyboard shortcuts, the fullscreen
- * button) and the platform video player instance. Each platform actual of
- * [VideoPlayer] wires the callbacks it supports; [PlayerOverlay] wires the
- * fullscreen toggle. Unwired callbacks are no-ops so shortcuts are safe at
- * any point in the player lifecycle.
+ * Live bridge between the player UI (keyboard shortcuts, fullscreen and
+ * quality controls) and the platform video player instance.
  */
 class PlayerActions {
     var togglePlayPause: () -> Unit = {}
@@ -14,4 +11,6 @@ class PlayerActions {
     var adjustVolume: (Int) -> Unit = {}     // delta, clamped to 0..100
     var toggleMute: () -> Unit = {}
     var toggleFullscreen: () -> Unit = {}
+    var toggleCinema: () -> Unit = {}
+    var reportSeek: (Long) -> Unit = {}     // signed seconds, for on-screen feedback
 }

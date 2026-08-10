@@ -40,6 +40,15 @@ bastet-lastline/
 *.hprof
 Inspect.kt
 
+# Local state created by AI coding assistants (never commit)
+.claude/
+.claude.json
+.claude.local.md
+.codebuff/
+.aider.chat.history.md
+.aider.input.history
+.aider.tags.cache.v3/
+
 # Release signing keystore (NEVER commit)
 keystore/
 keystore.properties

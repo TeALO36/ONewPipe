@@ -35,19 +35,20 @@ class SyncViewModel(
         viewModelScope.launch {
             _status.value = ServerStatus.Disconnected
             try {
+                val normalizedUrl = client.normalizeServerUrl(serverUrl)
                 val result = if (register) {
-                    client.register(serverUrl, username, password)
+                    client.register(normalizedUrl, username, password)
                 } else {
-                    client.login(serverUrl, username, password)
+                    client.login(normalizedUrl, username, password)
                 }
                 settingsViewModel.setServerConfig(
                     ServerConfig(
-                        serverUrl = serverUrl.trim().trimEnd('/'),
+                        serverUrl = normalizedUrl,
                         username = result.username,
                         token = result.token
                     )
                 )
-                _status.value = ServerStatus.Connected(result.username, serverUrl.trim().trimEnd('/'))
+                _status.value = ServerStatus.Connected(result.username, normalizedUrl)
             } catch (e: Exception) {
                 _status.value = ServerStatus.Error(e.message ?: "Connection failed")
             }

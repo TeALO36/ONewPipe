@@ -15,11 +15,12 @@ plugins {
 // https://stackoverflow.com/a/74771876/8446131
 val buildConfigGenerator by tasks.registering(Sync::class) {
     val buildConfigPackage = NEWPIPE_APPLICATION_ID_NEW
+    val buildVersionName = System.getProperty("versionNameOverride") ?: NEWPIPE_VERSION_NAME
     val rawClass = """
         package $buildConfigPackage
 
         object BuildConfig {
-            const val VERSION_NAME = "$NEWPIPE_VERSION_NAME"
+            const val VERSION_NAME = "$buildVersionName"
         }
     """.trimIndent()
     from(resources.text.fromString(rawClass)) {

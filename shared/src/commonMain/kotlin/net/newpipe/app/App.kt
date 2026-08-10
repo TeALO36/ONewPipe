@@ -9,23 +9,30 @@ import androidx.compose.animation.scaleOut
 import androidx.compose.animation.slideInVertically
 import androidx.compose.animation.slideOutVertically
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.BoxWithConstraints
+import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.unit.dp
 import net.newpipe.app.composable.DownloadOverlay
 import net.newpipe.app.composable.HomeContent
+import net.newpipe.app.composable.MobileNavigationBar
 import net.newpipe.app.composable.NavItem
 import net.newpipe.app.composable.PlayerOverlay
 import net.newpipe.app.composable.ServerDialog
+import net.newpipe.app.composable.SettingsDialog
 import net.newpipe.app.composable.Sidebar
+import net.newpipe.app.composable.UpdateDialog
 import net.newpipe.app.domain.DownloadState
 import net.newpipe.app.domain.DownloadViewModel
 import net.newpipe.app.domain.HomeViewModel
@@ -35,26 +42,32 @@ import net.newpipe.app.domain.ServerStatus
 import net.newpipe.app.domain.SettingsViewModel
 import net.newpipe.app.domain.SyncViewModel
 import net.newpipe.app.domain.TrendingCategory
-import net.newpipe.app.navigation.Screen
+import net.newpipe.app.domain.UpdateState
+import net.newpipe.app.domain.UpdateViewModel
 import net.newpipe.app.theme.AppTheme
 import org.koin.compose.viewmodel.koinViewModel
 
 /**
- * Application shell: wires the view models together and composes the sidebar,
- * the home content and the player/download overlays.
+ * Application shell shared by desktop and Android.
+ *
+ * Compact windows use a labelled bottom navigation bar; larger windows keep the
+ * navigation rail. This prevents the desktop layout from being squeezed onto a phone.
  */
 @Composable
-fun App(startDestination: Screen? = null) {
-    AppTheme {
+fun App() {
+    val settingsViewModel = koinViewModel<SettingsViewModel>()
+    val themeMode by settingsViewModel.themeMode.collectAsState()
+
+    AppTheme(themeOverride = themeMode) {
         coil3.compose.setSingletonImageLoaderFactory { context ->
             getAsyncImageLoader(context)
         }
 
         val homeViewModel = koinViewModel<HomeViewModel>()
-        val settingsViewModel = koinViewModel<SettingsViewModel>()
         val playerViewModel = koinViewModel<PlayerViewModel>()
         val downloadViewModel = koinViewModel<DownloadViewModel>()
         val syncViewModel = koinViewModel<SyncViewModel>()
+        val updateViewModel = koinViewModel<UpdateViewModel>()
 
         val homeState by homeViewModel.state.collectAsState()
         val service by settingsViewModel.currentService.collectAsState()
@@ -62,49 +75,85 @@ fun App(startDestination: Screen? = null) {
         val downloadState by downloadViewModel.state.collectAsState()
         val selectedCategory by homeViewModel.selectedCategory.collectAsState()
         val serverStatus by syncViewModel.status.collectAsState()
+        val updateState by updateViewModel.state.collectAsState()
 
         var selectedItem by remember { mutableStateOf(NavItem.HOME) }
         var showServerDialog by remember { mutableStateOf(false) }
+        var showSettingsDialog by remember { mutableStateOf(false) }
+        var showUpdateDialog by remember { mutableStateOf(false) }
 
+        val onItemSelected: (NavItem) -> Unit = { item ->
+            selectedItem = item
+            if (item == NavItem.TRENDING) {
+                homeViewModel.selectCategory(TrendingCategory.ALL)
+            }
+        }
+        val onUpdateClick = {
+            showUpdateDialog = true
+            updateViewModel.checkForUpdates(force = true)
+        }
+
+        LaunchedEffect(Unit) { updateViewModel.checkForUpdates() }
         Surface(
             modifier = Modifier.fillMaxSize(),
             color = MaterialTheme.colorScheme.background
         ) {
-            Box(modifier = Modifier.fillMaxSize()) {
-                Row(modifier = Modifier.fillMaxSize()) {
-                    // Left Sidebar
-                    Sidebar(
-                        selectedItem = selectedItem,
-                        onItemSelected = {
-                            selectedItem = it
-                            // Trending shows the plain feed: drop any category filter
-                            if (it == NavItem.TRENDING) {
-                                homeViewModel.selectCategory(TrendingCategory.ALL)
-                            }
-                        },
-                        onServiceSelected = { settingsViewModel.setService(it) },
-                        serverConnected = serverStatus is ServerStatus.Connected,
-                        onServerClick = { showServerDialog = true }
-                    )
+            BoxWithConstraints(modifier = Modifier.fillMaxSize()) {
+                val isCompact = maxWidth < 600.dp
 
-                    // Main Content Area
-                    HomeContent(
-                        selectedItem = selectedItem,
-                        service = service,
-                        homeState = homeState,
-                        selectedCategory = selectedCategory,
-                        onSearch = homeViewModel::search,
-                        onServiceSelected = settingsViewModel::setService,
-                        onCategorySelected = homeViewModel::selectCategory,
-                        onMediaClick = { media -> playerViewModel.loadVideo(media.url, media.title) },
-                        onDownloadClick = { media -> downloadViewModel.loadStreams(media.url, media.title) },
-                        onLoadMore = homeViewModel::loadMore,
-                        isLoadingMore = homeViewModel.isLoadingMore,
-                        modifier = Modifier.weight(1f)
-                    )
+                if (isCompact) {
+                    Column(modifier = Modifier.fillMaxSize()) {
+                        HomeContent(
+                            selectedItem = selectedItem,
+                            service = service,
+                            homeState = homeState,
+                            selectedCategory = selectedCategory,
+                            onSearch = homeViewModel::search,
+                            onServiceSelected = settingsViewModel::setService,
+                            onCategorySelected = homeViewModel::selectCategory,
+                            onMediaClick = { media -> playerViewModel.loadVideo(media.url, media.title) },
+                            onPrefetch = { media -> playerViewModel.prefetch(media.url) },
+                            onDownloadClick = { media -> downloadViewModel.loadStreams(media.url, media.title) },
+                            onLoadMore = homeViewModel::loadMore,
+                            isLoadingMore = homeViewModel.isLoadingMore,
+                            modifier = Modifier.weight(1f)
+                        )
+                        MobileNavigationBar(
+                            selectedItem = selectedItem,
+                            onItemSelected = onItemSelected,
+                            updateAvailable = updateState is UpdateState.Available,
+                            onSettingsClick = { showSettingsDialog = true }
+                        )
+                    }
+                } else {
+                    Row(modifier = Modifier.fillMaxSize()) {
+                        Sidebar(
+                            selectedItem = selectedItem,
+                            onItemSelected = onItemSelected,
+                            onServiceSelected = settingsViewModel::setService,
+                            serverConnected = serverStatus is ServerStatus.Connected,
+                            onServerClick = { showServerDialog = true },
+                            updateAvailable = updateState is UpdateState.Available,
+                            onSettingsClick = { showSettingsDialog = true }
+                        )
+                        HomeContent(
+                            selectedItem = selectedItem,
+                            service = service,
+                            homeState = homeState,
+                            selectedCategory = selectedCategory,
+                            onSearch = homeViewModel::search,
+                            onServiceSelected = settingsViewModel::setService,
+                            onCategorySelected = homeViewModel::selectCategory,
+                            onMediaClick = { media -> playerViewModel.loadVideo(media.url, media.title) },
+                            onPrefetch = { media -> playerViewModel.prefetch(media.url) },
+                            onDownloadClick = { media -> downloadViewModel.loadStreams(media.url, media.title) },
+                            onLoadMore = homeViewModel::loadMore,
+                            isLoadingMore = homeViewModel.isLoadingMore,
+                            modifier = Modifier.weight(1f)
+                        )
+                    }
                 }
 
-                // Player Overlay — slides up from the bottom, fades out on close
                 AnimatedVisibility(
                     visible = playerState !is PlayerState.Idle,
                     enter = slideInVertically(initialOffsetY = { it }, animationSpec = tween(300)) +
@@ -116,13 +165,10 @@ fun App(startDestination: Screen? = null) {
                         state = playerState,
                         playerViewModel = playerViewModel,
                         downloadViewModel = downloadViewModel,
-                        // Hide the native video surface while the download dialog is open
-                        // so the dialog always paints on top of everything.
                         isCovered = downloadState !is DownloadState.Idle
                     )
                 }
 
-                // Download Dialog Overlay — gently scales in, fades out
                 AnimatedVisibility(
                     visible = downloadState !is DownloadState.Idle,
                     enter = scaleIn(initialScale = 0.94f, animationSpec = tween(220)) +
@@ -136,7 +182,29 @@ fun App(startDestination: Screen? = null) {
                     )
                 }
 
-                // Server Connection Dialog
+                if (showSettingsDialog) {
+                    SettingsDialog(
+                        settingsViewModel = settingsViewModel,
+                        themeMode = themeMode,
+                        serverStatus = serverStatus,
+                        updateState = updateState,
+                        onCheckUpdates = onUpdateClick,
+                        onServerClick = {
+                            showSettingsDialog = false
+                            showServerDialog = true
+                        },
+                        onDismiss = { showSettingsDialog = false }
+                    )
+                }
+
+                if (showUpdateDialog) {
+                    UpdateDialog(
+                        state = updateState,
+                        onCheckAgain = { updateViewModel.checkForUpdates(force = true) },
+                        onDismiss = { showUpdateDialog = false }
+                    )
+                }
+
                 if (showServerDialog) {
                     ServerDialog(
                         status = serverStatus,

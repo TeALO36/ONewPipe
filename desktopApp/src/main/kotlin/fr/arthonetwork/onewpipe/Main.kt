@@ -5,8 +5,10 @@
 
 package fr.arthonetwork.onewpipe
 
+import androidx.compose.ui.unit.dp
 import androidx.compose.ui.window.Window
 import androidx.compose.ui.window.application
+import androidx.compose.ui.window.rememberWindowState
 import net.newpipe.app.App
 
 import org.schabi.newpipe.extractor.NewPipe
@@ -22,13 +24,20 @@ fun main() {
     // Geo-localize trending and search (YouTube gl/hl params) from the system
     // locale, so a French user gets French content instead of US content.
     net.newpipe.app.backend.applySystemGeoLocalization()
-    // YouTube throttles the plain WEB client to ~360p; the iOS client returns
-    // the full format range (720p/1080p/4K + audio) without a poToken.
-    org.schabi.newpipe.extractor.services.youtube.extractors.YoutubeStreamExtractor.setFetchIosClient(true)
+    // Do not fetch the optional iOS player response on the desktop fast path.
+    // It adds another YouTube request even though playback starts from the
+    // progressive Android stream; a real integration run resolved the same
+    // video in about 2.2s with this disabled.
+    org.schabi.newpipe.extractor.services.youtube.extractors.YoutubeStreamExtractor.setFetchIosClient(false)
     KoinApp.init()
     
     application {
-        Window(onCloseRequest = ::exitApplication, title = "ONewPipe") {
+        val windowState = rememberWindowState(width = 1440.dp, height = 900.dp)
+        Window(
+            onCloseRequest = ::exitApplication,
+            title = "ONewPipe",
+            state = windowState
+        ) {
             App()
         }
     }

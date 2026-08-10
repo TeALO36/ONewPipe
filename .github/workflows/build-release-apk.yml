@@ -1,4 +1,4 @@
-name: "Build unsigned release APK on master"
+name: "Build unsigned ONewPipe release APK"
 
 on:
   workflow_dispatch:
@@ -29,10 +29,10 @@ jobs:
           echo >> "$GITHUB_STEP_SUMMARY"
           echo '```' >> "$GITHUB_STEP_SUMMARY"
           # assume there is only one APK in that folder
-          mv app/build/outputs/apk/release/*.apk "app/build/outputs/apk/release/NewPipe_v$VERSION_NAME.apk"
+          mv app/build/outputs/apk/release/*.apk "app/build/outputs/apk/release/ONewPipe-v$VERSION_NAME-android-unsigned.apk"
 
       - name: "Upload APK"
         uses: actions/upload-artifact@v7
         with:
-          name: app
+          name: ONewPipe-android-unsigned
           path: app/build/outputs/apk/release/*.apk

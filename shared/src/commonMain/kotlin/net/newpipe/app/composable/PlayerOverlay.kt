@@ -14,12 +14,9 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.rememberScrollState
-import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.ArrowBack
-import androidx.compose.material.icons.filled.Fullscreen
-import androidx.compose.material.icons.filled.FullscreenExit
 import androidx.compose.material3.Button
 import androidx.compose.material3.Divider
 import androidx.compose.material3.Icon
@@ -28,6 +25,7 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -66,6 +64,18 @@ fun PlayerOverlay(
     // fullscreen button) and the platform video player.
     val playerActions = remember { PlayerActions() }
 
+    // AWT's global dispatcher keeps shortcuts working while the native VLC
+    // surface owns focus. The Compose preview handler remains as a fallback
+    // for non-desktop surfaces.
+    if (state is PlayerState.Playing) {
+        DisposableEffect(Unit) {
+            val removeHandler = installGlobalPlayerKeyHandler { key ->
+                handlePlayerShortcut(key.name, playerActions)
+            }
+            onDispose { removeHandler() }
+        }
+    }
+
     Box(
         modifier = modifier
             .fillMaxSize()
@@ -87,11 +97,24 @@ fun PlayerOverlay(
             }
             is PlayerState.Playing -> {
                 var isFullscreen by remember { mutableStateOf(false) }
+                var isCinema by remember { mutableStateOf(false) }
+                var seekNotice by remember { mutableStateOf<String?>(null) }
                 val scrollState = rememberScrollState()
+
+                LaunchedEffect(seekNotice) {
+                    if (seekNotice != null) {
+                        kotlinx.coroutines.delay(900)
+                        seekNotice = null
+                    }
+                }
 
                 // Wire the shared fullscreen action (double-click / F key) to
                 // this branch's fullscreen state.
                 playerActions.toggleFullscreen = { isFullscreen = !isFullscreen }
+                playerActions.toggleCinema = { isCinema = !isCinema }
+                playerActions.reportSeek = { seconds ->
+                    seekNotice = if (seconds < 0) "${-seconds}s" else "+${seconds}s"
+                }
 
                 // When another overlay (e.g. the download dialog) is on top, the native
                 // AWT video surface would paint above it. Hide the video surface and
@@ -102,6 +125,7 @@ fun PlayerOverlay(
 
                 BoxWithConstraints(modifier = Modifier.fillMaxSize().background(Color(0xFF121212))) {
                     val isWide = maxWidth > 1000.dp
+                    val showRelated = isWide && !isFullscreen && !isCinema
                     val scrollModifier = if (isFullscreen) Modifier else Modifier.verticalScroll(scrollState)
 
                     Row(modifier = Modifier.fillMaxSize().then(scrollModifier)) {
@@ -109,7 +133,7 @@ fun PlayerOverlay(
                         // Left Side (or Full Width)
                         Column(
                             modifier = Modifier
-                                .weight(if (isWide && !isFullscreen) 0.65f else 1f)
+                                .weight(if (showRelated) 0.65f else 1f)
                                 .padding(if (isFullscreen) 0.dp else 16.dp)
                         ) {
 
@@ -147,6 +171,7 @@ fun PlayerOverlay(
                                     VideoPlayer(
                                         modifier = Modifier.fillMaxSize(),
                                         videoUrl = state.streamUrl,
+                                        audioUrl = state.audioUrl,
                                         startPositionMs = state.resumePositionMs,
                                         onPlaybackEnded = { playerViewModel.stop() },
                                         onPositionChange = { positionMs -> playerViewModel.onPositionUpdate(positionMs, 0L) },
@@ -166,22 +191,6 @@ fun PlayerOverlay(
                                     }
                                 }
 
-                                // Fullscreen Toggle Button — prominent, always visible
-                                IconButton(
-                                    onClick = { isFullscreen = !isFullscreen },
-                                    modifier = Modifier
-                                        .align(Alignment.TopEnd)
-                                        .padding(12.dp)
-                                        .background(Color.Black.copy(alpha = 0.6f), shape = CircleShape)
-                                        .padding(4.dp)
-                                ) {
-                                    Icon(
-                                        imageVector = if (isFullscreen) Icons.Filled.FullscreenExit else Icons.Filled.Fullscreen,
-                                        contentDescription = if (isFullscreen) "Exit fullscreen" else "Fullscreen",
-                                        tint = Color.White,
-                                        modifier = Modifier.padding(4.dp)
-                                    )
-                                }
                             }
 
                             // Details & Mobile Related
@@ -189,7 +198,7 @@ fun PlayerOverlay(
                                 Spacer(modifier = Modifier.height(16.dp))
                                 VideoDetailsContent(state, playerViewModel, downloadViewModel)
 
-                                if (!isWide) {
+                                if (!isWide && !isCinema) {
                                     Spacer(modifier = Modifier.height(24.dp))
                                     Divider(color = Color.DarkGray)
                                     Spacer(modifier = Modifier.height(16.dp))
@@ -199,7 +208,7 @@ fun PlayerOverlay(
                         }
 
                         // Right Side (Desktop Related)
-                        if (isWide && !isFullscreen) {
+                        if (showRelated) {
                             Column(
                                 modifier = Modifier
                                     .weight(0.35f)
@@ -208,6 +217,21 @@ fun PlayerOverlay(
                                 RelatedVideosContent(state, playerViewModel)
                             }
                         }
+                    }
+
+                    // YouTube-style seek feedback, visible for a short time
+                    // after Left/Right or a numeric jump.
+                    seekNotice?.let { notice ->
+                        Text(
+                            text = notice,
+                            color = Color.White,
+                            style = MaterialTheme.typography.titleMedium,
+                            modifier = Modifier
+                                .align(Alignment.TopCenter)
+                                .padding(top = if (isFullscreen) 20.dp else 84.dp)
+                                .background(Color.Black.copy(alpha = 0.78f))
+                                .padding(horizontal = 18.dp, vertical = 8.dp)
+                        )
                     }
                 }
             }
@@ -238,23 +262,44 @@ private fun handlePlayerKey(event: KeyEvent, actions: PlayerActions): Boolean {
     if (event.isCtrlPressed || event.isAltPressed || event.isMetaPressed) return false
 
     return when (event.key) {
-        Key.Spacebar -> { actions.togglePlayPause(); true }
-        Key.DirectionLeft -> { actions.seekBy(-5); true }
-        Key.DirectionRight -> { actions.seekBy(5); true }
-        Key.DirectionUp -> { actions.adjustVolume(5); true }
-        Key.DirectionDown -> { actions.adjustVolume(-5); true }
-        Key.F -> { actions.toggleFullscreen(); true }
-        Key.M -> { actions.toggleMute(); true }
-        Key.Zero -> { actions.seekToFraction(0f); true }
-        Key.One -> { actions.seekToFraction(0.1f); true }
-        Key.Two -> { actions.seekToFraction(0.2f); true }
-        Key.Three -> { actions.seekToFraction(0.3f); true }
-        Key.Four -> { actions.seekToFraction(0.4f); true }
-        Key.Five -> { actions.seekToFraction(0.5f); true }
-        Key.Six -> { actions.seekToFraction(0.6f); true }
-        Key.Seven -> { actions.seekToFraction(0.7f); true }
-        Key.Eight -> { actions.seekToFraction(0.8f); true }
-        Key.Nine -> { actions.seekToFraction(0.9f); true }
+        Key.Spacebar -> handlePlayerShortcut("SPACE", actions)
+        Key.DirectionLeft -> handlePlayerShortcut("LEFT", actions)
+        Key.DirectionRight -> handlePlayerShortcut("RIGHT", actions)
+        Key.DirectionUp -> handlePlayerShortcut("UP", actions)
+        Key.DirectionDown -> handlePlayerShortcut("DOWN", actions)
+        Key.F -> handlePlayerShortcut("F", actions)
+        Key.M -> handlePlayerShortcut("M", actions)
+        Key.Zero -> handlePlayerShortcut("0", actions)
+        Key.One -> handlePlayerShortcut("1", actions)
+        Key.Two -> handlePlayerShortcut("2", actions)
+        Key.Three -> handlePlayerShortcut("3", actions)
+        Key.Four -> handlePlayerShortcut("4", actions)
+        Key.Five -> handlePlayerShortcut("5", actions)
+        Key.Six -> handlePlayerShortcut("6", actions)
+        Key.Seven -> handlePlayerShortcut("7", actions)
+        Key.Eight -> handlePlayerShortcut("8", actions)
+        Key.Nine -> handlePlayerShortcut("9", actions)
         else -> false
     }
+}
+
+private fun handlePlayerShortcut(name: String, actions: PlayerActions): Boolean = when (name) {
+    "SPACE" -> { actions.togglePlayPause(); true }
+    "LEFT" -> { actions.seekBy(-5); true }
+    "RIGHT" -> { actions.seekBy(5); true }
+    "UP" -> { actions.adjustVolume(5); true }
+    "DOWN" -> { actions.adjustVolume(-5); true }
+    "F" -> { actions.toggleFullscreen(); true }
+    "M" -> { actions.toggleMute(); true }
+    "0" -> { actions.seekToFraction(0f); true }
+    "1" -> { actions.seekToFraction(0.1f); true }
+    "2" -> { actions.seekToFraction(0.2f); true }
+    "3" -> { actions.seekToFraction(0.3f); true }
+    "4" -> { actions.seekToFraction(0.4f); true }
+    "5" -> { actions.seekToFraction(0.5f); true }
+    "6" -> { actions.seekToFraction(0.6f); true }
+    "7" -> { actions.seekToFraction(0.7f); true }
+    "8" -> { actions.seekToFraction(0.8f); true }
+    "9" -> { actions.seekToFraction(0.9f); true }
+    else -> false
 }

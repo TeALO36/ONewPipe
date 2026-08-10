@@ -9,44 +9,37 @@ import android.os.Bundle
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
-import kotlinx.serialization.json.Json
-import net.newpipe.Constants
-import net.newpipe.app.navigation.Screen
-
-import org.schabi.newpipe.extractor.NewPipe
 import net.newpipe.app.backend.OkHttpDownloader
 import okhttp3.OkHttpClient
 import org.koin.android.ext.koin.androidContext
+import org.schabi.newpipe.extractor.NewPipe
 
 /**
- * Entry point for compose-related UI components on Android
+ * Primary mobile entry point for the modern Compose interface.
  */
 class ComposeActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         enableEdgeToEdge()
         super.onCreate(savedInstanceState)
+
         try {
             NewPipe.init(OkHttpDownloader(OkHttpClient.Builder().build()))
-            // Geo-localize trending and search (YouTube gl/hl params) from the system
-            // locale, so a French user gets French content instead of US content.
+            // Use the device locale for trending/search results.
             net.newpipe.app.backend.applySystemGeoLocalization()
-            // YouTube throttles the plain WEB client to ~360p; the iOS client returns
-            // the full format range (720p/1080p/4K + audio) without a poToken.
-            org.schabi.newpipe.extractor.services.youtube.extractors.YoutubeStreamExtractor.setFetchIosClient(true)
+            // Keep the initial extraction to the fast progressive response. The
+            // quality menu explicitly enables the slower iOS response when HD
+            // and 4K formats are requested.
+            org.schabi.newpipe.extractor.services.youtube.extractors.YoutubeStreamExtractor
+                .setFetchIosClient(false)
             net.newpipe.app.di.KoinApp.init {
                 androidContext(this@ComposeActivity)
             }
-        } catch (e: Exception) {
-            // Already initialized
+        } catch (_: Exception) {
+            // The legacy Android application may already have initialized these singletons.
         }
 
-        setContent {
-            App(
-                // TODO: Change when everything is in compose and this is the primary activity
-                startDestination = Json.decodeFromString<Screen>(
-                    intent.getStringExtra(Constants.INTENT_SCREEN_KEY)!!
-                )
-            )
-        }
+        // A launcher intent has no navigation payload. App currently owns the home shell,
+        // while deep-link destinations can be added here without making startup nullable.
+        setContent { App() }
     }
 }

@@ -59,7 +59,7 @@ fun ServerDialog(
                         value = serverUrl,
                         onValueChange = { serverUrl = it },
                         label = { Text("Server URL") },
-                        placeholder = { Text("http://192.168.1.10:8080") },
+                        placeholder = { Text("192.168.1.10:8080 or https://server.example") },
                         singleLine = true,
                         modifier = Modifier.fillMaxWidth()
                     )

@@ -102,6 +102,31 @@ jobs:
           name: linux-deb
           path: desktopApp/build/compose/binaries/main/deb/*
 
+  # ---- Desktop app - macOS (.dmg) ----
+  desktop-macos:
+    runs-on: macos-latest
+    permissions:
+      contents: read
+
+    steps:
+      - uses: actions/checkout@v6
+
+      - name: Set up JDK 17 (toolchain for shared/desktopApp)
+        uses: actions/setup-java@v5
+        with:
+          java-version: 17
+          distribution: "temurin"
+          cache: "gradle"
+
+      - name: Build .dmg package
+        run: ./gradlew :desktopApp:packageDistributionForCurrentOS --stacktrace
+
+      - name: Upload dmg
+        uses: actions/upload-artifact@v7
+        with:
+          name: macos-dmg
+          path: desktopApp/build/compose/binaries/main/dmg/*
+
   # ---- Server (jar + Docker image) ----
   server:
     runs-on: ubuntu-latest

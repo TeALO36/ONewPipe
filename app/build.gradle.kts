@@ -103,7 +103,7 @@ configure<ApplicationExtension> {
 
         versionCode = System.getProperty("versionCodeOverride")?.toInt() ?: NEWPIPE_VERSION_CODE
 
-        versionName = NEWPIPE_VERSION_NAME
+        versionName = System.getProperty("versionNameOverride") ?: NEWPIPE_VERSION_NAME
         System.getProperty("versionNameSuffix")?.let { versionNameSuffix = it }
 
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
@@ -264,6 +264,9 @@ sonar {
 }
 
 dependencies {
+    // Compose-based mobile UI shared with desktop and iOS
+    implementation(projects.shared)
+
     // Desugaring
     coreLibraryDesugaring(libs.android.desugar)
 

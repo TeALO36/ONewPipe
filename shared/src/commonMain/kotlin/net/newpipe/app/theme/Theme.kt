@@ -101,14 +101,15 @@ private val blackScheme = darkScheme.copy(surface = Color.Black)
 @Composable
 fun currentColorScheme(
     useDarkTheme: Boolean = isSystemInDarkTheme(),
-    settings: Settings = koinInject()
+    settings: Settings = koinInject(),
+    themeOverride: String? = null
 ): ColorScheme {
     val nightScheme = when (settings.getString("night_theme", "dark_theme")) {
         "black_theme" -> blackScheme
         else -> darkScheme
     }
 
-    return when (settings.getString("theme", "auto_device_theme")) {
+    return when (themeOverride ?: settings.getString("theme", "auto_device_theme")) {
         "light_theme" -> lightScheme
         "dark_theme" -> darkScheme
         "black_theme" -> blackScheme
@@ -125,7 +126,8 @@ fun currentColorScheme(
 @Composable
 fun AppTheme(
     isPreview: Boolean = LocalInspectionMode.current,
-    colorScheme: ColorScheme = if (isPreview) lightScheme else currentColorScheme(),
+    themeOverride: String? = null,
+    colorScheme: ColorScheme = if (isPreview) lightScheme else currentColorScheme(themeOverride = themeOverride),
     content: @Composable () -> Unit
 ) {
     MaterialExpressiveTheme(

@@ -14,6 +14,12 @@ data class MediaItemDto(
 )
 
 @Serializable
+data class VideoFormatDto(
+    val label: String,
+    val url: String
+)
+
+@Serializable
 data class VideoInfoDto(
     val url: String,
     val title: String,
@@ -22,7 +28,9 @@ data class VideoInfoDto(
     val uploaderSubscriberCount: Long,
     val viewCount: Long,
     val durationSeconds: Long,
-    val relatedItems: List<MediaItemDto> = emptyList()
+    val relatedItems: List<MediaItemDto> = emptyList(),
+    /** Progressive formats include audio and can be switched/downloaded by the web player. */
+    val videoFormats: List<VideoFormatDto> = emptyList()
 )
 
 @Serializable

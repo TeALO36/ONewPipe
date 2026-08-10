@@ -33,6 +33,14 @@ class ServerClientTest {
     }
 
     @Test
+    fun normalizesBareLanAddress() {
+        val client = ServerClient()
+        assertEquals("http://192.168.1.10:8080", client.normalizeServerUrl("192.168.1.10"))
+        assertEquals("http://192.168.1.10:8099", client.normalizeServerUrl("192.168.1.10:8099"))
+        assertEquals("https://server.example:8443", client.normalizeServerUrl("https://server.example:8443/"))
+    }
+
+    @Test
     fun registerPushAndPullWatchState() = runBlocking {
         if (!serverReachable()) return@runBlocking // no server: skip
 

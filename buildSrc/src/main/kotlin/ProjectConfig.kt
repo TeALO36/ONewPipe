@@ -8,8 +8,8 @@ const val NEWPIPE_VERSION_SDK_COMPILE_MINOR = 1
 const val NEWPIPE_VERSION_SDK_MIN = 23
 const val NEWPIPE_VERSION_SDK_TARGET = 35
 
-const val NEWPIPE_VERSION_CODE = 1100
-const val NEWPIPE_VERSION_NAME = "1.0.0"
+const val NEWPIPE_VERSION_CODE = 1101
+const val NEWPIPE_VERSION_NAME = "1.1.0"
 
 // The namespace determines the package of generated R/BuildConfig classes.
 // The whole app codebase still references org.schabi.newpipe.R and

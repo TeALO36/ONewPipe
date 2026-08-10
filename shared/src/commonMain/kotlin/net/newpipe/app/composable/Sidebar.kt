@@ -10,7 +10,7 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Cloud
 import androidx.compose.material.icons.filled.Home
 import androidx.compose.material.icons.filled.LocalFireDepartment
-import androidx.compose.material.icons.filled.PlayArrow
+import androidx.compose.material.icons.filled.Settings
 import androidx.compose.material.icons.filled.VideoLibrary
 import androidx.compose.material.icons.filled.Subscriptions
 import androidx.compose.material3.*
@@ -21,7 +21,9 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.scale
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
 import net.newpipe.app.theme.currentServiceScheme
 
 enum class NavItem(val title: String, val icon: ImageVector) {
@@ -31,6 +33,55 @@ enum class NavItem(val title: String, val icon: ImageVector) {
     LIBRARY("Library", Icons.Filled.VideoLibrary)
 }
 
+/** Compact, labelled navigation for phones and narrow windows. */
+@Composable
+fun MobileNavigationBar(
+    selectedItem: NavItem,
+    onItemSelected: (NavItem) -> Unit,
+    updateAvailable: Boolean,
+    onSettingsClick: () -> Unit
+) {
+    Row(
+        modifier = Modifier.fillMaxWidth(),
+        verticalAlignment = Alignment.CenterVertically
+    ) {
+        NavigationBar(
+            modifier = Modifier.weight(1f),
+            tonalElevation = 4.dp
+        ) {
+        NavItem.entries.forEach { item ->
+            NavigationBarItem(
+                selected = selectedItem == item,
+                onClick = { onItemSelected(item) },
+                icon = { Icon(item.icon, contentDescription = item.title) },
+                label = {
+                    Text(
+                        text = item.title,
+                        maxLines = 1,
+                        softWrap = false,
+                        overflow = TextOverflow.Ellipsis,
+                        fontSize = 10.sp
+                    )
+                }
+            )
+        }
+        }
+
+        IconButton(
+            onClick = onSettingsClick,
+            modifier = Modifier.padding(horizontal = 2.dp)
+        ) {
+            if (updateAvailable) {
+                BadgedBox(badge = { Badge() }) {
+                    Icon(Icons.Filled.Settings, contentDescription = "Settings")
+                }
+            } else {
+                Icon(Icons.Filled.Settings, contentDescription = "Settings")
+            }
+        }
+    }
+}
+
 @Composable
 fun Sidebar(
     modifier: Modifier = Modifier,
@@ -38,7 +89,9 @@ fun Sidebar(
     onItemSelected: (NavItem) -> Unit,
     onServiceSelected: (net.newpipe.app.theme.Service) -> Unit,
     serverConnected: Boolean = false,
-    onServerClick: () -> Unit = {}
+    onServerClick: () -> Unit = {},
+    updateAvailable: Boolean = false,
+    onSettingsClick: () -> Unit = {}
 ) {
     val serviceColor = currentServiceScheme().primaryContainer
 
@@ -62,11 +115,7 @@ fun Sidebar(
                         .clickable { expanded = true },
                     contentAlignment = Alignment.Center
                 ) {
-                    Icon(
-                        imageVector = Icons.Filled.PlayArrow,
-                        contentDescription = "Logo",
-                        tint = Color.White
-                    )
+                    BrandLogo(modifier = Modifier.fillMaxSize().padding(6.dp))
                 }
                 
                 DropdownMenu(
@@ -96,6 +145,26 @@ fun Sidebar(
             )
         }
         Spacer(modifier = Modifier.weight(1f))
+
+        // Settings is intentionally a small secondary action. Update status is
+        // shown as a badge here and the check itself lives inside Settings.
+        Box(
+            modifier = Modifier
+                .padding(vertical = 4.dp)
+                .size(48.dp)
+                .clip(RoundedCornerShape(14.dp))
+                .background(Color.Transparent)
+                .clickable { onSettingsClick() },
+            contentAlignment = Alignment.Center
+        ) {
+            if (updateAvailable) {
+                BadgedBox(badge = { Badge() }) {
+                    Icon(Icons.Filled.Settings, contentDescription = "Settings", tint = MaterialTheme.colorScheme.onSurfaceVariant)
+                }
+            } else {
+                Icon(Icons.Filled.Settings, contentDescription = "Settings", tint = MaterialTheme.colorScheme.onSurfaceVariant)
+            }
+        }
 
         // Server sync entry (bottom of the rail)
         val cloudBackground by animateColorAsState(

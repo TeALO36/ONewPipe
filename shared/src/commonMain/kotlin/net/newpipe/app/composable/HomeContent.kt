@@ -5,9 +5,8 @@ import androidx.compose.animation.Crossfade
 import androidx.compose.animation.core.tween
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
-import androidx.compose.animation.slideInHorizontally
-import androidx.compose.animation.slideOutHorizontally
 import androidx.compose.animation.togetherWith
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -22,6 +21,7 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.ArrowDropDown
 import androidx.compose.material.icons.filled.Cloud
@@ -46,8 +46,11 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import net.newpipe.app.domain.HomeState
 import net.newpipe.app.domain.MediaItem
+import net.newpipe.app.domain.SearchFilter
+import net.newpipe.app.domain.Subscription
 import net.newpipe.app.domain.TrendingCategory
 import net.newpipe.app.theme.Service
+import coil3.compose.AsyncImage
 
 /**
  * Main content of the app: search bar, service switcher, dynamic title and
@@ -63,10 +66,16 @@ fun HomeContent(
     service: Service,
     homeState: HomeState,
     selectedCategory: TrendingCategory,
+    searchQuery: String? = null,
+    searchFilter: SearchFilter = SearchFilter.ALL,
     onSearch: (String) -> Unit,
+    onSearchFilterSelected: (SearchFilter) -> Unit = {},
     onServiceSelected: (Service) -> Unit,
     onCategorySelected: (TrendingCategory) -> Unit,
     onMediaClick: (MediaItem) -> Unit,
+    onChannelClick: (MediaItem) -> Unit = {},
+    subscriptions: List<Subscription> = emptyList(),
+    onSubscriptionClick: (Subscription) -> Unit = {},
     onDownloadClick: (MediaItem) -> Unit,
     onPrefetch: (MediaItem) -> Unit = {},
     onLoadMore: () -> Unit = {},
@@ -75,6 +84,7 @@ fun HomeContent(
 ) {
     BoxWithConstraints(modifier = modifier.fillMaxSize()) {
         val isCompact = maxWidth < 600.dp
+        val isSearching = !searchQuery.isNullOrBlank()
 
         Column(modifier = Modifier.fillMaxSize()) {
             Spacer(modifier = Modifier.height(if (isCompact) 12.dp else 24.dp))
@@ -87,11 +97,13 @@ fun HomeContent(
                         verticalArrangement = Arrangement.spacedBy(10.dp)
                     ) {
                         GlassSearchBar(onSearch = onSearch, modifier = Modifier.fillMaxWidth())
-                        ServiceSwitcher(
-                            service = service,
-                            onServiceSelected = onServiceSelected,
-                            modifier = Modifier.fillMaxWidth()
-                        )
+                        if (!isSearching) {
+                            ServiceSwitcher(
+                                service = service,
+                                onServiceSelected = onServiceSelected,
+                                modifier = Modifier.fillMaxWidth()
+                            )
+                        }
                     }
                 } else {
                     Row(
@@ -102,11 +114,21 @@ fun HomeContent(
                             onSearch = onSearch,
                             modifier = Modifier.weight(1f)
                         )
-                        Spacer(modifier = Modifier.width(16.dp))
-                        ServiceSwitcher(service = service, onServiceSelected = onServiceSelected)
+                        if (!isSearching) {
+                            Spacer(modifier = Modifier.width(16.dp))
+                            ServiceSwitcher(service = service, onServiceSelected = onServiceSelected)
+                        }
                     }
                 }
                 Spacer(modifier = Modifier.height(if (isCompact) 10.dp else 16.dp))
+                if (isSearching) {
+                    SearchFilters(
+                        selected = searchFilter,
+                        onSelected = onSearchFilterSelected,
+                        isCompact = isCompact
+                    )
+                    Spacer(modifier = Modifier.height(8.dp))
+                }
             }
 
         // Dynamic Title (crossfades when switching sections)
@@ -116,7 +138,11 @@ fun HomeContent(
             label = "title"
         ) { item ->
             Text(
-                text = item.title,
+                text = if (isSearching && (item == NavItem.HOME || item == NavItem.TRENDING)) {
+                    "Search results"
+                } else {
+                    item.title
+                },
                 style = MaterialTheme.typography.headlineMedium.copy(fontWeight = FontWeight.Bold),
                 color = MaterialTheme.colorScheme.onBackground,
                 modifier = Modifier.padding(
@@ -132,7 +158,7 @@ fun HomeContent(
         // OUTSIDE the animated section. AnimatedContent stacks its children in
         // a Box, so a grid inside it would paint over the chips. Keeping the
         // chips here guarantees they are never covered by the video grid.
-        if (selectedItem == NavItem.HOME) {
+        if (selectedItem == NavItem.HOME && !isSearching) {
             Row(
                 modifier = Modifier
                     .fillMaxWidth()
@@ -155,17 +181,12 @@ fun HomeContent(
             Spacer(modifier = Modifier.height(12.dp))
         }
 
-        // Section content (slides + fades when switching sidebar items).
-        // weight(1f) bounds the content to the remaining height so the grid
-        // scrolls internally instead of overflowing over the header/chips.
-        AnimatedContent(
+        // Section content fades in place. Crossfade keeps a stable layout
+        // box, avoiding the horizontal remeasurement/shake seen when the
+        // previous slide transition switched between Home and Trending.
+        Crossfade(
             targetState = selectedItem,
-            transitionSpec = {
-                (fadeIn(tween(240)) + slideInHorizontally(initialOffsetX = { it / 10 }, animationSpec = tween(240)))
-                    .togetherWith(
-                        fadeOut(tween(140)) + slideOutHorizontally(targetOffsetX = { -it / 10 }, animationSpec = tween(140))
-                    )
-            },
+            animationSpec = tween(220),
             modifier = Modifier.weight(1f).fillMaxWidth(),
             label = "section"
         ) { item ->
@@ -186,6 +207,7 @@ fun HomeContent(
                                     items = state.items,
                                     isLoadingMore = isLoadingMore,
                                     onMediaClick = onMediaClick,
+                                    onChannelClick = onChannelClick,
                                     onDownloadClick = onDownloadClick,
                                     onPrefetch = onPrefetch,
                                     onLoadMore = onLoadMore,
@@ -199,11 +221,9 @@ fun HomeContent(
                     }
                 }
                 NavItem.SUBSCRIPTIONS -> {
-                    EmptySection(
-                        icon = { Icon(Icons.Filled.Cloud, contentDescription = null, modifier = Modifier.size(56.dp)) },
-                        title = "No subscriptions yet",
-                        message = "Connect to your ONewPipe server (cloud icon, bottom left) to sync your " +
-                            "watch positions across devices. Subscription sync is not available yet."
+                    SubscriptionSection(
+                        subscriptions = subscriptions,
+                        onSubscriptionClick = onSubscriptionClick
                     )
                 }
                 NavItem.LIBRARY -> {
@@ -215,6 +235,57 @@ fun HomeContent(
                     )
                 }
             }
+            }
+        }
+    }
+}
+
+@Composable
+private fun SubscriptionSection(
+    subscriptions: List<Subscription>,
+    onSubscriptionClick: (Subscription) -> Unit
+) {
+    if (subscriptions.isEmpty()) {
+        EmptySection(
+            icon = { Icon(Icons.Filled.Cloud, contentDescription = null, modifier = Modifier.size(56.dp)) },
+            title = "No subscriptions yet",
+            message = "Open a video and press Subscribe to keep your favorite channels here."
+        )
+        return
+    }
+
+    Column(
+        modifier = Modifier
+            .fillMaxSize()
+            .verticalScroll(rememberScrollState())
+            .padding(horizontal = 24.dp, vertical = 8.dp),
+        verticalArrangement = Arrangement.spacedBy(12.dp)
+    ) {
+        Text(
+            text = "Your subscriptions",
+            style = MaterialTheme.typography.titleLarge,
+            fontWeight = FontWeight.Bold
+        )
+        subscriptions.forEach { subscription ->
+            Row(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .clickable { onSubscriptionClick(subscription) }
+                    .padding(12.dp),
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                if (subscription.thumbnailUrl.isNotBlank()) {
+                    AsyncImage(
+                        model = subscription.thumbnailUrl,
+                        contentDescription = subscription.name,
+                        modifier = Modifier.size(48.dp),
+                        contentScale = androidx.compose.ui.layout.ContentScale.Crop
+                    )
+                } else {
+                    Icon(Icons.Filled.Cloud, contentDescription = null, modifier = Modifier.size(48.dp))
+                }
+                Spacer(modifier = Modifier.width(12.dp))
+                Text(subscription.name, style = MaterialTheme.typography.titleMedium)
             }
         }
     }
@@ -243,6 +314,29 @@ private fun EmptySection(
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
                 textAlign = TextAlign.Center,
                 modifier = Modifier.padding(horizontal = 48.dp)
+            )
+        }
+    }
+}
+
+@Composable
+private fun SearchFilters(
+    selected: SearchFilter,
+    onSelected: (SearchFilter) -> Unit,
+    isCompact: Boolean
+) {
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .horizontalScroll(rememberScrollState())
+            .padding(horizontal = if (isCompact) 16.dp else 24.dp),
+        horizontalArrangement = Arrangement.spacedBy(8.dp)
+    ) {
+        SearchFilter.entries.forEach { filter ->
+            FilterChip(
+                selected = selected == filter,
+                onClick = { onSelected(filter) },
+                label = { Text(filter.label) }
             )
         }
     }

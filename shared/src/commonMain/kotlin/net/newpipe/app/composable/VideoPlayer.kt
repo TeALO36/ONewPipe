@@ -8,8 +8,13 @@ expect fun VideoPlayer(
     modifier: Modifier = Modifier,
     videoUrl: String,
     audioUrl: String? = null,
+    title: String = "",
+    artistName: String = "",
+    thumbnailUrl: String? = null,
     startPositionMs: Long = 0L,
     onPlaybackEnded: () -> Unit = {},
+    onPreviousVideo: () -> Unit = {},
+    onNextVideo: () -> Unit = {},
     onPositionChange: (Long) -> Unit = {},
     playerActions: PlayerActions = PlayerActions()
 )

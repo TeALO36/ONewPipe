@@ -10,6 +10,13 @@ import kotlinx.serialization.json.Json
 import net.newpipe.app.Constants.KEY_STREAMING_SERVICE
 import net.newpipe.app.theme.Service
 
+@kotlinx.serialization.Serializable
+data class Subscription(
+    val url: String,
+    val name: String,
+    val thumbnailUrl: String = ""
+)
+
 class SettingsViewModel(private val settings: Settings) : ViewModel() {
 
     private val json = Json { ignoreUnknownKeys = true }
@@ -25,6 +32,15 @@ class SettingsViewModel(private val settings: Settings) : ViewModel() {
         settings.getString(KEY_THEME_MODE, THEME_SYSTEM)
     )
     val themeMode: StateFlow<String> = _themeMode.asStateFlow()
+
+    private val _subscriptions = MutableStateFlow(
+        runCatching {
+            json.decodeFromString<List<Subscription>>(
+                settings.getString(KEY_SUBSCRIPTIONS, "[]")
+            )
+        }.getOrDefault(emptyList())
+    )
+    val subscriptions: StateFlow<List<Subscription>> = _subscriptions.asStateFlow()
 
     private val _serverConfig = MutableStateFlow(
         runCatching {
@@ -48,7 +64,21 @@ class SettingsViewModel(private val settings: Settings) : ViewModel() {
         _serverConfig.value = config
     }
 
+    fun isSubscribed(url: String): Boolean =
+        _subscriptions.value.any { it.url == url }
+
+    fun toggleSubscription(subscription: Subscription) {
+        val updated = if (isSubscribed(subscription.url)) {
+            _subscriptions.value.filterNot { it.url == subscription.url }
+        } else {
+            _subscriptions.value + subscription
+        }
+        settings.putString(KEY_SUBSCRIPTIONS, json.encodeToString(updated))
+        _subscriptions.value = updated
+    }
+
     companion object {
+        const val KEY_SUBSCRIPTIONS = "subscriptions"
         const val KEY_SERVER_CONFIG = "server_config"
         const val KEY_THEME_MODE = "theme"
         const val THEME_SYSTEM = "auto_device_theme"

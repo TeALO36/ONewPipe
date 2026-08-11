@@ -27,12 +27,16 @@ import coil3.compose.AsyncImage
 import net.newpipe.app.domain.DownloadViewModel
 import net.newpipe.app.domain.PlayerState
 import net.newpipe.app.domain.PlayerViewModel
+import net.newpipe.app.domain.Subscription
 
 @Composable
 fun VideoDetailsContent(
     state: PlayerState.Playing,
     playerViewModel: PlayerViewModel,
-    downloadViewModel: DownloadViewModel
+    downloadViewModel: DownloadViewModel,
+    onChannelClick: (String) -> Unit = {},
+    isSubscribed: Boolean = false,
+    onToggleSubscription: (Subscription) -> Unit = {}
 ) {
     // Title & Views
     Text(text = state.title, color = Color.White, style = MaterialTheme.typography.titleLarge)
@@ -43,7 +47,9 @@ fun VideoDetailsContent(
     
     // Channel Info
     Row(
-        modifier = Modifier.fillMaxWidth(),
+        modifier = Modifier
+            .fillMaxWidth()
+            .then(if (state.uploaderUrl.isNotBlank()) Modifier.clickable { onChannelClick(state.uploaderUrl) } else Modifier),
         verticalAlignment = Alignment.CenterVertically
     ) {
         Box(modifier = Modifier.size(40.dp).background(Color.DarkGray, shape = CircleShape), contentAlignment = Alignment.Center) {
@@ -55,10 +61,24 @@ fun VideoDetailsContent(
             Text(text = "${java.text.NumberFormat.getInstance().format(state.uploaderSubscriberCount)} subscribers", color = Color.Gray, style = MaterialTheme.typography.bodySmall)
         }
         Button(
-            onClick = { },
-            colors = ButtonDefaults.buttonColors(containerColor = Color.White, contentColor = Color.Black)
+            onClick = {
+                if (state.uploaderUrl.isNotBlank()) {
+                    onToggleSubscription(
+                        Subscription(
+                            url = state.uploaderUrl,
+                            name = state.uploaderName,
+                            thumbnailUrl = ""
+                        )
+                    )
+                }
+            },
+            enabled = state.uploaderUrl.isNotBlank(),
+            colors = ButtonDefaults.buttonColors(
+                containerColor = if (isSubscribed) MaterialTheme.colorScheme.primary else Color.White,
+                contentColor = if (isSubscribed) MaterialTheme.colorScheme.onPrimary else Color.Black
+            )
         ) {
-            Text("Subscribe")
+            Text(if (isSubscribed) "Subscribed" else "Subscribe")
         }
     }
     

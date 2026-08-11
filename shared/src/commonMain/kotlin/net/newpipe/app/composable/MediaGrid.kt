@@ -30,6 +30,7 @@ import net.newpipe.app.theme.currentServiceScheme
 import kotlinx.coroutines.delay
 
 import net.newpipe.app.domain.MediaItem
+import net.newpipe.app.domain.MediaItemKind
 import coil3.compose.AsyncImage
 
 @Composable
@@ -39,6 +40,7 @@ fun MediaGrid(
     isLoadingMore: Boolean = false,
     errorMessage: String? = null,
     onMediaClick: (MediaItem) -> Unit = {},
+    onChannelClick: (MediaItem) -> Unit = {},
     onDownloadClick: (MediaItem) -> Unit = {},
     onPrefetch: (MediaItem) -> Unit = {},
     onLoadMore: () -> Unit = {},
@@ -66,7 +68,7 @@ fun MediaGrid(
     // prefetch remains useful, but touch devices have no hover event; without
     // this warm-up the extractor starts only after the user taps a card.
     LaunchedEffect(items) {
-        items.take(2).forEachIndexed { index, media ->
+        items.filter { it.kind == MediaItemKind.VIDEO }.take(2).forEachIndexed { index, media ->
             if (index > 0) delay(100L)
             onPrefetch(media)
         }
@@ -99,6 +101,7 @@ fun MediaGrid(
             MediaCard(
                 media = media,
                 onClick = { onMediaClick(media) },
+                onChannelClick = { onChannelClick(media) },
                 onPrefetch = { onPrefetch(media) },
                 onDownloadClick = { onDownloadClick(media) }
             )
@@ -128,6 +131,7 @@ fun MediaGrid(
 fun MediaCard(
     media: MediaItem,
     onClick: () -> Unit = {},
+    onChannelClick: () -> Unit = {},
     onPrefetch: () -> Unit = {},
     onDownloadClick: () -> Unit = {}
 ) {
@@ -139,7 +143,7 @@ fun MediaCard(
     // few hundred milliseconds here makes a fast click miss the prefetch and
     // puts the full extractor latency back on the player overlay.
     LaunchedEffect(isHovered) {
-        if (isHovered) onPrefetch()
+        if (isHovered && media.kind == MediaItemKind.VIDEO) onPrefetch()
     }
 
     val scale by animateFloatAsState(
@@ -160,7 +164,7 @@ fun MediaCard(
             .clickable(
                 interactionSource = interactionSource,
                 indication = null,
-                onClick = onClick
+                onClick = if (media.kind == MediaItemKind.CHANNEL) onChannelClick else onClick
             ),
         shape = RoundedCornerShape(16.dp),
         elevation = CardDefaults.cardElevation(defaultElevation = elevation),
@@ -200,7 +204,7 @@ fun MediaCard(
                 }
 
                 // Hover overlay with play button
-                if (isHovered) {
+                if (isHovered && media.kind == MediaItemKind.VIDEO) {
                     Box(
                         modifier = Modifier
                             .fillMaxSize()
@@ -249,14 +253,22 @@ fun MediaCard(
                         )
                     }
 
-                    IconButton(
-                        onClick = { onDownloadClick() },
-                        modifier = Modifier.size(32.dp)
-                    ) {
-                        Icon(
-                            imageVector = androidx.compose.material.icons.Icons.Default.Add,
-                            contentDescription = "Download",
-                            tint = MaterialTheme.colorScheme.primary
+                    if (media.kind == MediaItemKind.VIDEO) {
+                        IconButton(
+                            onClick = { onDownloadClick() },
+                            modifier = Modifier.size(32.dp)
+                        ) {
+                            Icon(
+                                imageVector = androidx.compose.material.icons.Icons.Default.Add,
+                                contentDescription = "Download",
+                                tint = MaterialTheme.colorScheme.primary
+                            )
+                        }
+                    } else {
+                        Text(
+                            text = "Channel",
+                            style = MaterialTheme.typography.labelMedium,
+                            color = MaterialTheme.colorScheme.primary
                         )
                     }
                 }

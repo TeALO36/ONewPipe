@@ -1,5 +1,16 @@
 package net.newpipe.app.domain
 
+enum class MediaItemKind {
+    VIDEO,
+    CHANNEL
+}
+
+enum class SearchFilter(val label: String) {
+    ALL("All"),
+    VIDEOS("Videos"),
+    CHANNELS("Channels")
+}
+
 data class MediaItem(
     val url: String,
     val title: String,
@@ -7,7 +18,8 @@ data class MediaItem(
     val thumbnailUrl: String,
     val durationText: String,
     val isLive: Boolean = false,
-    val viewCount: Long = 0
+    val viewCount: Long = 0,
+    val kind: MediaItemKind = MediaItemKind.VIDEO
 )
 
 /** Paginated result from the repository. */
@@ -43,8 +55,15 @@ interface MediaRepository {
      */
     suspend fun getTrending(serviceId: Int, category: TrendingCategory): PageResult
 
-    /** Returns the first page of search results for the given query. */
-    suspend fun search(serviceId: Int, query: String): PageResult
+    /** Returns the first page of search results for the given query and filter. */
+    suspend fun search(
+        serviceId: Int,
+        query: String,
+        filter: SearchFilter = SearchFilter.ALL
+    ): PageResult
+
+    /** Loads the first page of videos from a channel URL. */
+    suspend fun getChannel(serviceId: Int, url: String): PageResult
 
     /** Returns the next page using a token obtained from a previous [PageResult]. */
     suspend fun loadMore(serviceId: Int, pageToken: String): PageResult

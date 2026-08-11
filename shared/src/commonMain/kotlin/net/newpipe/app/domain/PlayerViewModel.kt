@@ -49,7 +49,9 @@ sealed class PlayerState {
         /** Adaptive streams contain video only and are paired with [audioStreams]. */
         val videoOnlyStreams: List<VideoStream> = emptyList(),
         val audioStreams: List<AudioStream>,
-        val resumePositionMs: Long = 0
+        val resumePositionMs: Long = 0,
+        val uploaderUrl: String = "",
+        val thumbnailUrl: String = ""
     ) : PlayerState()
     data class Error(val message: String) : PlayerState()
 }
@@ -67,6 +69,7 @@ class PlayerViewModel(
 
     private var currentUrl = ""
     private var currentTitle = ""
+    private val playbackHistory = mutableListOf<Pair<String, String>>()
     private var lastPositionMs = 0L
     private var lastDurationMs = 0L
     private val infoCache = mutableMapOf<String, Deferred<StreamInfo>>()
@@ -89,6 +92,10 @@ class PlayerViewModel(
     }
 
     fun loadVideo(url: String, title: String) {
+        if (currentUrl.isNotBlank() && currentUrl != url) {
+            playbackHistory += currentUrl to currentTitle
+            if (playbackHistory.size > 50) playbackHistory.removeAt(0)
+        }
         _state.value = PlayerState.Loading
         viewModelScope.launch {
             try {
@@ -114,6 +121,11 @@ class PlayerViewModel(
                 _state.value = PlayerState.Error(e.message ?: "Failed to load video")
             }
         }
+    }
+
+    fun playPrevious() {
+        val previous = playbackHistory.removeLastOrNull() ?: return
+        loadVideo(previous.first, previous.second)
     }
 
     /**
@@ -232,7 +244,9 @@ class PlayerViewModel(
             videoStreams = progressive,
             videoOnlyStreams = adaptive,
             audioStreams = audioStreams,
-            resumePositionMs = resumePositionMs
+            resumePositionMs = resumePositionMs,
+            uploaderUrl = info.uploaderUrl ?: "",
+            thumbnailUrl = info.thumbnails.firstOrNull()?.url ?: ""
         )
     }
 

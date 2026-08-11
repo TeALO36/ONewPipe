@@ -13,6 +13,8 @@ import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.navigationBarsPadding
+import androidx.compose.foundation.layout.statusBarsPadding
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
 import androidx.compose.runtime.Composable
@@ -74,6 +76,9 @@ fun App() {
         val playerState by playerViewModel.state.collectAsState()
         val downloadState by downloadViewModel.state.collectAsState()
         val selectedCategory by homeViewModel.selectedCategory.collectAsState()
+        val searchQuery by homeViewModel.searchQuery.collectAsState()
+        val searchFilter by homeViewModel.searchFilter.collectAsState()
+        val subscriptions by settingsViewModel.subscriptions.collectAsState()
         val serverStatus by syncViewModel.status.collectAsState()
         val updateState by updateViewModel.state.collectAsState()
 
@@ -95,7 +100,13 @@ fun App() {
 
         LaunchedEffect(Unit) { updateViewModel.checkForUpdates() }
         Surface(
-            modifier = Modifier.fillMaxSize(),
+            // ComposeActivity opts into edge-to-edge. Keep the app shell below
+            // the status bar and above the gesture/navigation area so the
+            // search field and bottom navigation never collide with Android UI.
+            modifier = Modifier
+                .fillMaxSize()
+                .statusBarsPadding()
+                .navigationBarsPadding(),
             color = MaterialTheme.colorScheme.background
         ) {
             BoxWithConstraints(modifier = Modifier.fillMaxSize()) {
@@ -108,10 +119,19 @@ fun App() {
                             service = service,
                             homeState = homeState,
                             selectedCategory = selectedCategory,
+                            searchQuery = searchQuery,
+                            searchFilter = searchFilter,
                             onSearch = homeViewModel::search,
+                            onSearchFilterSelected = homeViewModel::selectSearchFilter,
                             onServiceSelected = settingsViewModel::setService,
                             onCategorySelected = homeViewModel::selectCategory,
                             onMediaClick = { media -> playerViewModel.loadVideo(media.url, media.title) },
+                            onChannelClick = { media -> homeViewModel.openChannel(media.url) },
+                            subscriptions = subscriptions,
+                            onSubscriptionClick = { subscription ->
+                                selectedItem = NavItem.HOME
+                                homeViewModel.openChannel(subscription.url)
+                            },
                             onPrefetch = { media -> playerViewModel.prefetch(media.url) },
                             onDownloadClick = { media -> downloadViewModel.loadStreams(media.url, media.title) },
                             onLoadMore = homeViewModel::loadMore,
@@ -141,10 +161,19 @@ fun App() {
                             service = service,
                             homeState = homeState,
                             selectedCategory = selectedCategory,
+                            searchQuery = searchQuery,
+                            searchFilter = searchFilter,
                             onSearch = homeViewModel::search,
+                            onSearchFilterSelected = homeViewModel::selectSearchFilter,
                             onServiceSelected = settingsViewModel::setService,
                             onCategorySelected = homeViewModel::selectCategory,
                             onMediaClick = { media -> playerViewModel.loadVideo(media.url, media.title) },
+                            onChannelClick = { media -> homeViewModel.openChannel(media.url) },
+                            subscriptions = subscriptions,
+                            onSubscriptionClick = { subscription ->
+                                selectedItem = NavItem.HOME
+                                homeViewModel.openChannel(subscription.url)
+                            },
                             onPrefetch = { media -> playerViewModel.prefetch(media.url) },
                             onDownloadClick = { media -> downloadViewModel.loadStreams(media.url, media.title) },
                             onLoadMore = homeViewModel::loadMore,
@@ -165,6 +194,9 @@ fun App() {
                         state = playerState,
                         playerViewModel = playerViewModel,
                         downloadViewModel = downloadViewModel,
+                        onChannelClick = homeViewModel::openChannel,
+                        isSubscribed = { url -> subscriptions.any { it.url == url } },
+                        onToggleSubscription = { subscription -> settingsViewModel.toggleSubscription(subscription) },
                         isCovered = downloadState !is DownloadState.Idle
                     )
                 }

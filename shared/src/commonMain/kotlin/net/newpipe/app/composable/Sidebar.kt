@@ -41,14 +41,13 @@ fun MobileNavigationBar(
     updateAvailable: Boolean,
     onSettingsClick: () -> Unit
 ) {
-    Row(
+    // Settings belongs to the same navigation surface as the other sections.
+    // Keeping it outside NavigationBar made it look like an unrelated floating
+    // control and caused a visible gap on small screens.
+    NavigationBar(
         modifier = Modifier.fillMaxWidth(),
-        verticalAlignment = Alignment.CenterVertically
+        tonalElevation = 3.dp
     ) {
-        NavigationBar(
-            modifier = Modifier.weight(1f),
-            tonalElevation = 4.dp
-        ) {
         NavItem.entries.forEach { item ->
             NavigationBarItem(
                 selected = selectedItem == item,
@@ -65,20 +64,28 @@ fun MobileNavigationBar(
                 }
             )
         }
-        }
-
-        IconButton(
+        NavigationBarItem(
+            selected = false,
             onClick = onSettingsClick,
-            modifier = Modifier.padding(horizontal = 2.dp)
-        ) {
-            if (updateAvailable) {
-                BadgedBox(badge = { Badge() }) {
+            icon = {
+                if (updateAvailable) {
+                    BadgedBox(badge = { Badge() }) {
+                        Icon(Icons.Filled.Settings, contentDescription = "Settings")
+                    }
+                } else {
                     Icon(Icons.Filled.Settings, contentDescription = "Settings")
                 }
-            } else {
-                Icon(Icons.Filled.Settings, contentDescription = "Settings")
+            },
+            label = {
+                Text(
+                    text = "Settings",
+                    maxLines = 1,
+                    softWrap = false,
+                    overflow = TextOverflow.Ellipsis,
+                    fontSize = 10.sp
+                )
             }
-        }
+        )
     }
 }
 

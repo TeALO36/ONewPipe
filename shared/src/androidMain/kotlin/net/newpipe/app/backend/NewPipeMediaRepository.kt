@@ -3,14 +3,18 @@ package net.newpipe.app.backend
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import net.newpipe.app.domain.MediaItem
+import net.newpipe.app.domain.MediaItemKind
 import net.newpipe.app.domain.MediaRepository
 import net.newpipe.app.domain.PageResult
+import net.newpipe.app.domain.SearchFilter
 import net.newpipe.app.domain.TrendingCategory
 import org.schabi.newpipe.extractor.NewPipe
 import org.schabi.newpipe.extractor.InfoItem
 import org.schabi.newpipe.extractor.Page
 import org.schabi.newpipe.extractor.ServiceList
+import org.schabi.newpipe.extractor.channel.ChannelInfo
 import org.schabi.newpipe.extractor.channel.ChannelInfoItem
+import org.schabi.newpipe.extractor.channel.tabs.ChannelTabInfo
 import org.schabi.newpipe.extractor.kiosk.KioskInfo
 import org.schabi.newpipe.extractor.linkhandler.SearchQueryHandler
 import org.schabi.newpipe.extractor.search.SearchInfo
@@ -44,10 +48,36 @@ class NewPipeMediaRepository : MediaRepository {
         }
     }
 
-    override suspend fun search(serviceId: Int, query: String): PageResult =
+    override suspend fun search(
+        serviceId: Int,
+        query: String,
+        filter: SearchFilter
+    ): PageResult = withContext(Dispatchers.IO) {
+            try {
+                searchWithPagination(
+                    NewPipe.getService(serviceId),
+                    query,
+                    "search:${filter.name}:$query",
+                    filter
+                )
+            } catch (e: Exception) {
+                e.printStackTrace()
+                PageResult(emptyList())
+            }
+        }
+
+    override suspend fun getChannel(serviceId: Int, url: String): PageResult =
         withContext(Dispatchers.IO) {
             try {
-                searchWithPagination(NewPipe.getService(serviceId), query, "search:$query")
+                val service = NewPipe.getService(serviceId)
+                val channel = ChannelInfo.getInfo(service, url)
+                val tab = channel.tabs.firstOrNull()
+                if (tab == null) {
+                    PageResult(emptyList())
+                } else {
+                    val tabInfo = ChannelTabInfo.getInfo(service, tab)
+                    PageResult(tabInfo.relatedItems.mapNotNull { it.toMediaItem() })
+                }
             } catch (e: Exception) {
                 e.printStackTrace()
                 PageResult(emptyList())
@@ -69,14 +99,18 @@ class NewPipeMediaRepository : MediaRepository {
                     KioskInfo.getMoreItems(service, kioskUrl, page)
                 } else {
                     val query = if (pageToken.startsWith("search:")) {
-                        pageToken.removePrefix("search:")
+                        pageToken.removePrefix("search:").split(":", limit = 3).last()
                     } else if (pageToken.startsWith("trending:")) {
                         TrendingCategory.entries.find { it.id == pageToken.removePrefix("trending:") }
                             ?.fallbackQuery ?: "trending"
                     } else {
                         pageToken
                     }
-                    val queryHandler = buildQueryHandler(service, query)
+                    val searchParts = pageToken.removePrefix("search:").split(":", limit = 3)
+                    val filter = searchParts.firstOrNull()?.let { name ->
+                        runCatching { SearchFilter.valueOf(name) }.getOrDefault(SearchFilter.ALL)
+                    } ?: SearchFilter.ALL
+                    val queryHandler = buildQueryHandler(service, query, filter)
                     SearchInfo.getMoreItems(service, queryHandler, page)
                 }
 
@@ -103,14 +137,19 @@ class NewPipeMediaRepository : MediaRepository {
     private fun searchWithPagination(
         service: org.schabi.newpipe.extractor.StreamingService,
         query: String,
-        pageId: String
+        pageId: String,
+        filter: SearchFilter = SearchFilter.ALL
     ): PageResult {
-        val queryHandler = buildQueryHandler(service, query)
+        val queryHandler = buildQueryHandler(service, query, filter)
         val searchInfo = SearchInfo.getInfo(service, queryHandler)
 
         // Store the next page for later pagination
         if (searchInfo.hasNextPage()) {
-            trendingPages[pageId] = searchInfo.nextPage
+            if (pageId.startsWith("search:")) {
+                searchPages[pageId] = searchInfo.nextPage
+            } else {
+                trendingPages[pageId] = searchInfo.nextPage
+            }
         }
 
         val items = searchInfo.relatedItems.mapNotNull { item -> item.toMediaItem() }
@@ -159,12 +198,18 @@ class NewPipeMediaRepository : MediaRepository {
 
     private fun buildQueryHandler(
         service: org.schabi.newpipe.extractor.StreamingService,
-        query: String
+        query: String,
+        filter: SearchFilter = SearchFilter.ALL
     ): SearchQueryHandler {
         return try {
             val ytFactory = service.searchQHFactory as? YoutubeSearchQueryHandlerFactory
             if (ytFactory != null) {
-                ytFactory.fromQuery(query, listOf(YoutubeSearchQueryHandlerFactory.VIDEOS), null)
+                val contentFilter = when (filter) {
+                    SearchFilter.ALL -> YoutubeSearchQueryHandlerFactory.ALL
+                    SearchFilter.VIDEOS -> YoutubeSearchQueryHandlerFactory.VIDEOS
+                    SearchFilter.CHANNELS -> YoutubeSearchQueryHandlerFactory.CHANNELS
+                }
+                ytFactory.fromQuery(query, listOf(contentFilter), null)
             } else {
                 service.searchQHFactory.fromQuery(query)
             }
@@ -185,14 +230,16 @@ class NewPipeMediaRepository : MediaRepository {
             viewCount = viewCount
         )
         is ChannelInfoItem -> MediaItem(
-            url = url,
-            title = name,
-            uploaderName = "Channel • ${subscriberCount} subs",
-            thumbnailUrl = thumbnails.maxByOrNull { it.width }?.url
-                ?: thumbnails.firstOrNull()?.url ?: "",
-            durationText = "",
-            isLive = false
-        )
+                url = url,
+                title = name,
+                uploaderName = "Channel • ${subscriberCount} subs",
+                thumbnailUrl = thumbnails.maxByOrNull { it.width }?.url
+                    ?: thumbnails.firstOrNull()?.url ?: "",
+                durationText = "",
+                isLive = false,
+                kind = MediaItemKind.CHANNEL
+            )
+
         else -> null
     }
 

@@ -11,6 +11,7 @@ class PlayerActions {
     var adjustVolume: (Int) -> Unit = {}     // delta, clamped to 0..100
     var toggleMute: () -> Unit = {}
     var toggleFullscreen: () -> Unit = {}
+    var togglePictureInPicture: () -> Unit = {}
     var toggleCinema: () -> Unit = {}
     var reportSeek: (Long) -> Unit = {}     // signed seconds, for on-screen feedback
 }

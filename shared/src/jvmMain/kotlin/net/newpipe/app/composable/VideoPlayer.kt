@@ -8,6 +8,7 @@ import androidx.compose.material.icons.filled.Fullscreen
 import androidx.compose.material.icons.filled.FullscreenExit
 import androidx.compose.material.icons.filled.Pause
 import androidx.compose.material.icons.filled.PlayArrow
+import androidx.compose.material.icons.filled.SkipNext
 import androidx.compose.material.icons.filled.Theaters
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
@@ -27,8 +28,13 @@ actual fun VideoPlayer(
     modifier: Modifier,
     videoUrl: String,
     audioUrl: String?,
+    title: String,
+    artistName: String,
+    thumbnailUrl: String?,
     startPositionMs: Long,
     onPlaybackEnded: () -> Unit,
+    onPreviousVideo: () -> Unit,
+    onNextVideo: () -> Unit,
     onPositionChange: (Long) -> Unit,
     playerActions: PlayerActions
 ) {
@@ -242,6 +248,9 @@ actual fun VideoPlayer(
                 modifier = Modifier.weight(1f)
             )
             Text(totalTime, color = Color.White, modifier = Modifier.padding(horizontal = 8.dp))
+            IconButton(onClick = onNextVideo) {
+                Icon(Icons.Filled.SkipNext, contentDescription = "Next video", tint = Color.White)
+            }
             IconButton(onClick = { playerActions.toggleCinema() }) {
                 Icon(Icons.Filled.Theaters, contentDescription = "Cinema mode", tint = Color.White)
             }

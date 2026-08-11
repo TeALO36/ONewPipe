@@ -25,6 +25,12 @@ class HomeViewModel(
     private val _selectedCategory = MutableStateFlow(TrendingCategory.ALL)
     val selectedCategory: StateFlow<TrendingCategory> = _selectedCategory.asStateFlow()
 
+    private val _searchQuery = MutableStateFlow<String?>(null)
+    val searchQuery: StateFlow<String?> = _searchQuery.asStateFlow()
+
+    private val _searchFilter = MutableStateFlow(SearchFilter.ALL)
+    val searchFilter: StateFlow<SearchFilter> = _searchFilter.asStateFlow()
+
     // Pagination state
     private var currentPageToken: String? = null
     private var currentItems = mutableListOf<MediaItem>()
@@ -47,6 +53,8 @@ class HomeViewModel(
         if (category == _selectedCategory.value) return
         _selectedCategory.value = category
         currentQuery = null
+        _searchQuery.value = null
+        _searchFilter.value = SearchFilter.ALL
         reload()
     }
 
@@ -56,7 +64,7 @@ class HomeViewModel(
         if (currentQuery.isNullOrBlank()) {
             loadTrending()
         } else {
-            search(currentQuery!!)
+            search(currentQuery!!, _searchFilter.value)
         }
     }
 
@@ -98,26 +106,58 @@ class HomeViewModel(
         }
     }
 
-    fun search(query: String) {
-        currentQuery = query
-        if (query.isBlank()) {
+    fun search(query: String, filter: SearchFilter = _searchFilter.value) {
+        val normalizedQuery = query.trim()
+        currentQuery = normalizedQuery
+        _searchQuery.value = normalizedQuery.takeIf { it.isNotBlank() }
+        _searchFilter.value = filter
+        if (normalizedQuery.isBlank()) {
             loadTrending()
             return
         }
         viewModelScope.launch {
             _state.value = HomeState.Loading
             try {
-                val result = repository.search(currentServiceId, query)
+                val result = repository.search(currentServiceId, normalizedQuery, filter)
                 currentItems.clear()
                 currentItems.addAll(result.items)
                 currentPageToken = result.nextPageToken
                 if (currentItems.isEmpty()) {
-                    _state.value = HomeState.Error("No results found for '$query'")
+                    _state.value = HomeState.Error("No results found for '$normalizedQuery'")
                 } else {
                     _state.value = HomeState.Success(currentItems.toList())
                 }
             } catch (e: Exception) {
                 _state.value = HomeState.Error(e.message ?: "Unknown error")
+            }
+        }
+    }
+
+    fun selectSearchFilter(filter: SearchFilter) {
+        val query = currentQuery
+        _searchFilter.value = filter
+        if (!query.isNullOrBlank()) search(query, filter)
+    }
+
+    fun openChannel(url: String) {
+        if (url.isBlank()) return
+        currentQuery = null
+        _searchQuery.value = null
+        _searchFilter.value = SearchFilter.ALL
+        viewModelScope.launch {
+            _state.value = HomeState.Loading
+            try {
+                val result = repository.getChannel(currentServiceId, url)
+                currentItems.clear()
+                currentItems.addAll(result.items)
+                currentPageToken = result.nextPageToken
+                _state.value = if (currentItems.isEmpty()) {
+                    HomeState.Error("No videos found on this channel")
+                } else {
+                    HomeState.Success(currentItems.toList())
+                }
+            } catch (e: Exception) {
+                _state.value = HomeState.Error(e.message ?: "Unable to load channel")
             }
         }
     }

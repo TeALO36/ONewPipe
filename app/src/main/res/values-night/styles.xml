@@ -3,7 +3,9 @@
 
     <!-- Opening Theme -->
     <style name="Base.OpeningTheme" parent="Base.V21.OpeningTheme">
-        <item name="android:navigationBarColor">@color/dark_youtube_primary_color</item>
+        <item name="android:navigationBarColor">@color/ic_launcher_background</item>
+        <item name="android:statusBarColor">@color/ic_launcher_background</item>
+        <item name="android:windowLightStatusBar">false</item>
     </style>
 
 </resources>

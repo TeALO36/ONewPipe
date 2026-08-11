@@ -57,6 +57,9 @@ fun PlayerOverlay(
     state: PlayerState,
     playerViewModel: PlayerViewModel,
     downloadViewModel: DownloadViewModel,
+    onChannelClick: (String) -> Unit = {},
+    isSubscribed: (String) -> Boolean = { false },
+    onToggleSubscription: (net.newpipe.app.domain.Subscription) -> Unit = {},
     isCovered: Boolean = false,
     modifier: Modifier = Modifier
 ) {
@@ -116,6 +119,12 @@ fun PlayerOverlay(
                     seekNotice = if (seconds < 0) "${-seconds}s" else "+${seconds}s"
                 }
 
+                val playNextVideo: () -> Unit = {
+                    state.relatedItems.firstOrNull()?.let { next ->
+                        playerViewModel.loadVideo(next.url ?: "", next.name ?: "")
+                    } ?: playerViewModel.stop()
+                }
+
                 // When another overlay (e.g. the download dialog) is on top, the native
                 // AWT video surface would paint above it. Hide the video surface and
                 // remember the position so playback resumes where it left off.
@@ -172,8 +181,13 @@ fun PlayerOverlay(
                                         modifier = Modifier.fillMaxSize(),
                                         videoUrl = state.streamUrl,
                                         audioUrl = state.audioUrl,
+                                        title = state.title,
+                                        artistName = state.uploaderName,
+                                        thumbnailUrl = state.thumbnailUrl,
                                         startPositionMs = state.resumePositionMs,
-                                        onPlaybackEnded = { playerViewModel.stop() },
+                                        onPlaybackEnded = playNextVideo,
+                                        onPreviousVideo = playerViewModel::playPrevious,
+                                        onNextVideo = playNextVideo,
                                         onPositionChange = { positionMs -> playerViewModel.onPositionUpdate(positionMs, 0L) },
                                         playerActions = playerActions
                                     )
@@ -196,7 +210,14 @@ fun PlayerOverlay(
                             // Details & Mobile Related
                             if (!isFullscreen) {
                                 Spacer(modifier = Modifier.height(16.dp))
-                                VideoDetailsContent(state, playerViewModel, downloadViewModel)
+                                VideoDetailsContent(
+                                    state = state,
+                                    playerViewModel = playerViewModel,
+                                    downloadViewModel = downloadViewModel,
+                                    onChannelClick = onChannelClick,
+                                    isSubscribed = isSubscribed(state.uploaderUrl),
+                                    onToggleSubscription = onToggleSubscription
+                                )
 
                                 if (!isWide && !isCinema) {
                                     Spacer(modifier = Modifier.height(24.dp))

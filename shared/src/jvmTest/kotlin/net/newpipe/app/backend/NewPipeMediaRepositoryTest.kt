@@ -1,6 +1,8 @@
 package net.newpipe.app.backend
 
 import kotlinx.coroutines.runBlocking
+import net.newpipe.app.domain.MediaItemKind
+import net.newpipe.app.domain.SearchFilter
 import net.newpipe.app.domain.TrendingCategory
 import okhttp3.OkHttpClient
 import org.schabi.newpipe.extractor.NewPipe
@@ -43,6 +45,13 @@ class NewPipeMediaRepositoryTest {
         assertTrue(result.items.isNotEmpty(), "Expected trending items for 'Gaming' category")
         println("Gaming: got ${result.items.size} items, hasMore=${result.nextPageToken != null}")
         result.items.take(3).forEach { println("  - ${it.title} [${it.uploaderName}]") }
+    }
+
+    @Test
+    fun `channel search returns channel items`() = runBlocking {
+        val result = repository().search(0, "Linus Tech Tips", SearchFilter.CHANNELS)
+        assertTrue(result.items.isNotEmpty(), "Expected channel search results")
+        assertTrue(result.items.all { it.kind == MediaItemKind.CHANNEL }, "Expected only channels")
     }
 
     @Test

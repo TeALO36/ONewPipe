@@ -44,6 +44,8 @@
             android:name="net.newpipe.app.ComposeActivity"
             android:exported="true"
             android:windowSoftInputMode="adjustResize"
+            android:supportsPictureInPicture="true"
+            android:configChanges="screenSize|smallestScreenSize|screenLayout|orientation"
             tools:replace="android:exported">
             <intent-filter>
                 <action android:name="android.intent.action.MAIN" />

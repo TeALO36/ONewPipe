@@ -2,6 +2,7 @@ package net.newpipe.app.composable
 
 import androidx.compose.ui.test.ExperimentalTestApi
 import androidx.compose.ui.test.assertIsDisplayed
+import androidx.compose.ui.test.performScrollTo
 import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.runComposeUiTest
 import net.newpipe.app.theme.AppTheme
@@ -12,8 +13,8 @@ import org.schabi.newpipe.extractor.stream.DeliveryMethod
 import org.schabi.newpipe.extractor.stream.VideoStream
 
 /**
- * UI test for the download dialog: it must show every format family
- * (video with audio, video-only, audio) so users never see "only 360p".
+ * UI test for the download dialog: high-resolution video-only streams are
+ * presented as packaged video+audio choices, never as useless raw video files.
  */
 class DownloadDialogTest {
 
@@ -52,19 +53,20 @@ class DownloadDialogTest {
                     title = "Test Video",
                     onDismiss = {},
                     onDownloadVideo = {},
-                    onDownloadAudio = {}
+                    onDownloadVideoWithAudio = { _, _ -> },
+                    onDownloadAudio = {},
+                    showCombinedVideoOptions = true
                 )
             }
         }
 
         onNodeWithText("Download: Test Video").assertIsDisplayed()
-        onNodeWithText("Video (with audio)").assertIsDisplayed()
-        onNodeWithText("Video only (no audio)").assertIsDisplayed()
-        onNodeWithText("Audio").assertIsDisplayed()
-        // All the resolutions the user complained were missing.
-        onNodeWithText("360p - MPEG-4").assertIsDisplayed()
-        onNodeWithText("1080p - MPEG-4").assertIsDisplayed()
-        onNodeWithText("720p - WebM").assertIsDisplayed()
-        onNodeWithText("128kbps - m4a").assertIsDisplayed()
+        onNodeWithText("Video + audio").assertIsDisplayed()
+        onNodeWithText("High quality · packaged MP4").performScrollTo().assertIsDisplayed()
+        onNodeWithText("Audio only").performScrollTo().assertIsDisplayed()
+        onNodeWithText("360p · MPEG-4").assertIsDisplayed()
+        onNodeWithText("1080p · video + audio").performScrollTo().assertIsDisplayed()
+        onNodeWithText("720p · video + audio").performScrollTo().assertIsDisplayed()
+        onNodeWithText("128 kbps · m4a").performScrollTo().assertIsDisplayed()
     }
 }

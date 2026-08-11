@@ -245,7 +245,11 @@ class PlayerViewModel(
             videoOnlyStreams = adaptive,
             audioStreams = audioStreams,
             resumePositionMs = resumePositionMs,
-            uploaderUrl = info.uploaderUrl ?: "",
+            // Some YouTube formats expose the creator as a sub-channel rather
+            // than uploader. Keep either URL so the profile row never becomes            // a dead, non-interactive surface.
+            uploaderUrl = info.uploaderUrl.orEmpty().ifBlank {
+                info.subChannelUrl.orEmpty()
+            },
             thumbnailUrl = info.thumbnails.firstOrNull()?.url ?: ""
         )
     }

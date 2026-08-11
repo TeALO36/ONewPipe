@@ -7,7 +7,9 @@ package net.newpipe.app
 
 import android.Manifest
 import android.content.pm.PackageManager
+import android.content.res.Configuration
 import android.os.Build
+import net.newpipe.app.composable.AndroidPlayerWindowState
 import android.os.Bundle
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
@@ -52,6 +54,14 @@ class ComposeActivity : ComponentActivity() {
         // A launcher intent has no navigation payload. App currently owns the home shell,
         // while deep-link destinations can be added here without making startup nullable.
         setContent { App() }
+    }
+
+    override fun onPictureInPictureModeChanged(
+        isInPictureInPictureMode: Boolean,
+        newConfig: Configuration
+    ) {
+        super.onPictureInPictureModeChanged(isInPictureInPictureMode, newConfig)
+        AndroidPlayerWindowState.isPictureInPicture = isInPictureInPictureMode
     }
 
     override fun onResume() {

@@ -2,7 +2,9 @@ package net.newpipe.app.backend
 
 import android.app.NotificationChannel
 import android.app.NotificationManager
+import android.app.PendingIntent
 import android.content.Context
+import android.content.Intent
 import android.graphics.Bitmap
 import android.graphics.BitmapFactory
 import android.os.Build
@@ -11,6 +13,7 @@ import androidx.core.app.NotificationManagerCompat
 import androidx.media.app.NotificationCompat.MediaStyle
 import android.support.v4.media.MediaMetadataCompat
 import androidx.media.session.MediaButtonReceiver
+import net.newpipe.app.ComposeActivity
 import android.support.v4.media.session.MediaSessionCompat
 import android.support.v4.media.session.PlaybackStateCompat
 import androidx.media3.common.Player
@@ -113,7 +116,16 @@ class MediaNotificationController(
             "drawable",
             context.packageName
         ).takeIf { it != 0 } ?: android.R.drawable.ic_media_play
+        val contentIntent = PendingIntent.getActivity(
+            context,
+            NOTIFICATION_REQUEST_CODE,
+            Intent(context, ComposeActivity::class.java).apply {
+                flags = Intent.FLAG_ACTIVITY_CLEAR_TOP or Intent.FLAG_ACTIVITY_SINGLE_TOP
+            },
+            PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
+        )
         val builder = NotificationCompat.Builder(context, CHANNEL_ID)
+            .setContentIntent(contentIntent)
             .setSmallIcon(icon)
             .setContentTitle(title)
             .setContentText(artist)
@@ -196,5 +208,6 @@ class MediaNotificationController(
     companion object {
         private const val CHANNEL_ID = "onewpipe_playback"
         private const val NOTIFICATION_ID = 2107
+        private const val NOTIFICATION_REQUEST_CODE = 2108
     }
 }

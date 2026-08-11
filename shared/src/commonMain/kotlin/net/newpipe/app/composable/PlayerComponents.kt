@@ -117,12 +117,19 @@ fun VideoDetailsContent(
         val qualityProfiles = remember(state.videoStreams, state.videoOnlyStreams, state.audioStreams) {
             buildQualityProfiles(state)
         }
+
+        // Fetch optional HD/4K formats after the popup is visible. Starting
+        // extractor work in the button callback made the Android popup race
+        // with a state update and could crash the Compose window.
+        LaunchedEffect(expandedQuality, state.originalUrl) {
+            if (expandedQuality) {
+                kotlinx.coroutines.delay(150)
+                playerViewModel.loadFullQuality(state.originalUrl)
+            }
+        }
         Box {
             OutlinedButton(
-                onClick = {
-                    playerViewModel.loadFullQuality(state.originalUrl)
-                    expandedQuality = true
-                },
+                onClick = { expandedQuality = true },
                 colors = ButtonDefaults.outlinedButtonColors(contentColor = Color.White)
             ) {
                 Icon(imageVector = Icons.Default.Settings, contentDescription = null, modifier = Modifier.size(18.dp))
@@ -137,7 +144,6 @@ fun VideoDetailsContent(
                     .width(250.dp)
                     .heightIn(max = 360.dp)
                     .background(Color(0xFF2D2D2D))
-                    .verticalScroll(rememberScrollState())
             ) {
                 if (qualityProfiles.isEmpty()) {
                     DropdownMenuItem(
@@ -189,7 +195,7 @@ private data class QualityProfile(
  * YouTube exposes many codecs/bitrates for the same resolution; users should
  * choose 360p/480p/720p/1080p, not inspect every raw stream.
  */
-private fun buildQualityProfiles(state: PlayerState.Playing): List<QualityProfile> {
+private fun buildQualityProfiles(state: PlayerState.Playing): List<QualityProfile> = runCatching {
     val bestAudio = state.audioStreams.maxByOrNull { it.averageBitrate }
     val candidates = buildList {
         state.videoOnlyStreams.forEach { stream ->
@@ -224,7 +230,8 @@ private fun buildQualityProfiles(state: PlayerState.Playing): List<QualityProfil
         }
     }
 
-    return candidates
+    candidates
+        .filter { it.height > 0 }
         .groupBy { it.bucket }
         .values
         .mapNotNull { group ->
@@ -250,7 +257,7 @@ private fun buildQualityProfiles(state: PlayerState.Playing): List<QualityProfil
         }
         .sortedBy { qualityBucket(resolutionHeight(it.label)) }
         .take(5)
-}
+}.getOrDefault(emptyList())
 
 private fun qualityBucket(height: Int): Int = when {
     height <= 240 -> 240
@@ -260,8 +267,8 @@ private fun qualityBucket(height: Int): Int = when {
     else -> 1080
 }
 
-private fun resolutionHeight(value: String): Int =
-    value.filter { it.isDigit() }.toIntOrNull() ?: 0
+private fun resolutionHeight(value: String?): Int =
+    value.orEmpty().filter { it.isDigit() }.toIntOrNull() ?: 0
 
 @Composable
 fun RelatedVideosContent(

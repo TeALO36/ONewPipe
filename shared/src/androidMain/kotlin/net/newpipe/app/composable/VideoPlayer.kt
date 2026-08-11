@@ -8,7 +8,9 @@ import android.net.Uri
 import android.os.Build
 import android.util.Rational
 import android.view.TextureView
+import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
+import androidx.compose.foundation.gestures.detectDragGestures
 import androidx.compose.foundation.gestures.detectTapGestures
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -16,6 +18,7 @@ import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.shape.RoundedCornerShape
@@ -27,7 +30,6 @@ import androidx.compose.material.icons.filled.PlayArrow
 import androidx.compose.material.icons.filled.SkipNext
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
-import androidx.compose.material3.Slider
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
@@ -39,12 +41,15 @@ import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.StrokeCap
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.platform.LocalContext
+import android.content.pm.ActivityInfo
 import androidx.compose.ui.viewinterop.AndroidView
 import androidx.core.view.WindowCompat
 import androidx.core.view.WindowInsetsCompat
@@ -77,7 +82,10 @@ actual fun VideoPlayer(
     val coroutineScope = rememberCoroutineScope()
     val textureView = remember(videoUrl, audioUrl) { TextureView(context) }
     var isPlaying by remember(videoUrl, audioUrl) { mutableStateOf(true) }
-    var controlsVisible by remember(videoUrl, audioUrl) { mutableStateOf(true) }
+    val pictureInPictureMode = PlatformPictureInPictureMode()
+    var controlsVisible by remember(videoUrl, audioUrl) {
+        mutableStateOf(!pictureInPictureMode)
+    }
     var positionMs by remember(videoUrl, audioUrl) { mutableStateOf(startPositionMs) }
     var durationMs by remember(videoUrl, audioUrl) { mutableStateOf(0L) }
     var seekFeedback by remember(videoUrl, audioUrl) { mutableStateOf<String?>(null) }
@@ -111,6 +119,10 @@ actual fun VideoPlayer(
                 }
             })
         }
+    }
+
+    LaunchedEffect(pictureInPictureMode) {
+        if (pictureInPictureMode) controlsVisible = false
     }
 
     LaunchedEffect(controlsVisible, isPlaying, seekFeedback) {
@@ -158,10 +170,13 @@ actual fun VideoPlayer(
         }
         val activity = context.findActivity()
         val parentFullscreenAction = playerActions.toggleFullscreen
+        val previousRequestedOrientation = activity?.requestedOrientation
+            ?: ActivityInfo.SCREEN_ORIENTATION_UNSPECIFIED
         playerActions.togglePictureInPicture = {
             if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
-                // Keep only the player visible in the small PiP window.
-                parentFullscreenAction()
+                // Android PiP must contain only the video. The activity callback
+                // hides this Compose control layer as soon as PiP is entered.
+                controlsVisible = false
                 activity?.enterPictureInPictureMode(
                     PictureInPictureParams.Builder()
                         .setAspectRatio(Rational(16, 9))
@@ -172,6 +187,11 @@ actual fun VideoPlayer(
         playerActions.toggleFullscreen = {
             nativeFullscreen = !nativeFullscreen
             parentFullscreenAction()
+            activity?.requestedOrientation = if (nativeFullscreen) {
+                ActivityInfo.SCREEN_ORIENTATION_SENSOR_LANDSCAPE
+            } else {
+                previousRequestedOrientation
+            }
             activity?.window?.let { window ->
                 val controller = WindowCompat.getInsetsController(window, window.decorView)
                 if (nativeFullscreen) {
@@ -215,6 +235,7 @@ actual fun VideoPlayer(
             playerActions.toggleFullscreen = {}
             notificationController.release()
             playerActions.reportSeek = {}
+            activity?.requestedOrientation = previousRequestedOrientation
             activity?.window?.let { window ->
                 WindowCompat.getInsetsController(window, window.decorView)
                     .show(WindowInsetsCompat.Type.systemBars())
@@ -243,10 +264,8 @@ actual fun VideoPlayer(
                             controlsVisible = true
                         },
                         onTap = {
-                            // A tap on the picture is both an obvious play/pause
-                            // gesture and a request to reveal the controls. The
-                            // double-tap branch above wins over this callback.
-                            playerActions.togglePlayPause()
+                            // A single tap only reveals the controls. Playback is
+                            // changed explicitly with the play/pause button, so a                            // user can inspect the timeline without interrupting it.
                             controlsVisible = true
                         }
                     )
@@ -278,16 +297,12 @@ actual fun VideoPlayer(
                     )
                     .padding(start = 12.dp, end = 12.dp, bottom = 8.dp)
             ) {
-                Slider(
-                    value = if (durationMs > 0) {
-                        (positionMs.toFloat() / durationMs.toFloat()).coerceIn(0f, 1f)
-                    } else {
-                        0f
-                    },
-                    onValueChange = { fraction ->
+                PlayerTimeline(
+                    positionMs = positionMs,
+                    durationMs = durationMs,
+                    onFractionChange = { fraction ->
                         if (durationMs > 0) {
-                            val target = (fraction * durationMs).toLong()
-                            positionMs = target
+                            positionMs = (fraction * durationMs).toLong()
                             playerActions.seekToFraction(fraction)
                         }
                         controlsVisible = true
@@ -307,12 +322,6 @@ actual fun VideoPlayer(
                                 tint = Color.White,
                                 modifier = Modifier.size(28.dp)
                             )
-                        }
-                        IconButton(onClick = { playerActions.seekBy(-10) }) {
-                            Text("−10", color = Color.White, fontWeight = FontWeight.Bold)
-                        }
-                        IconButton(onClick = { playerActions.seekBy(10) }) {
-                            Text("+10", color = Color.White, fontWeight = FontWeight.Bold)
                         }
                         IconButton(onClick = onNextVideo) {
                             Icon(
@@ -345,6 +354,64 @@ actual fun VideoPlayer(
                 }
             }
         }
+    }
+}
+
+@Composable
+private fun PlayerTimeline(
+    positionMs: Long,
+    durationMs: Long,
+    onFractionChange: (Float) -> Unit,
+    modifier: Modifier = Modifier
+) {
+    val fraction = if (durationMs > 0) {
+        (positionMs.toFloat() / durationMs.toFloat()).coerceIn(0f, 1f)
+    } else {
+        0f
+    }
+
+    Canvas(
+        modifier = modifier
+            .height(18.dp)
+            .pointerInput(durationMs) {
+                detectTapGestures { offset ->
+                    if (size.width > 0) {
+                        onFractionChange((offset.x / size.width).coerceIn(0f, 1f))
+                    }
+                }
+            }
+            .pointerInput(durationMs) {
+                detectDragGestures(
+                    onDrag = { change, _ ->
+                        change.consume()
+                        if (size.width > 0) {
+                            onFractionChange((change.position.x / size.width).coerceIn(0f, 1f))
+                        }
+                    }
+                )
+            }
+    ) {
+        val centerY = size.height / 2f
+        val trackWidth = size.width
+        drawLine(
+            color = Color.White.copy(alpha = 0.35f),
+            start = Offset(0f, centerY),
+            end = Offset(trackWidth, centerY),
+            strokeWidth = 3.dp.toPx(),
+            cap = StrokeCap.Round
+        )
+        drawLine(
+            color = Color.White,
+            start = Offset(0f, centerY),
+            end = Offset(trackWidth * fraction, centerY),
+            strokeWidth = 3.dp.toPx(),
+            cap = StrokeCap.Round
+        )
+        drawCircle(
+            color = Color.White,
+            radius = 4.dp.toPx(),
+            center = Offset(trackWidth * fraction, centerY)
+        )
     }
 }
 

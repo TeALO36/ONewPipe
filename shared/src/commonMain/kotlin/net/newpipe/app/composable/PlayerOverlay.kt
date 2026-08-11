@@ -102,7 +102,16 @@ fun PlayerOverlay(
                 var isFullscreen by remember { mutableStateOf(false) }
                 var isCinema by remember { mutableStateOf(false) }
                 var seekNotice by remember { mutableStateOf<String?>(null) }
+                val pictureInPictureMode = PlatformPictureInPictureMode()
                 val scrollState = rememberScrollState()
+
+                PlatformPlayerBackHandler(enabled = true) {
+                    if (isFullscreen) {
+                        playerActions.toggleFullscreen()
+                    } else {
+                        playerViewModel.stop()
+                    }
+                }
 
                 LaunchedEffect(seekNotice) {
                     if (seekNotice != null) {
@@ -134,8 +143,12 @@ fun PlayerOverlay(
 
                 BoxWithConstraints(modifier = Modifier.fillMaxSize().background(Color(0xFF121212))) {
                     val isWide = maxWidth > 1000.dp
-                    val showRelated = isWide && !isFullscreen && !isCinema
-                    val scrollModifier = if (isFullscreen) Modifier else Modifier.verticalScroll(scrollState)
+                    val showRelated = isWide && !isFullscreen && !isCinema && !pictureInPictureMode
+                    val scrollModifier = if (isFullscreen || pictureInPictureMode) {
+                        Modifier
+                    } else {
+                        Modifier.verticalScroll(scrollState)
+                    }
 
                     Row(modifier = Modifier.fillMaxSize().then(scrollModifier)) {
 
@@ -143,34 +156,13 @@ fun PlayerOverlay(
                         Column(
                             modifier = Modifier
                                 .weight(if (showRelated) 0.65f else 1f)
-                                .padding(if (isFullscreen) 0.dp else 16.dp)
+                                .padding(if (isFullscreen || pictureInPictureMode) 0.dp else 16.dp)
                         ) {
 
-                            // Header
-                            if (!isFullscreen) {
-                                Row(
-                                    modifier = Modifier.fillMaxWidth().background(Color.Black).padding(8.dp),
-                                    verticalAlignment = Alignment.CenterVertically
-                                ) {
-                                    IconButton(onClick = { playerViewModel.stop() }) {
-                                        Icon(
-                                            imageVector = Icons.Default.ArrowBack,
-                                            contentDescription = "Back",
-                                            tint = Color.White
-                                        )
-                                    }
-                                    Text(
-                                        text = "Now Playing",
-                                        color = Color.White,
-                                        style = MaterialTheme.typography.titleMedium,
-                                        modifier = Modifier.padding(start = 8.dp)
-                                    )
-                                }
-                                Spacer(modifier = Modifier.height(16.dp))
-                            }
-
-                            // Video Player
-                            val playerModifier = if (isFullscreen) {
+                            // Video Player. In fullscreen and PiP the video owns
+                            // the entire available window; no "Now Playing" bar
+                            // or details are rendered around it.
+                            val playerModifier = if (isFullscreen || pictureInPictureMode) {
                                 Modifier.fillMaxSize()
                             } else {
                                 Modifier.fillMaxWidth().aspectRatio(16f / 9f)
@@ -207,8 +199,19 @@ fun PlayerOverlay(
 
                             }
 
-                            // Details & Mobile Related
-                            if (!isFullscreen) {
+                            if (!isFullscreen && !pictureInPictureMode) {
+                                IconButton(
+                                    onClick = { playerViewModel.stop() },
+                                    modifier = Modifier.padding(top = 4.dp)
+                                ) {
+                                    Icon(
+                                        imageVector = Icons.Default.ArrowBack,
+                                        contentDescription = "Back",
+                                        tint = Color.White
+                                    )
+                                }
+
+                                // Details & Mobile Related
                                 Spacer(modifier = Modifier.height(16.dp))
                                 VideoDetailsContent(
                                     state = state,

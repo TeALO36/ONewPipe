@@ -194,7 +194,10 @@ fun App() {
                         state = playerState,
                         playerViewModel = playerViewModel,
                         downloadViewModel = downloadViewModel,
-                        onChannelClick = homeViewModel::openChannel,
+                        onChannelClick = { url ->
+                            playerViewModel.stop()
+                            homeViewModel.openChannel(url)
+                        },
                         isSubscribed = { url -> subscriptions.any { it.url == url } },
                         onToggleSubscription = { subscription -> settingsViewModel.toggleSubscription(subscription) },
                         isCovered = downloadState !is DownloadState.Idle

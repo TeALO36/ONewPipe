@@ -19,12 +19,35 @@ import kotlinx.serialization.Serializable
 import kotlinx.serialization.json.Json
 
 @Serializable
+data class GitHubAsset(
+    val name: String,
+    val browser_download_url: String,
+    val content_type: String = "",
+    val size: Long = 0,
+    val digest: String? = null
+)
+
+@Serializable
 data class GitHubRelease(
     val tag_name: String,
     val html_url: String,
+    val assets: List<GitHubAsset> = emptyList(),
     val prerelease: Boolean = false
 ) {
     val versionName: String get() = tag_name.removePrefix("v")
+    val androidApk: GitHubAsset? get() = assets.firstOrNull {
+        it.name.endsWith(".apk", ignoreCase = true) &&
+            (it.name.contains("android", ignoreCase = true) || assets.count { asset -> asset.name.endsWith(".apk", ignoreCase = true) } == 1)
+    }
+}
+
+sealed interface UpdateInstallState {
+    data object Idle : UpdateInstallState
+    data class Downloading(val progressPercent: Int) : UpdateInstallState
+    data object WaitingForPermission : UpdateInstallState
+    data object OpeningInstaller : UpdateInstallState
+    data class Failed(val message: String) : UpdateInstallState
+    data object Unsupported : UpdateInstallState
 }
 
 sealed interface UpdateState {

@@ -1,6 +1,7 @@
 package net.newpipe.app.domain
 
 import kotlin.test.Test
+import kotlin.test.assertEquals
 import kotlin.test.assertFalse
 import kotlin.test.assertTrue
 
@@ -16,5 +17,20 @@ class UpdateViewModelTest {
         assertFalse(UpdateViewModel.isNewerVersion("v1.0.0", "1.0.0"))
         assertFalse(UpdateViewModel.isNewerVersion("v0.9.9", "1.0.0"))
         assertFalse(UpdateViewModel.isNewerVersion("v1.0.1-beta", "1.0.1"))
+    }
+
+    @Test
+    fun selectsTheAndroidApkFromReleaseAssets() {
+        val release = GitHubRelease(
+            tag_name = "v1.2.0",
+            html_url = "https://github.com/TeALO36/ONewPipe/releases/tag/v1.2.0",
+            assets = listOf(
+                GitHubAsset("ONewPipe-v1.2.0-windows-setup.msi", "https://example.test/windows"),
+                GitHubAsset("ONewPipe-v1.2.0-android.apk", "https://example.test/android"),
+                GitHubAsset("ONewPipe-v1.2.0-server.jar", "https://example.test/server")
+            )
+        )
+
+        assertEquals("ONewPipe-v1.2.0-android.apk", release.androidApk?.name)
     }
 }

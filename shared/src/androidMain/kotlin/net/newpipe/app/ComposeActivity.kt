@@ -31,6 +31,8 @@ class ComposeActivity : ComponentActivity() {
             requestPermissions(arrayOf(Manifest.permission.POST_NOTIFICATIONS), 779)
         }
 
+        UpdateInstaller.initialize(this)
+
         try {
             NewPipe.init(OkHttpDownloader(OkHttpClient.Builder().build()))
             // Use the device locale for trending/search results.
@@ -50,5 +52,10 @@ class ComposeActivity : ComponentActivity() {
         // A launcher intent has no navigation payload. App currently owns the home shell,
         // while deep-link destinations can be added here without making startup nullable.
         setContent { App() }
+    }
+
+    override fun onResume() {
+        super.onResume()
+        UpdateInstaller.resumePendingInstall()
     }
 }

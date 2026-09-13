@@ -113,7 +113,7 @@
 - [x] API REST du serveur consommée par le web (`/api/trending`, `/api/search`, `/api/video`, `/api/register`, `/api/login`, `/api/watchstate`)
 - [x] Hébergement : **Docker** (`server/Dockerfile` + `docker-compose.yml`, volume persistant) + jar autonome
 - [ ] Raccourci navigateur → un clic et on est sur son YouTube
-- [ ] Abonnements, playlists dans la web UI
+- [x] Abonnements, playlists et « à regarder plus tard » dans la web UI (via `/api/library`, partagés avec les apps)
 - [ ] Mode « serveur web » installable (barre d'outils / exe serveur pour Windows)
 
 ---

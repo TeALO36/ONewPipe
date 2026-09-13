@@ -87,6 +87,7 @@
   </div>
   <input id="search" type="search" placeholder="Search videos, channels...">
   <button class="btn primary" id="searchBtn">Search</button>
+  <button class="btn" id="libraryBtn" type="button" title="Your library" hidden>Library</button>
   <button class="btn" id="themeBtn" aria-label="Toggle dark mode" title="Toggle dark mode">☾</button>
   <div id="userbox">
     <button class="btn" id="accountBtn">Sign in</button>
@@ -100,6 +101,11 @@
   <button class="chip" data-cat="podcasts">Podcasts</button>
 </div>
 <div id="grid"></div>
+<section id="library" hidden>
+  <h2 style="padding:0 20px;">Your library</h2>
+  <p class="meta" style="padding:0 20px;">Subscriptions, playlists and saved videos are shared with the ONewPipe apps.</p>
+  <div id="libraryContent" style="padding:0 20px 24px;"></div>
+</section>
 <button class="btn primary" id="pwaInstallBtn" type="button" aria-haspopup="dialog">Install ONewPipe</button>
 
 <div id="player">
@@ -111,6 +117,7 @@
       <label for="qualitySelect">Quality</label>
       <select id="qualitySelect" aria-label="Video quality"></select>
       <a class="btn" id="downloadBtn" href="#" download>Download</a>
+      <button class="btn" id="watchLaterBtn" type="button" hidden>Watch later</button>
     </div>
   </div>
   <h3 style="padding:0 20px;">Related</h3>
@@ -258,12 +265,16 @@ function toast(msg) {
 }
 
 function updateUserBox() {
+  const libraryButton = document.getElementById('libraryBtn');
+  if (libraryButton) libraryButton.hidden = !state.token;
   if (state.username) {
     $('userbox').innerHTML = `<span style="color:var(--muted);font-size:13px">${state.username}</span>
       <button class="btn" id="logoutBtn">Sign out</button>`;
     $('logoutBtn').onclick = () => {
       state.token = ''; state.username = '';
       localStorage.removeItem('token'); localStorage.removeItem('username');
+      library = { subscriptions: [], playlists: [], watchLater: [], updatedAt: 0 };
+      showLibrary(false);
       updateUserBox(); toast('Signed out');
     };
   } else {
@@ -399,6 +410,7 @@ async function openVideo(url, title) {
         toast('Resumed at ' + Math.floor(entry.positionMs / 60000) + ':' + String(Math.floor(entry.positionMs / 1000) % 60).padStart(2, '0'));
       }
     }
+    updateWatchLaterButton();
     const rel = $('related');
     (info.relatedItems || []).slice(0, 12).forEach(i => {
       const d = document.createElement('div');
@@ -431,10 +443,137 @@ video.addEventListener('timeupdate', () => {
   }
 });
 
+// ---- Library (subscriptions, playlists, watch later) -----------------------
+
+let library = { subscriptions: [], playlists: [], watchLater: [], updatedAt: 0 };
+
+function authHeaders(extra) {
+  return Object.assign({ Authorization: 'Bearer ' + state.token }, extra || {});
+}
+
+async function loadLibrary() {
+  if (!state.token) { library = { subscriptions: [], playlists: [], watchLater: [], updatedAt: 0 }; return library; }
+  try {
+    const res = await fetch('/api/library', { headers: authHeaders() });
+    if (res.ok) library = await res.json();
+  } catch (e) {}
+  return library;
+}
+
+async function saveLibrary() {
+  if (!state.token) return;
+  library.updatedAt = Date.now();
+  try {
+    const res = await fetch('/api/library', {
+      method: 'POST',
+      headers: authHeaders({ 'Content-Type': 'application/json' }),
+      body: JSON.stringify(library)
+    });
+    if (res.ok) library = await res.json();
+  } catch (e) { toast('Could not save the library'); }
+}
+
+function isSaved(url) {
+  return (library.watchLater || []).some(i => i.url === url);
+}
+
+function updateWatchLaterButton() {
+  const button = $('watchLaterBtn');
+  button.hidden = !state.token || !currentVideoUrl;
+  button.textContent = isSaved(currentVideoUrl) ? 'Saved' : 'Watch later';
+}
+
+$('watchLaterBtn').onclick = async () => {
+  if (!state.token || !currentVideoUrl) return;
+  if (isSaved(currentVideoUrl)) {
+    library.watchLater = library.watchLater.filter(i => i.url !== currentVideoUrl);
+  } else {
+    library.watchLater = (library.watchLater || []).concat([{ url: currentVideoUrl, title: $('ptitle').textContent }]);
+  }
+  await saveLibrary();
+  updateWatchLaterButton();
+  renderLibrary();
+};
+
+function libraryRow(item, onRemove) {
+  const row = document.createElement('div');
+  row.className = 'rel';
+  row.innerHTML = '<div><h4></h4><div class="meta"></div></div>';
+  row.querySelector('h4').textContent = item.title || item.name || item.url;
+  row.querySelector('.meta').textContent = item.uploaderName || '';
+  const remove = document.createElement('button');
+  remove.className = 'btn';
+  remove.type = 'button';
+  remove.textContent = 'Remove';
+  remove.onclick = async event => { event.stopPropagation(); await onRemove(); renderLibrary(); };
+  row.appendChild(remove);
+  return row;
+}
+
+function renderLibrary() {
+  const container = $('libraryContent');
+  container.innerHTML = '';
+  const sections = [
+    {
+      title: 'Watch later',
+      items: library.watchLater || [],
+      play: true,
+      remove: item => { library.watchLater = library.watchLater.filter(i => i.url !== item.url); return saveLibrary(); }
+    },
+    {
+      title: 'Subscriptions',
+      items: library.subscriptions || [],
+      play: false,
+      remove: item => { library.subscriptions = library.subscriptions.filter(i => i.url !== item.url); return saveLibrary(); }
+    }
+  ];
+  sections.forEach(section => {
+    const heading = document.createElement('h3');
+    heading.textContent = section.title + ' (' + section.items.length + ')';
+    container.appendChild(heading);
+    if (!section.items.length) {
+      const empty = document.createElement('p');
+      empty.className = 'meta';
+      empty.textContent = 'Nothing here yet.';
+      container.appendChild(empty);
+      return;
+    }
+    section.items.forEach(item => {
+      const row = libraryRow(item, () => section.remove(item));
+      if (section.play) row.onclick = () => { showLibrary(false); openVideo(item.url, item.title || ''); };
+      container.appendChild(row);
+    });
+  });
+  (library.playlists || []).forEach(playlist => {
+    const heading = document.createElement('h3');
+    heading.textContent = playlist.name + ' (' + (playlist.items || []).length + ')';
+    container.appendChild(heading);
+    (playlist.items || []).forEach(item => {
+      const row = libraryRow(item, () => {
+        playlist.items = playlist.items.filter(i => i.url !== item.url);
+        return saveLibrary();
+      });
+      row.onclick = () => { showLibrary(false); openVideo(item.url, item.title || ''); };
+      container.appendChild(row);
+    });
+  });
+}
+
+function showLibrary(visible) {
+  $('library').hidden = !visible;
+  $('grid').hidden = visible;
+  $('chips').style.display = visible ? 'none' : '';
+  if (visible) renderLibrary();
+}
+
+$('libraryBtn').onclick = () => showLibrary($('library').hidden);
+
 async function syncFromServer() {
   try {
     const saved = await (await fetch('/api/watchstate', { headers: { Authorization: 'Bearer ' + state.token } })).json();
     if (saved.length) toast('Synced ' + saved.length + ' watch position(s)');
+    await loadLibrary();
+    updateWatchLaterButton();
   } catch (e) {}
 }
 
@@ -455,6 +594,7 @@ document.addEventListener('keydown', e => {
 
 updateUserBox();
 loadTrending('all');
+if (state.token) syncFromServer();
 </script>
 </body>
 </html>

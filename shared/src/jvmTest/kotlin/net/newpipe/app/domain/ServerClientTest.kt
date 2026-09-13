@@ -101,6 +101,15 @@ class ServerClientTest {
                 )
             ),
             watchLater = listOf(PlaylistItem(url = "https://youtube.com/watch?v=2", title = "Later")),
+            history = listOf(
+                HistoryEntry(
+                    url = "https://youtube.com/watch?v=3",
+                    title = "Watched",
+                    positionMs = 30_000,
+                    durationMs = 300_000,
+                    watchedAt = System.currentTimeMillis()
+                )
+            ),
             updatedAt = System.currentTimeMillis()
         )
         val stored = client.pushLibrary(config, snapshot)
@@ -111,6 +120,7 @@ class ServerClientTest {
         assertEquals("Channel", pulled.subscriptions.single().name)
         assertEquals("Song", pulled.playlists.single().items.single().title)
         assertEquals("Later", pulled.watchLater.single().title)
+        assertEquals(30_000, pulled.history.single().positionMs)
 
         // An older copy must not overwrite the newest one.
         val stale = client.pushLibrary(config, snapshot.copy(subscriptions = emptyList(), updatedAt = 1))

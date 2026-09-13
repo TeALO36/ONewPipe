@@ -43,6 +43,7 @@ data class LibrarySnapshot(
     val subscriptions: List<Subscription> = emptyList(),
     val playlists: List<LocalPlaylist> = emptyList(),
     val watchLater: List<PlaylistItem> = emptyList(),
+    val history: List<HistoryEntry> = emptyList(),
     val updatedAt: Long = 0
 )
 

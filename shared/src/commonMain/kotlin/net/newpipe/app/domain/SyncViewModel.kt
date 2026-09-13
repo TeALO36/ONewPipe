@@ -12,7 +12,12 @@ import net.newpipe.app.currentTimeMillis
 sealed class LibrarySyncState {
     object Idle : LibrarySyncState()
     object Syncing : LibrarySyncState()
-    data class Done(val subscriptions: Int, val playlists: Int, val watchLater: Int) : LibrarySyncState()
+    data class Done(
+        val subscriptions: Int,
+        val playlists: Int,
+        val watchLater: Int,
+        val history: Int
+    ) : LibrarySyncState()
     data class Failed(val message: String) : LibrarySyncState()
 }
 
@@ -99,21 +104,36 @@ class SyncViewModel(
                     subscriptions = (settings.subscriptions.value + remote.subscriptions).distinctBy { it.url },
                     playlists = mergePlaylists(libraryViewModel.playlists.value, remote.playlists),
                     watchLater = (libraryViewModel.watchLater.value + remote.watchLater).distinctBy { it.url },
+                    history = mergeHistory(libraryViewModel.history.value, remote.history),
                     updatedAt = currentTimeMillis()
                 )
                 val stored = client.pushLibrary(config, merged)
                 settings.replaceSubscriptions(stored.subscriptions)
-                libraryViewModel.replaceLibrary(stored.playlists, stored.watchLater)
+                libraryViewModel.replaceLibrary(stored.playlists, stored.watchLater, stored.history)
                 _librarySync.value = LibrarySyncState.Done(
                     subscriptions = stored.subscriptions.size,
                     playlists = stored.playlists.size,
-                    watchLater = stored.watchLater.size
+                    watchLater = stored.watchLater.size,
+                    history = stored.history.size
                 )
             } catch (e: Exception) {
                 _librarySync.value = LibrarySyncState.Failed(e.message ?: "Library sync failed")
             }
         }
     }
+
+    /**
+     * History entries are merged by URL, keeping the most recently watched
+     * copy, so the resume position of the device used last wins.
+     */
+    private fun mergeHistory(
+        local: List<HistoryEntry>,
+        remote: List<HistoryEntry>
+    ): List<HistoryEntry> = (local + remote)
+        .groupBy { it.url }
+        .map { (_, entries) -> entries.maxByOrNull { it.watchedAt } ?: entries.first() }
+        .sortedByDescending { it.watchedAt }
+        .take(MAX_SYNCED_HISTORY)
 
     /** Playlists with the same name are one playlist; their entries are merged. */
     private fun mergePlaylists(
@@ -131,6 +151,11 @@ class SyncViewModel(
             }
         }
         return byName.values.toList()
+    }
+
+    private companion object {
+        /** Keep the synchronized history small enough for a self-hosted server. */
+        const val MAX_SYNCED_HISTORY = 300
     }
 
     /** Pull the watch position for one video URL, or null when not connected / unknown. */

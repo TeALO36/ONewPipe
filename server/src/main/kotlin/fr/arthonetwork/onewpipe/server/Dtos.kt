@@ -128,9 +128,22 @@ data class PlaylistDto(
  * their own endpoint because they change constantly during playback.
  */
 @Serializable
+data class HistoryEntryDto(
+    val url: String,
+    val title: String = "",
+    val uploaderName: String = "",
+    val thumbnailUrl: String = "",
+    val durationText: String = "",
+    val positionMs: Long = 0,
+    val durationMs: Long = 0,
+    val watchedAt: Long = 0
+)
+
+@Serializable
 data class LibraryDto(
     val subscriptions: List<SubscriptionDto> = emptyList(),
     val playlists: List<PlaylistDto> = emptyList(),
     val watchLater: List<PlaylistItemDto> = emptyList(),
+    val history: List<HistoryEntryDto> = emptyList(),
     val updatedAt: Long = 0
 )

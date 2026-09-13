@@ -76,7 +76,8 @@
 - [x] **Sync des positions de lecture** : reprise à la position sauvegardée à l'ouverture, push à la fermeture
 - [x] Client multiplateforme (ktor-client, okhttp/darwin) + test d'intégration contre un serveur live (register → push → pull, 0 échec)
 - [x] **Sync des playlists, abonnements et « à regarder plus tard »** (`/api/library`, fusion par URL, la copie la plus récente gagne)
-- [ ] Sync des likes et de l'historique complet
+- [x] Sync de l'historique de lecture (300 entrées max, fusion par URL sur la date de visionnage)
+- [ ] Sync des likes
 - [ ] Indicateur visuel d'état de connexion + message d'erreur réseau dans le dialogue
 
 ---
@@ -96,7 +97,7 @@
 - [ ] Likes / « J'aime »
 - [x] Enregistrements (« plus tard » / favoris) — synchronisés
 - [x] Playlists (création + synchronisation multi-appareils ; partage/collaboration à venir)
-- [ ] Historique synchronisé (optionnel, avec respect de la vie privée)
+- [x] Historique synchronisé (optionnel : uniquement sur demande depuis les réglages, vers votre propre serveur)
 - [x] Abonnements synchronisés
 
 ### 2.3 Recommandations

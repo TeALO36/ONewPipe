@@ -193,14 +193,15 @@ fun SettingsDialog(
                             if (librarySync is LibrarySyncState.Syncing) {
                                 "Synchronizing…"
                             } else {
-                                "Sync subscriptions and playlists"
+                                "Sync library with the server"
                             }
                         )
                     }
                     when (val state = librarySync) {
                         is LibrarySyncState.Done -> Text(
                             text = "Synchronized: ${state.subscriptions} subscriptions, " +
-                                "${state.playlists} playlists, ${state.watchLater} saved videos.",
+                                "${state.playlists} playlists, ${state.watchLater} saved videos, " +
+                                "${state.history} history entries.",
                             style = MaterialTheme.typography.bodySmall,
                             color = MaterialTheme.colorScheme.onSurfaceVariant
                         )

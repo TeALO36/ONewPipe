@@ -300,9 +300,18 @@ class LibraryViewModel(
     }
 
     /** Replaces the synchronized parts of the library after a server sync. */
-    fun replaceLibrary(playlists: List<LocalPlaylist>, watchLater: List<PlaylistItem>) {
+    fun replaceLibrary(
+        playlists: List<LocalPlaylist>,
+        watchLater: List<PlaylistItem>,
+        history: List<HistoryEntry> = _history.value
+    ) {
         update(_playlists, KEY_PLAYLISTS, playlists)
         update(_watchLater, KEY_WATCH_LATER, watchLater.distinctBy { it.url })
+        update(
+            _history,
+            KEY_HISTORY,
+            history.distinctBy { it.url }.sortedByDescending { it.watchedAt }.take(MAX_HISTORY)
+        )
     }
 
     // ----------------------------------------------------------------- shared

@@ -14,3 +14,6 @@ actual fun currentTimeMillis(): Long = System.currentTimeMillis()
 actual val classicInterfaceAvailable: Boolean = false
 
 actual fun openClassicInterface(): Boolean = false
+
+// Desktop has no system share sheet; the caller copies the link instead.
+actual fun shareLink(url: String, title: String): Boolean = false

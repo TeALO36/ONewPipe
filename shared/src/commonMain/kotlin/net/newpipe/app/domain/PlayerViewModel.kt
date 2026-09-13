@@ -68,6 +68,7 @@ sealed class PlayerState {
         val audioStreams: List<AudioStream>,
         val resumePositionMs: Long = 0,
         val uploaderUrl: String = "",
+        val uploaderAvatarUrl: String = "",
         val thumbnailUrl: String = "",
         /** True while the player is restricted to the audio track (background/music mode). */
         val audioOnly: Boolean = false,
@@ -462,6 +463,7 @@ class PlayerViewModel(
             uploaderUrl = info.uploaderUrl.orEmpty().ifBlank {
                 info.subChannelUrl.orEmpty()
             },
+            uploaderAvatarUrl = info.uploaderAvatars?.firstOrNull()?.url.orEmpty(),
             thumbnailUrl = info.thumbnails.firstOrNull()?.url ?: "",
             durationText = formatDuration(info.duration ?: 0L),
             description = info.description?.content.orEmpty(),

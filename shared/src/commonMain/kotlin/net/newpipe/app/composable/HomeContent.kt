@@ -24,7 +24,7 @@ import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.ArrowDropDown
-import androidx.compose.material.icons.filled.Cloud
+import androidx.compose.material.icons.filled.Subscriptions
 import androidx.compose.material.icons.filled.VideoLibrary
 import androidx.compose.material3.DropdownMenu
 import androidx.compose.material3.DropdownMenuItem
@@ -80,6 +80,7 @@ fun HomeContent(
     onUnsubscribe: (Subscription) -> Unit = {},
     onOpenSubscriptionFeed: () -> Unit = {},
     libraryViewModel: LibraryViewModel? = null,
+    onEnqueue: (MediaItem) -> Unit = {},
     searchHistory: List<String> = emptyList(),
     onSearchHistoryRemove: (String) -> Unit = {},
     onSearchHistoryClear: () -> Unit = {},
@@ -257,7 +258,8 @@ fun HomeContent(
                         LibrarySection(
                             libraryViewModel = libraryViewModel,
                             onPlay = onMediaClick,
-                            onDownload = onDownloadClick
+                            onDownload = onDownloadClick,
+                            onEnqueue = onEnqueue
                         )
                     }
                 }
@@ -276,7 +278,7 @@ private fun SubscriptionSection(
 ) {
     if (subscriptions.isEmpty()) {
         EmptySection(
-            icon = { Icon(Icons.Filled.Cloud, contentDescription = null, modifier = Modifier.size(56.dp)) },
+            icon = { Icon(Icons.Filled.Subscriptions, contentDescription = null, modifier = Modifier.size(56.dp)) },
             title = "No subscriptions yet",
             message = "Open a video and press Subscribe to keep your favorite channels here."
         )
@@ -320,7 +322,7 @@ private fun SubscriptionSection(
                         contentScale = androidx.compose.ui.layout.ContentScale.Crop
                     )
                 } else {
-                    Icon(Icons.Filled.Cloud, contentDescription = null, modifier = Modifier.size(48.dp))
+                    Icon(Icons.Filled.Subscriptions, contentDescription = null, modifier = Modifier.size(48.dp))
                 }
                 Spacer(modifier = Modifier.width(12.dp))
                 Text(

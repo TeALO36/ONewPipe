@@ -4,6 +4,22 @@ ONewPipe is a privacy-focused, ad-free media frontend based on the NewPipe core.
 
 **Official public repository:** <https://github.com/TeALO36/ONewPipe>
 
+## Features
+
+- **Home** — the default feed of the selected service, with infinite scrolling.
+- **Trending** — All / Gaming / Music / Movies & Series / Podcasts categories.
+- **Search** — filter by videos or channels, with a recent-searches drop-down.
+- **Subscriptions** — follow channels without an account, open a channel,
+  unsubscribe, and load a feed of the newest videos from every followed channel.
+- **Library** — watch history with resume positions, local playlists,
+  a watch-later list, and the list of downloaded files.
+- **Player** — quality selection, playback speed, play queue, repeat modes,
+  audio-only (background) mode, picture-in-picture, fullscreen, keyboard
+  shortcuts, video description and comments.
+- **Settings** — theme, playback preferences, history controls, backup and
+  restore, self-hosted account, updates. On Android the classic NewPipe
+  interface remains reachable from here.
+
 ## Install from GitHub Releases
 
 Use the **latest non-draft release** on the [Releases page](https://github.com/TeALO36/ONewPipe/releases). The file names are deliberately explicit:
@@ -67,4 +83,6 @@ Set a strong `JWT_SECRET`, keep `DATA_DIR` persistent, allow TCP port 8080 on th
 ./gradlew :app:assembleDebug
 ```
 
-ONewPipe is free software released under the [GNU GPL v3 or later](LICENSE). It is not affiliated with the official NewPipe project; it is a fork built on the NewPipe code and extractor.
+The upstream base currently merged into this fork is NewPipe 0.29.1 (`dev`).
+
+ONewPipe is free software released under the [GNU GPL v3 or later](LICENSE). It is not affiliated with the official NewPipe project; it is a fork built on the NewPipe code and extractor. See [PRIVACY.md](PRIVACY.md) for what the application sends and stores.

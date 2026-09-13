@@ -22,6 +22,7 @@ import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalClipboardManager
@@ -40,6 +41,7 @@ import net.newpipe.app.domain.PlaylistItem
 import net.newpipe.app.domain.RepeatMode
 import net.newpipe.app.domain.Subscription
 import net.newpipe.app.openExternalUrl
+import net.newpipe.app.shareLink
 
 @Composable
 fun VideoDetailsContent(
@@ -66,7 +68,16 @@ fun VideoDetailsContent(
         verticalAlignment = Alignment.CenterVertically
     ) {
         Box(modifier = Modifier.size(40.dp).background(Color.DarkGray, shape = CircleShape), contentAlignment = Alignment.Center) {
-            Text(state.uploaderName.take(1).uppercase(), color = Color.White)
+            if (state.uploaderAvatarUrl.isNotBlank()) {
+                AsyncImage(
+                    model = state.uploaderAvatarUrl,
+                    contentDescription = state.uploaderName,
+                    modifier = Modifier.size(40.dp).clip(CircleShape),
+                    contentScale = ContentScale.Crop
+                )
+            } else {
+                Text(state.uploaderName.take(1).uppercase(), color = Color.White)
+            }
         }
         Spacer(modifier = Modifier.width(12.dp))
         Column(modifier = Modifier.weight(1f)) {
@@ -80,7 +91,7 @@ fun VideoDetailsContent(
                         Subscription(
                             url = state.uploaderUrl,
                             name = state.uploaderName,
-                            thumbnailUrl = ""
+                            thumbnailUrl = state.uploaderAvatarUrl
                         )
                     )
                 }
@@ -107,8 +118,12 @@ fun VideoDetailsContent(
         
         OutlinedButton(
             onClick = {
-                clipboardManager.setText(AnnotatedString(state.originalUrl))
-                shareText = "Copied!"
+                // Android opens the system share sheet; elsewhere the link is
+                // copied, which is the closest thing the platform offers.
+                if (!shareLink(state.originalUrl, state.title)) {
+                    clipboardManager.setText(AnnotatedString(state.originalUrl))
+                    shareText = "Copied!"
+                }
             },
             colors = ButtonDefaults.outlinedButtonColors(contentColor = Color.White)
         ) {

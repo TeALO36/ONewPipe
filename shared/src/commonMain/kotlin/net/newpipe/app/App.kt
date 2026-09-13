@@ -123,6 +123,8 @@ fun App() {
                     )
                 },
                 "Open channel" to { homeViewModel.openChannel(media.url) },
+                "Share" to { shareLink(media.url, media.title); Unit },
+                "Open in browser" to { openExternalUrl(media.url) },
                 "Download" to { downloadViewModel.loadStreams(media.url, media.title) }
             )
         }
@@ -172,6 +174,7 @@ fun App() {
                                 homeViewModel.loadSubscriptionFeed(subscriptions)
                             },
                             libraryViewModel = libraryViewModel,
+                            onEnqueue = playerViewModel::enqueue,
                             searchHistory = searchHistory,
                             onSearchHistoryRemove = libraryViewModel::removeSearch,
                             onSearchHistoryClear = libraryViewModel::clearSearchHistory,
@@ -224,6 +227,7 @@ fun App() {
                                 homeViewModel.loadSubscriptionFeed(subscriptions)
                             },
                             libraryViewModel = libraryViewModel,
+                            onEnqueue = playerViewModel::enqueue,
                             searchHistory = searchHistory,
                             onSearchHistoryRemove = libraryViewModel::removeSearch,
                             onSearchHistoryClear = libraryViewModel::clearSearchHistory,

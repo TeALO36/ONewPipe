@@ -13,3 +13,5 @@ actual fun currentTimeMillis(): Long =
 actual val classicInterfaceAvailable: Boolean = false
 
 actual fun openClassicInterface(): Boolean = false
+
+actual fun shareLink(url: String, title: String): Boolean = false

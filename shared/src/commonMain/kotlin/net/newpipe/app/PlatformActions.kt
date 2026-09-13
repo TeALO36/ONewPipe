@@ -17,3 +17,9 @@ expect val classicInterfaceAvailable: Boolean
  * Returns false when it could not be started.
  */
 expect fun openClassicInterface(): Boolean
+
+/**
+ * Opens the system share sheet for a link. Returns false when the platform has
+ * no share sheet, so the caller can fall back to copying the link.
+ */
+expect fun shareLink(url: String, title: String): Boolean

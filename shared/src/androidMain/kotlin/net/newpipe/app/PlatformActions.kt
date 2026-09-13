@@ -28,3 +28,19 @@ actual fun openClassicInterface(): Boolean {
         true
     }.getOrDefault(false)
 }
+
+actual fun shareLink(url: String, title: String): Boolean {
+    if (url.isBlank()) return false
+    val context = GlobalContext.get().get<android.content.Context>()
+    return runCatching {
+        val send = Intent(Intent.ACTION_SEND).apply {
+            type = "text/plain"
+            putExtra(Intent.EXTRA_SUBJECT, title)
+            putExtra(Intent.EXTRA_TEXT, url)
+        }
+        context.startActivity(
+            Intent.createChooser(send, title).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+        )
+        true
+    }.getOrDefault(false)
+}

@@ -78,6 +78,7 @@ fun LibrarySection(
     libraryViewModel: LibraryViewModel,
     onPlay: (MediaItem) -> Unit,
     onDownload: (MediaItem) -> Unit,
+    onEnqueue: (MediaItem) -> Unit = {},
     modifier: Modifier = Modifier
 ) {
     var selectedTab by remember { mutableStateOf(LibraryTab.HISTORY) }
@@ -102,6 +103,7 @@ fun LibrarySection(
                 history = history,
                 onPlay = onPlay,
                 onDownload = onDownload,
+                onEnqueue = onEnqueue,
                 onRemove = libraryViewModel::removeFromHistory,
                 onClear = libraryViewModel::clearHistory
             )
@@ -109,6 +111,7 @@ fun LibrarySection(
             LibraryTab.PLAYLISTS -> PlaylistsTab(
                 playlists = playlists,
                 onPlay = onPlay,
+                onEnqueue = onEnqueue,
                 onCreate = { libraryViewModel.createPlaylist(it) },
                 onRename = libraryViewModel::renamePlaylist,
                 onDelete = libraryViewModel::deletePlaylist,
@@ -119,12 +122,13 @@ fun LibrarySection(
                 items = watchLater,
                 onPlay = onPlay,
                 onDownload = onDownload,
+                onEnqueue = onEnqueue,
                 onRemove = { libraryViewModel.toggleWatchLater(it) },
                 onClear = libraryViewModel::clearWatchLater
             )
 
             LibraryTab.DOWNLOADS -> DownloadsTab(
-                downloads = downloads.map { it },
+                downloads = downloads,
                 onRemove = libraryViewModel::removeDownloadRecord,
                 onClear = libraryViewModel::clearDownloads
             )
@@ -137,6 +141,7 @@ private fun HistoryTab(
     history: List<HistoryEntry>,
     onPlay: (MediaItem) -> Unit,
     onDownload: (MediaItem) -> Unit,
+    onEnqueue: (MediaItem) -> Unit,
     onRemove: (String) -> Unit,
     onClear: () -> Unit
 ) {
@@ -175,6 +180,7 @@ private fun HistoryTab(
                         RowOverflowMenu(
                             entries = listOf(
                                 "Play" to { onPlay(item) },
+                                "Add to queue" to { onEnqueue(item) },
                                 "Download" to { onDownload(item) },
                                 "Remove from history" to { onRemove(entry.url) }
                             )
@@ -191,6 +197,7 @@ private fun WatchLaterTab(
     items: List<PlaylistItem>,
     onPlay: (MediaItem) -> Unit,
     onDownload: (MediaItem) -> Unit,
+    onEnqueue: (MediaItem) -> Unit,
     onRemove: (PlaylistItem) -> Unit,
     onClear: () -> Unit
 ) {
@@ -204,7 +211,13 @@ private fun WatchLaterTab(
     }
 
     Column(modifier = Modifier.fillMaxSize()) {
-        ListActionBar(count = items.size, unit = "video", onClear = onClear, clearLabel = "Clear list")
+        ListActionBar(
+            count = items.size,
+            unit = "video",
+            onClear = onClear,
+            clearLabel = "Clear list",
+            playAll = { playAll(items.map { it.toMediaItem() }, onPlay, onEnqueue) }
+        )
         LazyColumn(modifier = Modifier.fillMaxSize().padding(horizontal = 16.dp)) {
             items(items, key = { it.url }) { entry ->
                 val item = entry.toMediaItem()
@@ -218,6 +231,7 @@ private fun WatchLaterTab(
                         RowOverflowMenu(
                             entries = listOf(
                                 "Play" to { onPlay(item) },
+                                "Add to queue" to { onEnqueue(item) },
                                 "Download" to { onDownload(item) },
                                 "Remove" to { onRemove(entry) }
                             )
@@ -233,6 +247,7 @@ private fun WatchLaterTab(
 private fun PlaylistsTab(
     playlists: List<LocalPlaylist>,
     onPlay: (MediaItem) -> Unit,
+    onEnqueue: (MediaItem) -> Unit,
     onCreate: (String) -> Unit,
     onRename: (String, String) -> Unit,
     onDelete: (String) -> Unit,
@@ -290,8 +305,10 @@ private fun PlaylistsTab(
                             }
                             RowOverflowMenu(
                                 entries = listOfNotNull(
-                                    playlist.items.firstOrNull()?.let { first ->
-                                        "Play all" to { onPlay(first.toMediaItem()) }
+                                    playlist.items.firstOrNull()?.let {
+                                        "Play all" to {
+                                            playAll(playlist.items.map { entry -> entry.toMediaItem() }, onPlay, onEnqueue)
+                                        }
                                     },
                                     "Rename" to { renameTarget = playlist },
                                     "Delete playlist" to { onDelete(playlist.id) }
@@ -422,7 +439,13 @@ private fun DownloadsTab(
 }
 
 @Composable
-private fun ListActionBar(count: Int, unit: String, clearLabel: String, onClear: () -> Unit) {
+private fun ListActionBar(
+    count: Int,
+    unit: String,
+    clearLabel: String,
+    onClear: () -> Unit,
+    playAll: (() -> Unit)? = null
+) {
     var confirmClear by remember { mutableStateOf(false) }
     Row(
         modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 8.dp),
@@ -434,10 +457,19 @@ private fun ListActionBar(count: Int, unit: String, clearLabel: String, onClear:
             style = MaterialTheme.typography.bodyMedium,
             color = MaterialTheme.colorScheme.onSurfaceVariant
         )
-        OutlinedButton(onClick = { confirmClear = true }) {
-            Icon(Icons.Filled.Delete, contentDescription = null, modifier = Modifier.size(18.dp))
-            Spacer(Modifier.width(8.dp))
-            Text(clearLabel)
+        Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+            if (playAll != null && count > 0) {
+                OutlinedButton(onClick = playAll) {
+                    Icon(Icons.Filled.PlaylistPlay, contentDescription = null, modifier = Modifier.size(18.dp))
+                    Spacer(Modifier.width(8.dp))
+                    Text("Play all")
+                }
+            }
+            OutlinedButton(onClick = { confirmClear = true }) {
+                Icon(Icons.Filled.Delete, contentDescription = null, modifier = Modifier.size(18.dp))
+                Spacer(Modifier.width(8.dp))
+                Text(clearLabel)
+            }
         }
     }
 
@@ -594,6 +626,17 @@ private fun LibraryEmptyState(
             )
         }
     }
+}
+
+/** Plays the first video and queues the rest, the way "Play all" is expected to work. */
+private fun playAll(
+    items: List<MediaItem>,
+    onPlay: (MediaItem) -> Unit,
+    onEnqueue: (MediaItem) -> Unit
+) {
+    val first = items.firstOrNull() ?: return
+    items.drop(1).forEach(onEnqueue)
+    onPlay(first)
 }
 
 internal fun PlaylistItem.toMediaItem(): MediaItem = MediaItem(

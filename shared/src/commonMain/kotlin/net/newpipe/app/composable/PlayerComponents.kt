@@ -18,6 +18,7 @@ import androidx.compose.material.icons.filled.QueueMusic
 import androidx.compose.material.icons.filled.Repeat
 import androidx.compose.material.icons.filled.Settings
 import androidx.compose.material.icons.filled.Share
+import androidx.compose.material.icons.filled.Translate
 import androidx.compose.material.icons.filled.WatchLater
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
@@ -225,6 +226,48 @@ fun VideoDetailsContent(
             Icon(imageVector = Icons.Default.Headphones, contentDescription = null, modifier = Modifier.size(18.dp))
             Spacer(Modifier.width(8.dp))
             Text(if (state.audioOnly) "Audio only" else "Audio mode")
+        }
+
+        // Audio tracks: YouTube exposes dubbed tracks as separate audio
+        // streams, and the player already pairs a video stream with a chosen
+        // audio stream, so switching language is a matter of picking one.
+        val audioTracks = remember(state.audioStreams) { buildAudioTracks(state) }
+        if (audioTracks.size > 1) {
+            var expandedAudio by remember { mutableStateOf(false) }
+            Box {
+                OutlinedButton(
+                    onClick = { expandedAudio = true },
+                    colors = ButtonDefaults.outlinedButtonColors(contentColor = Color.White)
+                ) {
+                    Icon(imageVector = Icons.Default.Translate, contentDescription = null, modifier = Modifier.size(18.dp))
+                    Spacer(Modifier.width(8.dp))
+                    Text("Audio track")
+                }
+                DropdownMenu(
+                    expanded = expandedAudio,
+                    onDismissRequest = { expandedAudio = false },
+                    modifier = Modifier.heightIn(max = 320.dp).background(Color(0xFF2D2D2D))
+                ) {
+                    audioTracks.forEach { track ->
+                        DropdownMenuItem(
+                            text = {
+                                Text(
+                                    text = track.label,
+                                    color = if (track.url == state.audioUrl) {
+                                        MaterialTheme.colorScheme.primary
+                                    } else {
+                                        Color.White
+                                    }
+                                )
+                            },
+                            onClick = {
+                                expandedAudio = false
+                                playerViewModel.selectAudioTrack(track.url)
+                            }
+                        )
+                    }
+                }
+            }
         }
 
         if (subtitlesSupported && state.subtitles.isNotEmpty()) {
@@ -638,3 +681,24 @@ fun VideoExtrasContent(
         }
     }
 }
+
+private data class AudioTrackOption(val label: String, val url: String)
+
+/**
+ * One entry per audio language/track, keeping the highest bitrate of each.
+ * A video with a single track shows no menu.
+ */
+private fun buildAudioTracks(state: PlayerState.Playing): List<AudioTrackOption> =
+    state.audioStreams
+        .mapNotNull { stream ->
+            val url = stream.content ?: stream.url ?: return@mapNotNull null
+            val name = stream.audioTrackName
+                ?: stream.audioLocale?.displayLanguage
+                ?: stream.audioTrackId
+            Triple(name ?: "Default", stream.averageBitrate, url)
+        }
+        .groupBy { it.first }
+        .map { (name, streams) ->
+            val best = streams.maxByOrNull { it.second } ?: streams.first()
+            AudioTrackOption(label = name, url = best.third)
+        }

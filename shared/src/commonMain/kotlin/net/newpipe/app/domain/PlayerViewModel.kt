@@ -346,6 +346,38 @@ class PlayerViewModel(
         }
     }
 
+    /**
+     * Switches the audio track (dubbing) without touching the video stream.
+     * Playback resumes at the current position.
+     */
+    fun selectAudioTrack(audioUrl: String) {
+        val current = _state.value as? PlayerState.Playing ?: return
+        if (audioUrl.isBlank() || audioUrl == current.audioUrl) return
+
+        // A progressive stream already carries its own audio: pairing it with a
+        // second track would play both at once, so switch to the matching
+        // video-only stream first.
+        val videoUrl = if (current.audioUrl == null) {
+            val height = current.videoStreams
+                .firstOrNull { (it.content ?: it.url) == current.streamUrl }
+                ?.let { resolutionHeight(it.resolution) }
+                ?: 0
+            val replacement = current.videoOnlyStreams
+                .filter { !(it.content ?: it.url).isNullOrBlank() }
+                .minByOrNull { kotlin.math.abs(resolutionHeight(it.resolution) - height) }
+                ?: return
+            replacement.content ?: replacement.url ?: return
+        } else {
+            current.streamUrl
+        }
+
+        _state.value = current.copy(
+            streamUrl = videoUrl,
+            audioUrl = audioUrl,
+            resumePositionMs = lastPositionMs
+        )
+    }
+
     /** Turns a subtitle track on, or off when [track] is null. */
     fun selectSubtitle(track: SubtitleTrack?) {
         val current = _state.value as? PlayerState.Playing ?: return

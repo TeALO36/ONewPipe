@@ -49,7 +49,7 @@
 ### 1.4 Lecture & médias
 - [x] Lecteur : sélection de qualité (+ qualité préférée dans les réglages), **vitesse de lecture**, **file d'attente**, **répétition (off / file / vidéo)**, **mode audio seul**, précédent/suivant, muet, plein écran, cinéma, PiP
 - [x] Sous-titres (Android : sélection de piste + affichage des sous-titres ; desktop : menu masqué tant que VLC n'est pas branché)
-- [ ] Doublage (pistes audio multiples)
+- [x] Doublage : menu « Audio track » quand la vidéo propose plusieurs pistes (bascule automatiquement sur un flux vidéo seul pour éviter deux pistes superposées)
 - [ ] Mini-player flottant (mobile)
 - [ ] Cast / Chromecast (optionnel)
 - [x] Lecture audio seule (mode « musique »)

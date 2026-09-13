@@ -73,6 +73,14 @@ class StreamInfoTest {
         println("VIDEO-ONLY: ${videoOnly.map { "${it.resolution} (${it.format?.name}) content=${it.content?.take(40)}" }}")
         println("AUDIO: ${audios.map { "${it.averageBitrate}kbps (${it.format?.name}) content=${it.content?.take(40)}" }}")
 
+        // Audio tracks (dubbing): every track the menu offers must have a URL.
+        val audioTracks = audios.mapNotNull { it.audioTrackName ?: it.audioLocale?.displayLanguage }
+        println("AUDIO TRACKS: ${audioTracks.distinct()}")
+        assertTrue(
+            audios.all { !(it.content ?: it.url).isNullOrBlank() },
+            "Every audio stream should expose a URL"
+        )
+
         // Every subtitle the player offers must carry a usable URL, otherwise
         // the subtitle menu would list entries that play nothing.
         val subtitles = info.subtitles ?: emptyList()

@@ -8,3 +8,9 @@ actual fun openExternalUrl(url: String) {
         Desktop.getDesktop().browse(URI(url))
     }
 }
+
+actual fun currentTimeMillis(): Long = System.currentTimeMillis()
+
+actual val classicInterfaceAvailable: Boolean = false
+
+actual fun openClassicInterface(): Boolean = false

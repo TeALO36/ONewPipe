@@ -54,6 +54,7 @@ fun DownloadOverlay(
                             ".mp4"
                         }
                         net.newpipe.app.backend.downloadFile(url, safeTitle + ext)
+                        downloadViewModel.recordDownload(safeTitle + ext, state.title, isAudioOnly = false)
                     }
                     downloadViewModel.dismiss()
                 },
@@ -67,6 +68,7 @@ fun DownloadOverlay(
                             audioUrl,
                             "$safeTitle.mp4"
                         )
+                        downloadViewModel.recordDownload("$safeTitle.mp4", state.title, isAudioOnly = false)
                     }
                     downloadViewModel.dismiss()
                 },
@@ -80,6 +82,7 @@ fun DownloadOverlay(
                             else -> ".mp3"
                         }
                         net.newpipe.app.backend.downloadFile(url, safeTitle + ext)
+                        downloadViewModel.recordDownload(safeTitle + ext, state.title, isAudioOnly = true)
                     }
                     downloadViewModel.dismiss()
                 }

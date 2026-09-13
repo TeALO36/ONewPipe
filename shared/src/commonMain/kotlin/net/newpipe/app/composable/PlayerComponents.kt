@@ -9,9 +9,15 @@ import androidx.compose.foundation.verticalScroll
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.Headphones
 import androidx.compose.material.icons.filled.KeyboardArrowDown
+import androidx.compose.material.icons.filled.OpenInBrowser
+import androidx.compose.material.icons.filled.PlaylistAdd
+import androidx.compose.material.icons.filled.QueueMusic
+import androidx.compose.material.icons.filled.Repeat
 import androidx.compose.material.icons.filled.Settings
 import androidx.compose.material.icons.filled.Share
+import androidx.compose.material.icons.filled.WatchLater
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
@@ -24,10 +30,16 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.DpOffset
 import androidx.compose.ui.unit.dp
 import coil3.compose.AsyncImage
+import net.newpipe.app.domain.CommentsState
 import net.newpipe.app.domain.DownloadViewModel
+import net.newpipe.app.domain.LibraryViewModel
+import net.newpipe.app.domain.MediaItem
 import net.newpipe.app.domain.PlayerState
 import net.newpipe.app.domain.PlayerViewModel
+import net.newpipe.app.domain.PlaylistItem
+import net.newpipe.app.domain.RepeatMode
 import net.newpipe.app.domain.Subscription
+import net.newpipe.app.openExternalUrl
 
 @Composable
 fun VideoDetailsContent(
@@ -36,12 +48,13 @@ fun VideoDetailsContent(
     downloadViewModel: DownloadViewModel,
     onChannelClick: (String) -> Unit = {},
     isSubscribed: Boolean = false,
-    onToggleSubscription: (Subscription) -> Unit = {}
+    onToggleSubscription: (Subscription) -> Unit = {},
+    libraryViewModel: LibraryViewModel? = null
 ) {
     // Title & Views
     Text(text = state.title, color = Color.White, style = MaterialTheme.typography.titleLarge)
     Spacer(modifier = Modifier.height(4.dp))
-    Text(text = "${java.text.NumberFormat.getInstance().format(state.viewCount)} views", color = Color.Gray, style = MaterialTheme.typography.bodyMedium)
+    Text(text = "${formatCount(state.viewCount)} views", color = Color.Gray, style = MaterialTheme.typography.bodyMedium)
     
     Spacer(modifier = Modifier.height(16.dp))
     
@@ -58,7 +71,7 @@ fun VideoDetailsContent(
         Spacer(modifier = Modifier.width(12.dp))
         Column(modifier = Modifier.weight(1f)) {
             Text(text = state.uploaderName, color = Color.White, style = MaterialTheme.typography.titleMedium)
-            Text(text = "${java.text.NumberFormat.getInstance().format(state.uploaderSubscriberCount)} subscribers", color = Color.Gray, style = MaterialTheme.typography.bodySmall)
+            Text(text = "${formatCount(state.uploaderSubscriberCount)} subscribers", color = Color.Gray, style = MaterialTheme.typography.bodySmall)
         }
         Button(
             onClick = {
@@ -105,6 +118,16 @@ fun VideoDetailsContent(
         }
         
         OutlinedButton(
+            onClick = { openExternalUrl(state.originalUrl) },
+            enabled = state.originalUrl.isNotBlank(),
+            colors = ButtonDefaults.outlinedButtonColors(contentColor = Color.White)
+        ) {
+            Icon(imageVector = Icons.Default.OpenInBrowser, contentDescription = null, modifier = Modifier.size(18.dp))
+            Spacer(Modifier.width(8.dp))
+            Text("Open in browser")
+        }
+
+        OutlinedButton(
             onClick = { downloadViewModel.loadStreams(state.originalUrl, state.title) },
             colors = ButtonDefaults.outlinedButtonColors(contentColor = Color.White)
         ) {
@@ -112,6 +135,93 @@ fun VideoDetailsContent(
             Spacer(Modifier.width(8.dp))
             Text("Download")
         }
+
+        val mediaItem = MediaItem(
+            url = state.originalUrl,
+            title = state.title,
+            uploaderName = state.uploaderName,
+            thumbnailUrl = state.thumbnailUrl,
+            durationText = state.durationText
+        )
+
+        OutlinedButton(
+            onClick = { playerViewModel.enqueue(mediaItem) },
+            colors = ButtonDefaults.outlinedButtonColors(contentColor = Color.White)
+        ) {
+            Icon(imageVector = Icons.Default.QueueMusic, contentDescription = null, modifier = Modifier.size(18.dp))
+            Spacer(Modifier.width(8.dp))
+            Text("Add to queue")
+        }
+
+        if (libraryViewModel != null) {
+            val watchLater by libraryViewModel.watchLater.collectAsState()
+            val saved = watchLater.any { it.url == state.originalUrl }
+            OutlinedButton(
+                onClick = {
+                    libraryViewModel.toggleWatchLater(
+                        PlaylistItem(
+                            url = state.originalUrl,
+                            title = state.title,
+                            uploaderName = state.uploaderName,
+                            thumbnailUrl = state.thumbnailUrl,
+                            durationText = state.durationText
+                        )
+                    )
+                },
+                colors = ButtonDefaults.outlinedButtonColors(contentColor = Color.White)
+            ) {
+                Icon(imageVector = Icons.Default.WatchLater, contentDescription = null, modifier = Modifier.size(18.dp))
+                Spacer(Modifier.width(8.dp))
+                Text(if (saved) "Saved" else "Watch later")
+            }
+
+            var showPlaylistPicker by remember { mutableStateOf(false) }
+            OutlinedButton(
+                onClick = { showPlaylistPicker = true },
+                colors = ButtonDefaults.outlinedButtonColors(contentColor = Color.White)
+            ) {
+                Icon(imageVector = Icons.Default.PlaylistAdd, contentDescription = null, modifier = Modifier.size(18.dp))
+                Spacer(Modifier.width(8.dp))
+                Text("Add to playlist")
+            }
+            if (showPlaylistPicker) {
+                AddToPlaylistDialog(
+                    libraryViewModel = libraryViewModel,
+                    item = PlaylistItem(
+                        url = state.originalUrl,
+                        title = state.title,
+                        uploaderName = state.uploaderName,
+                        thumbnailUrl = state.thumbnailUrl,
+                        durationText = state.durationText
+                    ),
+                    onDismiss = { showPlaylistPicker = false }
+                )
+            }
+        }
+
+        OutlinedButton(
+            onClick = { playerViewModel.toggleAudioOnly() },
+            colors = ButtonDefaults.outlinedButtonColors(
+                contentColor = if (state.audioOnly) MaterialTheme.colorScheme.primary else Color.White
+            )
+        ) {
+            Icon(imageVector = Icons.Default.Headphones, contentDescription = null, modifier = Modifier.size(18.dp))
+            Spacer(Modifier.width(8.dp))
+            Text(if (state.audioOnly) "Audio only" else "Audio mode")
+        }
+
+        val repeatMode by playerViewModel.repeatMode.collectAsState()
+        OutlinedButton(
+            onClick = { playerViewModel.cycleRepeatMode() },
+            colors = ButtonDefaults.outlinedButtonColors(
+                contentColor = if (repeatMode == RepeatMode.OFF) Color.White else MaterialTheme.colorScheme.primary
+            )
+        ) {
+            Icon(imageVector = Icons.Default.Repeat, contentDescription = null, modifier = Modifier.size(18.dp))
+            Spacer(Modifier.width(8.dp))
+            Text(repeatMode.label)
+        }
+
         
         var expandedQuality by remember { mutableStateOf(false) }
         val qualityProfiles = remember(state.videoStreams, state.videoOnlyStreams, state.audioStreams) {
@@ -297,6 +407,174 @@ fun RelatedVideosContent(
                 Text(item.name ?: "", color = Color.White, style = MaterialTheme.typography.bodyMedium, maxLines = 2, overflow = TextOverflow.Ellipsis)
                 Spacer(modifier = Modifier.height(4.dp))
                 Text(item.uploaderName ?: "", color = Color.Gray, style = MaterialTheme.typography.bodySmall)
+            }
+        }
+    }
+}
+
+/** Compact "1,2M" style formatting, shared by every platform. */
+internal fun formatCount(count: Long): String = when {
+    count >= 1_000_000_000 -> "${count / 100_000_000 / 10.0}B"
+    count >= 1_000_000 -> "${count / 100_000 / 10.0}M"
+    count >= 1_000 -> "${count / 100 / 10.0}K"
+    else -> count.toString()
+}
+
+/**
+ * Picks the playlist a video should be added to, and allows creating a new one
+ * without leaving the dialog.
+ */
+@Composable
+fun AddToPlaylistDialog(
+    libraryViewModel: LibraryViewModel,
+    item: PlaylistItem,
+    onDismiss: () -> Unit
+) {
+    val playlists by libraryViewModel.playlists.collectAsState()
+    var newPlaylistName by remember { mutableStateOf("") }
+
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        title = { Text("Add to playlist") },
+        text = {
+            Column(
+                modifier = Modifier.heightIn(max = 380.dp).verticalScroll(rememberScrollState()),
+                verticalArrangement = Arrangement.spacedBy(8.dp)
+            ) {
+                if (playlists.isEmpty()) {
+                    Text(
+                        text = "You have no playlist yet. Create one below.",
+                        style = MaterialTheme.typography.bodySmall
+                    )
+                }
+                playlists.forEach { playlist ->
+                    val alreadyIn = playlist.items.any { it.url == item.url }
+                    TextButton(
+                        onClick = {
+                            libraryViewModel.addToPlaylist(playlist.id, item)
+                            onDismiss()
+                        },
+                        enabled = !alreadyIn,
+                        modifier = Modifier.fillMaxWidth()
+                    ) {
+                        Text(
+                            text = if (alreadyIn) "${playlist.name} — already added" else playlist.name,
+                            modifier = Modifier.fillMaxWidth()
+                        )
+                    }
+                }
+                HorizontalDivider()
+                OutlinedTextField(
+                    value = newPlaylistName,
+                    onValueChange = { newPlaylistName = it },
+                    label = { Text("New playlist") },
+                    singleLine = true,
+                    modifier = Modifier.fillMaxWidth()
+                )
+                TextButton(
+                    onClick = {
+                        val created = libraryViewModel.createPlaylist(newPlaylistName)
+                        if (created.id.isNotBlank()) {
+                            libraryViewModel.addToPlaylist(created.id, item)
+                        }
+                        onDismiss()
+                    },
+                    enabled = newPlaylistName.isNotBlank()
+                ) { Text("Create and add") }
+            }
+        },
+        confirmButton = {
+            TextButton(onClick = onDismiss) { Text("Close") }
+        }
+    )
+}
+
+/**
+ * Collapsible description and on-demand comments, the two detail sections
+ * NewPipe shows below a video.
+ */
+@Composable
+fun VideoExtrasContent(
+    state: PlayerState.Playing,
+    playerViewModel: PlayerViewModel
+) {
+    var showDescription by remember(state.originalUrl) { mutableStateOf(false) }
+    var showComments by remember(state.originalUrl) { mutableStateOf(false) }
+    val commentsState by playerViewModel.comments.collectAsState()
+
+    if (state.description.isNotBlank()) {
+        OutlinedButton(
+            onClick = { showDescription = !showDescription },
+            colors = ButtonDefaults.outlinedButtonColors(contentColor = Color.White)
+        ) {
+            Text(if (showDescription) "Hide description" else "Show description")
+        }
+        if (showDescription) {
+            Spacer(Modifier.height(8.dp))
+            if (state.uploadDate.isNotBlank()) {
+                Text(
+                    text = state.uploadDate,
+                    color = Color.Gray,
+                    style = MaterialTheme.typography.labelMedium
+                )
+                Spacer(Modifier.height(4.dp))
+            }
+            Text(
+                text = state.description,
+                color = Color.LightGray,
+                style = MaterialTheme.typography.bodyMedium,
+                modifier = Modifier.heightIn(max = 320.dp).verticalScroll(rememberScrollState())
+            )
+        }
+        Spacer(Modifier.height(12.dp))
+    }
+
+    OutlinedButton(
+        onClick = {
+            showComments = !showComments
+            if (showComments) playerViewModel.loadComments(state.originalUrl)
+        },
+        colors = ButtonDefaults.outlinedButtonColors(contentColor = Color.White)
+    ) {
+        Text(if (showComments) "Hide comments" else "Show comments")
+    }
+
+    if (showComments) {
+        Spacer(Modifier.height(8.dp))
+        when (val comments = commentsState) {
+            CommentsState.Idle, CommentsState.Loading -> {
+                Text("Loading comments…", color = Color.Gray, style = MaterialTheme.typography.bodySmall)
+            }
+            is CommentsState.Error -> {
+                Text(comments.message, color = Color.Gray, style = MaterialTheme.typography.bodySmall)
+            }
+            is CommentsState.Loaded -> {
+                comments.comments.forEach { comment ->
+                    Column(modifier = Modifier.fillMaxWidth().padding(vertical = 8.dp)) {
+                        Text(
+                            text = buildString {
+                                append(comment.author)
+                                if (comment.pinned) append(" • pinned")
+                                if (comment.publishedAt.isNotBlank()) append(" • ${comment.publishedAt}")
+                            },
+                            color = Color.Gray,
+                            style = MaterialTheme.typography.labelMedium
+                        )
+                        Spacer(Modifier.height(2.dp))
+                        Text(
+                            text = comment.text,
+                            color = Color.White,
+                            style = MaterialTheme.typography.bodyMedium
+                        )
+                        if (comment.likeCount > 0) {
+                            Text(
+                                text = "${formatCount(comment.likeCount)} likes",
+                                color = Color.Gray,
+                                style = MaterialTheme.typography.labelSmall
+                            )
+                        }
+                    }
+                }
             }
         }
     }

@@ -45,6 +45,7 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import net.newpipe.app.domain.HomeState
+import net.newpipe.app.domain.LibraryViewModel
 import net.newpipe.app.domain.MediaItem
 import net.newpipe.app.domain.SearchFilter
 import net.newpipe.app.domain.Subscription
@@ -57,8 +58,8 @@ import coil3.compose.AsyncImage
  * the section-specific content for each sidebar item.
  *
  * Home and Trending show the media grid (trending by category, or search
- * results). Subscriptions and Library have no data source yet, so they show
- * an honest empty state instead of silently reusing the home feed.
+ * results), Subscriptions lists the channels the user follows and Library
+ * shows the watch history, local playlists, watch-later list and downloads.
  */
 @Composable
 fun HomeContent(
@@ -76,6 +77,13 @@ fun HomeContent(
     onChannelClick: (MediaItem) -> Unit = {},
     subscriptions: List<Subscription> = emptyList(),
     onSubscriptionClick: (Subscription) -> Unit = {},
+    onUnsubscribe: (Subscription) -> Unit = {},
+    onOpenSubscriptionFeed: () -> Unit = {},
+    libraryViewModel: LibraryViewModel? = null,
+    searchHistory: List<String> = emptyList(),
+    onSearchHistoryRemove: (String) -> Unit = {},
+    onSearchHistoryClear: () -> Unit = {},
+    cardActions: (MediaItem) -> List<Pair<String, () -> Unit>> = { emptyList() },
     onDownloadClick: (MediaItem) -> Unit,
     onPrefetch: (MediaItem) -> Unit = {},
     onLoadMore: () -> Unit = {},
@@ -96,7 +104,13 @@ fun HomeContent(
                         modifier = Modifier.padding(horizontal = 16.dp),
                         verticalArrangement = Arrangement.spacedBy(10.dp)
                     ) {
-                        GlassSearchBar(onSearch = onSearch, modifier = Modifier.fillMaxWidth())
+                        GlassSearchBar(
+                            onSearch = onSearch,
+                            history = searchHistory,
+                            onHistoryRemove = onSearchHistoryRemove,
+                            onHistoryClear = onSearchHistoryClear,
+                            modifier = Modifier.fillMaxWidth()
+                        )
                         if (!isSearching) {
                             ServiceSwitcher(
                                 service = service,
@@ -112,6 +126,9 @@ fun HomeContent(
                     ) {
                         GlassSearchBar(
                             onSearch = onSearch,
+                            history = searchHistory,
+                            onHistoryRemove = onSearchHistoryRemove,
+                            onHistoryClear = onSearchHistoryClear,
                             modifier = Modifier.weight(1f)
                         )
                         if (!isSearching) {
@@ -158,7 +175,7 @@ fun HomeContent(
         // OUTSIDE the animated section. AnimatedContent stacks its children in
         // a Box, so a grid inside it would paint over the chips. Keeping the
         // chips here guarantees they are never covered by the video grid.
-        if (selectedItem == NavItem.HOME && !isSearching) {
+        if (selectedItem == NavItem.TRENDING && !isSearching) {
             Row(
                 modifier = Modifier
                     .fillMaxWidth()
@@ -211,6 +228,7 @@ fun HomeContent(
                                     onDownloadClick = onDownloadClick,
                                     onPrefetch = onPrefetch,
                                     onLoadMore = onLoadMore,
+                                    cardActions = cardActions,
                                     modifier = Modifier.fillMaxSize()
                                 )
                             }
@@ -223,16 +241,25 @@ fun HomeContent(
                 NavItem.SUBSCRIPTIONS -> {
                     SubscriptionSection(
                         subscriptions = subscriptions,
-                        onSubscriptionClick = onSubscriptionClick
+                        onSubscriptionClick = onSubscriptionClick,
+                        onUnsubscribe = onUnsubscribe,
+                        onOpenFeed = onOpenSubscriptionFeed
                     )
                 }
                 NavItem.LIBRARY -> {
-                    EmptySection(
-                        icon = { Icon(Icons.Filled.VideoLibrary, contentDescription = null, modifier = Modifier.size(56.dp)) },
-                        title = "Your library is empty",
-                        message = "Watch history and local downloads will appear here. " +
-                            "Played video positions are synchronized through your server."
-                    )
+                    if (libraryViewModel == null) {
+                        EmptySection(
+                            icon = { Icon(Icons.Filled.VideoLibrary, contentDescription = null, modifier = Modifier.size(56.dp)) },
+                            title = "Library unavailable",
+                            message = "The local library could not be loaded on this device."
+                        )
+                    } else {
+                        LibrarySection(
+                            libraryViewModel = libraryViewModel,
+                            onPlay = onMediaClick,
+                            onDownload = onDownloadClick
+                        )
+                    }
                 }
             }
             }
@@ -243,7 +270,9 @@ fun HomeContent(
 @Composable
 private fun SubscriptionSection(
     subscriptions: List<Subscription>,
-    onSubscriptionClick: (Subscription) -> Unit
+    onSubscriptionClick: (Subscription) -> Unit,
+    onUnsubscribe: (Subscription) -> Unit = {},
+    onOpenFeed: () -> Unit = {}
 ) {
     if (subscriptions.isEmpty()) {
         EmptySection(
@@ -261,11 +290,20 @@ private fun SubscriptionSection(
             .padding(horizontal = 24.dp, vertical = 8.dp),
         verticalArrangement = Arrangement.spacedBy(12.dp)
     ) {
-        Text(
-            text = "Your subscriptions",
-            style = MaterialTheme.typography.titleLarge,
-            fontWeight = FontWeight.Bold
-        )
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.SpaceBetween
+        ) {
+            Text(
+                text = "Your subscriptions",
+                style = MaterialTheme.typography.titleLarge,
+                fontWeight = FontWeight.Bold
+            )
+            OutlinedButton(onClick = onOpenFeed) {
+                Text("Show new videos")
+            }
+        }
         subscriptions.forEach { subscription ->
             Row(
                 modifier = Modifier
@@ -285,7 +323,17 @@ private fun SubscriptionSection(
                     Icon(Icons.Filled.Cloud, contentDescription = null, modifier = Modifier.size(48.dp))
                 }
                 Spacer(modifier = Modifier.width(12.dp))
-                Text(subscription.name, style = MaterialTheme.typography.titleMedium)
+                Text(
+                    text = subscription.name,
+                    style = MaterialTheme.typography.titleMedium,
+                    modifier = Modifier.weight(1f)
+                )
+                RowOverflowMenu(
+                    entries = listOf(
+                        "Open channel" to { onSubscriptionClick(subscription) },
+                        "Unsubscribe" to { onUnsubscribe(subscription) }
+                    )
+                )
             }
         }
     }

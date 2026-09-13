@@ -26,8 +26,6 @@ class StreamInfoTest {
                 OkHttpDownloader(OkHttpClient.Builder().build()),
                 Localization("en", "US")
             )
-            // Same as the app: the WEB client alone is throttled to ~360p.
-            org.schabi.newpipe.extractor.services.youtube.extractors.YoutubeStreamExtractor.setFetchIosClient(true)
             true
         }
     }

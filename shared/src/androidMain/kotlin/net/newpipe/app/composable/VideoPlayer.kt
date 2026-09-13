@@ -28,6 +28,10 @@ import androidx.compose.material.icons.filled.FullscreenExit
 import androidx.compose.material.icons.filled.Pause
 import androidx.compose.material.icons.filled.PlayArrow
 import androidx.compose.material.icons.filled.SkipNext
+import androidx.compose.material.icons.filled.SkipPrevious
+import androidx.compose.material.icons.filled.Speed
+import androidx.compose.material3.DropdownMenu
+import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.Text
@@ -76,6 +80,8 @@ actual fun VideoPlayer(
     onPreviousVideo: () -> Unit,
     onNextVideo: () -> Unit,
     onPositionChange: (Long) -> Unit,
+    isFullscreen: Boolean,
+    playbackSpeed: Float,
     playerActions: PlayerActions
 ) {
     val context = LocalContext.current
@@ -87,6 +93,7 @@ actual fun VideoPlayer(
         mutableStateOf(!pictureInPictureMode)
     }
     var positionMs by remember(videoUrl, audioUrl) { mutableStateOf(startPositionMs) }
+    var showSpeedMenu by remember { mutableStateOf(false) }
     var durationMs by remember(videoUrl, audioUrl) { mutableStateOf(0L) }
     var seekFeedback by remember(videoUrl, audioUrl) { mutableStateOf<String?>(null) }
     var nativeFullscreen by remember(videoUrl, audioUrl) { mutableStateOf(false) }
@@ -169,6 +176,11 @@ actual fun VideoPlayer(
             exoPlayer.volume = if (exoPlayer.volume > 0f) 0f else 1f
         }
         val activity = context.findActivity()
+        playerActions.setSpeed = { speed ->
+            runCatching { exoPlayer.setPlaybackSpeed(speed) }
+        }
+        runCatching { exoPlayer.setPlaybackSpeed(playbackSpeed) }
+
         val parentFullscreenAction = playerActions.toggleFullscreen
         val previousRequestedOrientation = activity?.requestedOrientation
             ?: ActivityInfo.SCREEN_ORIENTATION_UNSPECIFIED
@@ -231,6 +243,7 @@ actual fun VideoPlayer(
             playerActions.seekToFraction = {}
             playerActions.adjustVolume = {}
             playerActions.toggleMute = {}
+            playerActions.setSpeed = {}
             playerActions.togglePictureInPicture = {}
             playerActions.toggleFullscreen = {}
             notificationController.release()
@@ -265,7 +278,8 @@ actual fun VideoPlayer(
                         },
                         onTap = {
                             // A single tap only reveals the controls. Playback is
-                            // changed explicitly with the play/pause button, so a                            // user can inspect the timeline without interrupting it.
+                            // changed explicitly with the play/pause button, so a
+                            // user can inspect the timeline without interrupting it.
                             controlsVisible = true
                         }
                     )
@@ -315,6 +329,14 @@ actual fun VideoPlayer(
                     horizontalArrangement = Arrangement.SpaceBetween
                 ) {
                     Row(verticalAlignment = Alignment.CenterVertically) {
+                        IconButton(onClick = onPreviousVideo) {
+                            Icon(
+                                imageVector = Icons.Filled.SkipPrevious,
+                                contentDescription = "Previous video",
+                                tint = Color.White,
+                                modifier = Modifier.size(28.dp)
+                            )
+                        }
                         IconButton(onClick = { playerActions.togglePlayPause() }) {
                             Icon(
                                 imageVector = if (isPlaying) Icons.Filled.Pause else Icons.Filled.PlayArrow,
@@ -330,6 +352,30 @@ actual fun VideoPlayer(
                                 tint = Color.White,
                                 modifier = Modifier.size(28.dp)
                             )
+                        }
+                        Box {
+                            IconButton(onClick = { showSpeedMenu = true }) {
+                                Icon(
+                                    imageVector = Icons.Filled.Speed,
+                                    contentDescription = "Playback speed",
+                                    tint = Color.White,
+                                    modifier = Modifier.size(28.dp)
+                                )
+                            }
+                            DropdownMenu(
+                                expanded = showSpeedMenu,
+                                onDismissRequest = { showSpeedMenu = false }
+                            ) {
+                                listOf(0.25f, 0.5f, 0.75f, 1f, 1.25f, 1.5f, 1.75f, 2f).forEach { speed ->
+                                    DropdownMenuItem(
+                                        text = { Text(if (speed == 1f) "Normal" else "${speed}x") },
+                                        onClick = {
+                                            showSpeedMenu = false
+                                            playerActions.setSpeed(speed)
+                                        }
+                                    )
+                                }
+                            }
                         }
                         IconButton(
                             onClick = { playerActions.togglePictureInPicture() },

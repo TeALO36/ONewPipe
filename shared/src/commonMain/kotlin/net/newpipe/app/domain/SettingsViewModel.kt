@@ -49,6 +49,33 @@ class SettingsViewModel(private val settings: Settings) : ViewModel() {
     )
     val serverConfig: StateFlow<ServerConfig> = _serverConfig.asStateFlow()
 
+    private val _autoplayNext = MutableStateFlow(settings.getBoolean(KEY_AUTOPLAY_NEXT, true))
+    /** Play the first related video (or the queue) when a video ends. */
+    val autoplayNext: StateFlow<Boolean> = _autoplayNext.asStateFlow()
+
+    private val _resumePlayback = MutableStateFlow(settings.getBoolean(KEY_RESUME_PLAYBACK, true))
+    /** Resume a video where it was left off instead of restarting it. */
+    val resumePlayback: StateFlow<Boolean> = _resumePlayback.asStateFlow()
+
+    private val _preferredQuality = MutableStateFlow(settings.getString(KEY_PREFERRED_QUALITY, QUALITY_AUTO))
+    /** Preferred starting resolution: [QUALITY_AUTO], "360", "480", "720" or "1080". */
+    val preferredQuality: StateFlow<String> = _preferredQuality.asStateFlow()
+
+    fun setAutoplayNext(enabled: Boolean) {
+        settings.putBoolean(KEY_AUTOPLAY_NEXT, enabled)
+        _autoplayNext.value = enabled
+    }
+
+    fun setResumePlayback(enabled: Boolean) {
+        settings.putBoolean(KEY_RESUME_PLAYBACK, enabled)
+        _resumePlayback.value = enabled
+    }
+
+    fun setPreferredQuality(quality: String) {
+        settings.putString(KEY_PREFERRED_QUALITY, quality)
+        _preferredQuality.value = quality
+    }
+
     fun setService(service: Service) {
         settings.putString(KEY_STREAMING_SERVICE, service.serviceName)
         _currentService.value = service
@@ -67,6 +94,13 @@ class SettingsViewModel(private val settings: Settings) : ViewModel() {
     fun isSubscribed(url: String): Boolean =
         _subscriptions.value.any { it.url == url }
 
+    /** Replaces the whole subscription list, used by the restore button. */
+    fun replaceSubscriptions(subscriptions: List<Subscription>) {
+        val unique = subscriptions.distinctBy { it.url }
+        settings.putString(KEY_SUBSCRIPTIONS, json.encodeToString(unique))
+        _subscriptions.value = unique
+    }
+
     fun toggleSubscription(subscription: Subscription) {
         val updated = if (isSubscribed(subscription.url)) {
             _subscriptions.value.filterNot { it.url == subscription.url }
@@ -84,5 +118,10 @@ class SettingsViewModel(private val settings: Settings) : ViewModel() {
         const val THEME_SYSTEM = "auto_device_theme"
         const val THEME_LIGHT = "light_theme"
         const val THEME_DARK = "dark_theme"
+        const val KEY_AUTOPLAY_NEXT = "autoplay_next"
+        const val KEY_RESUME_PLAYBACK = "resume_playback"
+        const val KEY_PREFERRED_QUALITY = "preferred_quality"
+        const val QUALITY_AUTO = "auto"
+        val QUALITY_CHOICES = listOf(QUALITY_AUTO, "360", "480", "720", "1080")
     }
 }

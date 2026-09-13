@@ -8,6 +8,7 @@ plugins {
     alias(libs.plugins.jetbrains.kotlin.multiplatform)
     alias(libs.plugins.jetbrains.kotlin.compose)
     alias(libs.plugins.jetbrains.compose.multiplatform)
+    alias(libs.plugins.koin)
     alias(libs.plugins.jetbrains.kotlinx.serialization)
     alias(libs.plugins.about.libraries)
 }
@@ -111,6 +112,7 @@ kotlin {
 
                 implementation(libs.koin.compose.navigation3)
                 implementation(libs.koin.compose.viewmodel)
+                implementation(libs.koin.annotations)
 
                 implementation(libs.russhwolf.settings.core)
                 implementation(libs.coil.compose)

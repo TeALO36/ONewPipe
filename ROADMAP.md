@@ -19,7 +19,7 @@
 - [x] Clone + build app PC (MSI : `desktopApp/build/compose/binaries/main/msi/`)
 - [x] Corriger le build Android cassé (package namespace, tri `libs.versions.toml`, bugs compilateur Kotlin 2.3 sur `const val`)
 - [x] **Mettre à jour NewPipeExtractor** vers la dernière version upstream (`4de221b`, poToken + correctifs YouTube)
-- [ ] Rebaser/merger le dernier code upstream NewPipe (le fork est sur 0.28.7)
+- [x] **Merger le dernier code upstream NewPipe** (base actuelle : NewPipe 0.29.1 / branche `dev`, extractor `13a655f`)
 - [x] Corriger le target Android de `shared` (n'a jamais compilé : import `androidContext` cassé dans `ComposeActivity.kt`)
 - [ ] Implémenter un fournisseur poToken côté desktop (le kiosk `FEtrending` est bloqué par YouTube → tendances officielles indisponibles, voir issue upstream #12805)
 - [ ] Revoir `settings.gradle.kts` / CI (workflows GitHub Actions à valider sur `main`)
@@ -27,13 +27,13 @@
 ### 1.2 Interface — grande refonte
 - [x] Éclater `App.kt` (monolithe ~400 lignes) en écrans modulaires : `HomeContent` (recherche + catégories + grille), `PlayerOverlay` (lecteur + détails + liées), `DownloadOverlay` (téléchargements)
 - [x] **Navigation sidebar fonctionnelle** : chaque menu affiche son contenu (Home/Trending → grille, Subscriptions/Library → états vides explicites au lieu de réutiliser l'accueil)
-- [ ] Navigation par onglets / sidebar cohérente mobile + desktop
+- [x] Navigation par onglets / sidebar cohérente mobile + desktop (Home = fil par défaut, Trending = catégories, Subscriptions, Library)
 - [ ] Thème dynamique par service (YouTube rouge, SoundCloud orange, Bandcamp bleu…) + thème sombre/clair + Material 3
 - [ ] Mode adaptatif : layout smartphone ↔ tablette ↔ desktop (grille responsive)
 - [ ] Écran d'accueil : rangées thématiques (À la une, Musique, Gaming, Films & Séries, Podcasts…)
-- [ ] Page vidéo moderne : miniatures, uploader, description, commentaires, vidéos liées
+- [x] Page vidéo moderne : miniatures, uploader, description dépliable, commentaires, vidéos liées
 - [ ] Page chaîne (abonnement, contenu, playlists)
-- [ ] Page recherche avec filtres (vidéo / chaîne / playlist / date / durée)
+- [x] Page recherche avec filtres (tout / vidéos / chaînes) + historique de recherche
 - [ ] Animations et transitions fluides
 - [ ] États vide/chargement/erreur soignés
 
@@ -47,18 +47,18 @@
 - [ ] Personnalisation des catégories par l'utilisateur
 
 ### 1.4 Lecture & médias
-- [ ] Lecteur : qualité auto, vitesse, file d'attente, lecture en arrière-plan (déjà dans NewPipe Android — à porter/valider côté shared)
+- [x] Lecteur : sélection de qualité (+ qualité préférée dans les réglages), **vitesse de lecture**, **file d'attente**, **répétition (off / file / vidéo)**, **mode audio seul**, précédent/suivant, muet, plein écran, cinéma, PiP
 - [ ] Sous-titres, doublage (pistes audio multiples)
 - [ ] Mini-player flottant (mobile)
 - [ ] Cast / Chromecast (optionnel)
-- [ ] Lecture audio seule (mode « musique »)
+- [x] Lecture audio seule (mode « musique »)
 
 ### 1.5 Bibliothèque locale (déjà dans NewPipe, à harmoniser avec la nouvelle UI)
-- [ ] Abonnements sans compte
-- [ ] Historique de lecture
-- [ ] Playlists locales
-- [ ] Téléchargements (video/audio) — déjà en partie porté dans `shared`
-- [ ] Export/import (abonnements OPML, historique…)
+- [x] Abonnements sans compte (+ désabonnement et fil « nouvelles vidéos » des chaînes suivies)
+- [x] Historique de lecture (reprise à la position, suppression d'une entrée, effacement complet, activation/désactivation)
+- [x] Playlists locales (création, renommage, suppression, ajout/retrait de vidéos) + liste « à regarder plus tard »
+- [x] Téléchargements (video/audio) avec liste des fichiers et progression (desktop)
+- [x] Export/import : sauvegarde JSON complète (historique, playlists, à regarder plus tard, abonnements) depuis les réglages
 
 ### 1.6 Apps PC & mobile
 - [x] Installateurs : MSI/EXE Windows, DEB Linux (ciblés par Compose + workflow CI)
@@ -66,6 +66,7 @@
 - [x] App iOS (`iosApp`) — utilise la nouvelle UI `shared` (MainViewController)
 - [ ] Notifications de nouveaux contenus des abonnements
 - [ ] Tester l'APK sur un vrai appareil Android
+- [x] Accès à l'interface NewPipe classique depuis les réglages Android (toutes les fonctions d'origine restent atteignables)
 - [ ] **Porter la nouvelle UI `shared` sur Android** : l'app Android actuelle (`app`) est l'app NewPipe d'origine et ne dépend pas de `shared` — la refonte UI (tendances par catégories, navigation, sync serveur) n'est donc pour l'instant disponible que sur PC et iOS. Brancher `ComposeActivity` (déjà dans `shared/androidMain`) dans un launcher Android
 
 ### 1.7 Connexion au serveur (menu dans les apps)
@@ -141,7 +142,7 @@
 
 - [x] **Workflow CI** `.github/workflows/build.yml` : APK Android + MSI Windows + exe portable + .deb Linux + jar serveur + image Docker (poussée sur GHCR sur `main`)
 - [x] Poussé sur GitHub (`main`)
-- [ ] Tests automatisés (unitaires UI `shared`, tests extractor)
+- [x] Tests automatisés (bibliothèque locale, file d'attente du lecteur, UI `shared`, extractor)
 - [ ] Signature APK et mises à jour
 - [ ] Telemetry/CRASH reporting (opt-in)
 - [ ] Documentation développeur + utilisateur
@@ -149,7 +150,20 @@
 
 ---
 
-### État actuel (août 2026)
+### État actuel (septembre 2026)
+
+**Mise au point 1.3.0 — synchronisation upstream + menus complets**
+
+- ✅ **Base upstream à jour** : 126 commits de NewPipe `dev` (0.29.1) mergés, NewPipeExtractor `13a655f`, API supprimée `setFetchIosClient` retirée du code du fork
+- ✅ **Bibliothèque** (nouvel onglet) : Historique / Playlists / À regarder plus tard / Téléchargements, chaque ligne jouable, chaque liste effaçable
+- ✅ **Lecteur complet** : file d'attente, répétition, vitesse, audio seul, ouvrir dans le navigateur, ajouter à une playlist, description, commentaires
+- ✅ **Abonnements** : désabonnement, ouverture de chaîne, fil « nouvelles vidéos »
+- ✅ **Réglages** : lecture (autoplay, reprise, qualité préférée), historique (activation + effacement), sauvegarde/restauration, interface classique (Android), à propos
+- ✅ **Boutons corrigés** : bouton lecture du survol des cartes (ne faisait rien), icône de téléchargement (« + »), icône plein écran figée, boutons précédent/muet/vitesse absents sur desktop
+- ✅ **Liens « À propos » réparés** : le rebranding avait cassé les URL (`TeamONewPipe/ONewPipe`, `https://ONewPipe.net/…`) → dépôt réel + `PRIVACY.md`
+- ✅ **Bug de reprise de lecture** : la durée était stockée en secondes et comparée à des millisecondes, la reprise ne se déclenchait jamais
+
+### État précédent (août 2026)
 
 - ✅ Poussé sur GitHub (`main`) — tout le travail consolidé et commité
 - ✅ **Serveur ONewPipe** : module `server` (Ktor) — comptes (register/login JWT), sync des positions de lecture, **web UI complète** (recherche, tendances par catégories, lecteur, reprise des lectures), **Docker** (Dockerfile + compose), jar autonome. Testé de bout en bout (register → push → pull watchstate, trending/search/video OK)

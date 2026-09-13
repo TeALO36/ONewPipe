@@ -9,7 +9,11 @@ import androidx.compose.material.icons.filled.FullscreenExit
 import androidx.compose.material.icons.filled.Pause
 import androidx.compose.material.icons.filled.PlayArrow
 import androidx.compose.material.icons.filled.SkipNext
+import androidx.compose.material.icons.filled.SkipPrevious
+import androidx.compose.material.icons.filled.Speed
 import androidx.compose.material.icons.filled.Theaters
+import androidx.compose.material.icons.filled.VolumeOff
+import androidx.compose.material.icons.filled.VolumeUp
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
@@ -36,6 +40,8 @@ actual fun VideoPlayer(
     onPreviousVideo: () -> Unit,
     onNextVideo: () -> Unit,
     onPositionChange: (Long) -> Unit,
+    isFullscreen: Boolean,
+    playbackSpeed: Float,
     playerActions: PlayerActions
 ) {
     // Software decoding avoids the black-frame/audio-only issue seen with the
@@ -60,6 +66,8 @@ actual fun VideoPlayer(
     var isPlaying by remember { mutableStateOf(false) }
     var progress by remember { mutableStateOf(0f) }
     var currentTime by remember { mutableStateOf("0:00") }
+    var isMuted by remember { mutableStateOf(false) }
+    var showSpeedMenu by remember { mutableStateOf(false) }
     var totalTime by remember { mutableStateOf("0:00") }
     val coroutineScope = rememberCoroutineScope()
 
@@ -132,6 +140,9 @@ actual fun VideoPlayer(
         playerActions.toggleMute = {
             safe { player.audio().setMute(!player.audio().isMute) }
         }
+        playerActions.setSpeed = { speed ->
+            safe { player.controls().setRate(speed) }
+        }
 
         // VLC accepts a second media as an input slave. This pairs a 720p/1080p
         // adaptive video-only URL with the best audio URL from NewPipe.
@@ -171,9 +182,16 @@ actual fun VideoPlayer(
             playerActions.seekToFraction = {}
             playerActions.adjustVolume = {}
             playerActions.toggleMute = {}
+            playerActions.setSpeed = {}
             playerActions.reportSeek = {}
             safe { player.controls().stop() }
         }
+    }
+
+    // Keep the native player in sync with the speed chosen in the UI, including
+    // after a quality change recreates the media.
+    LaunchedEffect(playbackSpeed, videoUrl, audioUrl) {
+        playerActions.setSpeed(playbackSpeed)
     }
 
     // The callback component itself is not the video child on every VLCJ
@@ -248,14 +266,47 @@ actual fun VideoPlayer(
                 modifier = Modifier.weight(1f)
             )
             Text(totalTime, color = Color.White, modifier = Modifier.padding(horizontal = 8.dp))
+            IconButton(onClick = onPreviousVideo) {
+                Icon(Icons.Filled.SkipPrevious, contentDescription = "Previous video", tint = Color.White)
+            }
             IconButton(onClick = onNextVideo) {
                 Icon(Icons.Filled.SkipNext, contentDescription = "Next video", tint = Color.White)
+            }
+            IconButton(onClick = {
+                playerActions.toggleMute()
+                isMuted = !isMuted
+            }) {
+                Icon(
+                    imageVector = if (isMuted) Icons.Filled.VolumeOff else Icons.Filled.VolumeUp,
+                    contentDescription = if (isMuted) "Unmute" else "Mute",
+                    tint = Color.White
+                )
+            }
+            Box {
+                IconButton(onClick = { showSpeedMenu = true }) {
+                    Icon(Icons.Filled.Speed, contentDescription = "Playback speed", tint = Color.White)
+                }
+                DropdownMenu(expanded = showSpeedMenu, onDismissRequest = { showSpeedMenu = false }) {
+                    listOf(0.25f, 0.5f, 0.75f, 1f, 1.25f, 1.5f, 1.75f, 2f).forEach { speed ->
+                        DropdownMenuItem(
+                            text = { Text(if (speed == 1f) "Normal" else "${speed}x") },
+                            onClick = {
+                                showSpeedMenu = false
+                                playerActions.setSpeed(speed)
+                            }
+                        )
+                    }
+                }
             }
             IconButton(onClick = { playerActions.toggleCinema() }) {
                 Icon(Icons.Filled.Theaters, contentDescription = "Cinema mode", tint = Color.White)
             }
             IconButton(onClick = { playerActions.toggleFullscreen() }) {
-                Icon(Icons.Filled.Fullscreen, contentDescription = "Fullscreen", tint = Color.White)
+                Icon(
+                    imageVector = if (isFullscreen) Icons.Filled.FullscreenExit else Icons.Filled.Fullscreen,
+                    contentDescription = if (isFullscreen) "Exit fullscreen" else "Fullscreen",
+                    tint = Color.White
+                )
             }
         }
     }

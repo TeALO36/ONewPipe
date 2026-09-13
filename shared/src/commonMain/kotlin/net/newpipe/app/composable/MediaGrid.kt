@@ -15,7 +15,7 @@ import androidx.compose.foundation.lazy.grid.rememberLazyGridState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.PlayArrow
-import androidx.compose.material.icons.filled.Add
+import androidx.compose.material.icons.filled.Download
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
@@ -44,6 +44,7 @@ fun MediaGrid(
     onDownloadClick: (MediaItem) -> Unit = {},
     onPrefetch: (MediaItem) -> Unit = {},
     onLoadMore: () -> Unit = {},
+    cardActions: (MediaItem) -> List<Pair<String, () -> Unit>> = { emptyList() },
     modifier: Modifier = Modifier
 ) {
     if (isLoading) {
@@ -103,7 +104,8 @@ fun MediaGrid(
                 onClick = { onMediaClick(media) },
                 onChannelClick = { onChannelClick(media) },
                 onPrefetch = { onPrefetch(media) },
-                onDownloadClick = { onDownloadClick(media) }
+                onDownloadClick = { onDownloadClick(media) },
+                extraActions = cardActions(media)
             )
         }
 
@@ -133,7 +135,8 @@ fun MediaCard(
     onClick: () -> Unit = {},
     onChannelClick: () -> Unit = {},
     onPrefetch: () -> Unit = {},
-    onDownloadClick: () -> Unit = {}
+    onDownloadClick: () -> Unit = {},
+    extraActions: List<Pair<String, () -> Unit>> = emptyList()
 ) {
     val interactionSource = remember { MutableInteractionSource() }
     val isHovered by interactionSource.collectIsHoveredAsState()
@@ -212,7 +215,7 @@ fun MediaCard(
                         contentAlignment = Alignment.Center
                     ) {
                         FilledIconButton(
-                            onClick = { },
+                            onClick = onClick,
                             colors = IconButtonDefaults.filledIconButtonColors(
                                 containerColor = serviceColor,
                                 contentColor = Color.White
@@ -259,10 +262,13 @@ fun MediaCard(
                             modifier = Modifier.size(32.dp)
                         ) {
                             Icon(
-                                imageVector = androidx.compose.material.icons.Icons.Default.Add,
+                                imageVector = Icons.Filled.Download,
                                 contentDescription = "Download",
                                 tint = MaterialTheme.colorScheme.primary
                             )
+                        }
+                        if (extraActions.isNotEmpty()) {
+                            RowOverflowMenu(entries = extraActions)
                         }
                     } else {
                         Text(

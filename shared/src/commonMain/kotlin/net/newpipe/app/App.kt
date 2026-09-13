@@ -38,12 +38,14 @@ import net.newpipe.app.composable.UpdateDialog
 import net.newpipe.app.domain.DownloadState
 import net.newpipe.app.domain.DownloadViewModel
 import net.newpipe.app.domain.HomeViewModel
+import net.newpipe.app.domain.LibraryViewModel
+import net.newpipe.app.domain.MediaItem
+import net.newpipe.app.domain.PlaylistItem
 import net.newpipe.app.domain.PlayerState
 import net.newpipe.app.domain.PlayerViewModel
 import net.newpipe.app.domain.ServerStatus
 import net.newpipe.app.domain.SettingsViewModel
 import net.newpipe.app.domain.SyncViewModel
-import net.newpipe.app.domain.TrendingCategory
 import net.newpipe.app.domain.UpdateState
 import net.newpipe.app.domain.UpdateViewModel
 import net.newpipe.app.theme.AppTheme
@@ -70,6 +72,7 @@ fun App() {
         val downloadViewModel = koinViewModel<DownloadViewModel>()
         val syncViewModel = koinViewModel<SyncViewModel>()
         val updateViewModel = koinViewModel<UpdateViewModel>()
+        val libraryViewModel = koinViewModel<LibraryViewModel>()
 
         val homeState by homeViewModel.state.collectAsState()
         val service by settingsViewModel.currentService.collectAsState()
@@ -81,6 +84,7 @@ fun App() {
         val subscriptions by settingsViewModel.subscriptions.collectAsState()
         val serverStatus by syncViewModel.status.collectAsState()
         val updateState by updateViewModel.state.collectAsState()
+        val searchHistory by libraryViewModel.searchHistory.collectAsState()
 
         var selectedItem by remember { mutableStateOf(NavItem.HOME) }
         var showServerDialog by remember { mutableStateOf(false) }
@@ -89,10 +93,40 @@ fun App() {
 
         val onItemSelected: (NavItem) -> Unit = { item ->
             selectedItem = item
-            if (item == NavItem.TRENDING) {
-                homeViewModel.selectCategory(TrendingCategory.ALL)
-            }
+            // Home is the default feed: leaving a channel page, the
+            // subscription feed or a search must bring it back.
+            if (item == NavItem.HOME) homeViewModel.openHome()
         }
+        // Search from anywhere also records the query in the local history,
+        // which powers the recent-searches drop-down.
+        val onSearch: (String) -> Unit = { query ->
+            libraryViewModel.recordSearch(query)
+            homeViewModel.search(query)
+        }
+
+        // Per-card overflow actions: the queue and library entries NewPipe
+        // offers on a long press.
+        val cardActions: (MediaItem) -> List<Pair<String, () -> Unit>> = { media ->
+            listOf(
+                "Play" to { playerViewModel.loadVideo(media.url, media.title) },
+                "Play next" to { playerViewModel.playNext(media) },
+                "Add to queue" to { playerViewModel.enqueue(media) },
+                "Watch later" to {
+                    libraryViewModel.toggleWatchLater(
+                        PlaylistItem(
+                            url = media.url,
+                            title = media.title,
+                            uploaderName = media.uploaderName,
+                            thumbnailUrl = media.thumbnailUrl,
+                            durationText = media.durationText
+                        )
+                    )
+                },
+                "Open channel" to { homeViewModel.openChannel(media.url) },
+                "Download" to { downloadViewModel.loadStreams(media.url, media.title) }
+            )
+        }
+
         val onUpdateClick = {
             showUpdateDialog = true
             updateViewModel.checkForUpdates(force = true)
@@ -121,7 +155,7 @@ fun App() {
                             selectedCategory = selectedCategory,
                             searchQuery = searchQuery,
                             searchFilter = searchFilter,
-                            onSearch = homeViewModel::search,
+                            onSearch = onSearch,
                             onSearchFilterSelected = homeViewModel::selectSearchFilter,
                             onServiceSelected = settingsViewModel::setService,
                             onCategorySelected = homeViewModel::selectCategory,
@@ -132,6 +166,16 @@ fun App() {
                                 selectedItem = NavItem.HOME
                                 homeViewModel.openChannel(subscription.url)
                             },
+                            onUnsubscribe = { subscription -> settingsViewModel.toggleSubscription(subscription) },
+                            onOpenSubscriptionFeed = {
+                                selectedItem = NavItem.HOME
+                                homeViewModel.loadSubscriptionFeed(subscriptions)
+                            },
+                            libraryViewModel = libraryViewModel,
+                            searchHistory = searchHistory,
+                            onSearchHistoryRemove = libraryViewModel::removeSearch,
+                            onSearchHistoryClear = libraryViewModel::clearSearchHistory,
+                            cardActions = cardActions,
                             onPrefetch = { media -> playerViewModel.prefetch(media.url) },
                             onDownloadClick = { media -> downloadViewModel.loadStreams(media.url, media.title) },
                             onLoadMore = homeViewModel::loadMore,
@@ -163,7 +207,7 @@ fun App() {
                             selectedCategory = selectedCategory,
                             searchQuery = searchQuery,
                             searchFilter = searchFilter,
-                            onSearch = homeViewModel::search,
+                            onSearch = onSearch,
                             onSearchFilterSelected = homeViewModel::selectSearchFilter,
                             onServiceSelected = settingsViewModel::setService,
                             onCategorySelected = homeViewModel::selectCategory,
@@ -174,6 +218,16 @@ fun App() {
                                 selectedItem = NavItem.HOME
                                 homeViewModel.openChannel(subscription.url)
                             },
+                            onUnsubscribe = { subscription -> settingsViewModel.toggleSubscription(subscription) },
+                            onOpenSubscriptionFeed = {
+                                selectedItem = NavItem.HOME
+                                homeViewModel.loadSubscriptionFeed(subscriptions)
+                            },
+                            libraryViewModel = libraryViewModel,
+                            searchHistory = searchHistory,
+                            onSearchHistoryRemove = libraryViewModel::removeSearch,
+                            onSearchHistoryClear = libraryViewModel::clearSearchHistory,
+                            cardActions = cardActions,
                             onPrefetch = { media -> playerViewModel.prefetch(media.url) },
                             onDownloadClick = { media -> downloadViewModel.loadStreams(media.url, media.title) },
                             onLoadMore = homeViewModel::loadMore,
@@ -200,6 +254,7 @@ fun App() {
                         },
                         isSubscribed = { url -> subscriptions.any { it.url == url } },
                         onToggleSubscription = { subscription -> settingsViewModel.toggleSubscription(subscription) },
+                        libraryViewModel = libraryViewModel,
                         isCovered = downloadState !is DownloadState.Idle
                     )
                 }
@@ -220,6 +275,7 @@ fun App() {
                 if (showSettingsDialog) {
                     SettingsDialog(
                         settingsViewModel = settingsViewModel,
+                        libraryViewModel = libraryViewModel,
                         themeMode = themeMode,
                         serverStatus = serverStatus,
                         updateState = updateState,

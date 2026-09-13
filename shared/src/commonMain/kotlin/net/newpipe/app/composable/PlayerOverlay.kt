@@ -3,6 +3,7 @@ package net.newpipe.app.composable
 import androidx.compose.animation.Crossfade
 import androidx.compose.animation.core.tween
 import androidx.compose.foundation.background
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Column
@@ -17,6 +18,7 @@ import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.ArrowBack
+import androidx.compose.material.icons.filled.Close
 import androidx.compose.material3.Button
 import androidx.compose.material3.Divider
 import androidx.compose.material3.Icon
@@ -26,6 +28,7 @@ import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.DisposableEffect
+import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -60,6 +63,7 @@ fun PlayerOverlay(
     onChannelClick: (String) -> Unit = {},
     isSubscribed: (String) -> Boolean = { false },
     onToggleSubscription: (net.newpipe.app.domain.Subscription) -> Unit = {},
+    libraryViewModel: net.newpipe.app.domain.LibraryViewModel? = null,
     isCovered: Boolean = false,
     modifier: Modifier = Modifier
 ) {
@@ -100,6 +104,8 @@ fun PlayerOverlay(
             }
             is PlayerState.Playing -> {
                 var isFullscreen by remember { mutableStateOf(false) }
+                val playbackSpeed by playerViewModel.playbackSpeed.collectAsState()
+                val queue by playerViewModel.queue.collectAsState()
                 var isCinema by remember { mutableStateOf(false) }
                 var seekNotice by remember { mutableStateOf<String?>(null) }
                 val pictureInPictureMode = PlatformPictureInPictureMode()
@@ -128,10 +134,16 @@ fun PlayerOverlay(
                     seekNotice = if (seconds < 0) "${-seconds}s" else "+${seconds}s"
                 }
 
+                // "Next" plays the queue first and falls back to the first
+                // related video when autoplay is enabled; otherwise the player
+                // closes instead of silently doing nothing.
                 val playNextVideo: () -> Unit = {
-                    state.relatedItems.firstOrNull()?.let { next ->
-                        playerViewModel.loadVideo(next.url ?: "", next.name ?: "")
-                    } ?: playerViewModel.stop()
+                    val played = playerViewModel.playNextInQueue {
+                        state.relatedItems.firstOrNull()?.let { next ->
+                            (next.url ?: "") to (next.name ?: "")
+                        }?.takeIf { it.first.isNotBlank() }
+                    }
+                    if (!played) playerViewModel.stop()
                 }
 
                 // When another overlay (e.g. the download dialog) is on top, the native
@@ -181,6 +193,8 @@ fun PlayerOverlay(
                                         onPreviousVideo = playerViewModel::playPrevious,
                                         onNextVideo = playNextVideo,
                                         onPositionChange = { positionMs -> playerViewModel.onPositionUpdate(positionMs, 0L) },
+                                        isFullscreen = isFullscreen,
+                                        playbackSpeed = playbackSpeed,
                                         playerActions = playerActions
                                     )
                                 } else {
@@ -219,8 +233,25 @@ fun PlayerOverlay(
                                     downloadViewModel = downloadViewModel,
                                     onChannelClick = onChannelClick,
                                     isSubscribed = isSubscribed(state.uploaderUrl),
-                                    onToggleSubscription = onToggleSubscription
+                                    onToggleSubscription = onToggleSubscription,
+                                    libraryViewModel = libraryViewModel
                                 )
+
+                                Spacer(modifier = Modifier.height(16.dp))
+                                VideoExtrasContent(
+                                    state = state,
+                                    playerViewModel = playerViewModel
+                                )
+
+                                if (queue.isNotEmpty()) {
+                                    Spacer(modifier = Modifier.height(24.dp))
+                                    QueueSection(
+                                        queue = queue,
+                                        onPlay = { item -> playerViewModel.loadVideo(item.url, item.title) },
+                                        onRemove = playerViewModel::removeFromQueue,
+                                        onClear = playerViewModel::clearQueue
+                                    )
+                                }
 
                                 if (!isWide && !isCinema) {
                                     Spacer(modifier = Modifier.height(24.dp))
@@ -326,4 +357,55 @@ private fun handlePlayerShortcut(name: String, actions: PlayerActions): Boolean 
     "8" -> { actions.seekToFraction(0.8f); true }
     "9" -> { actions.seekToFraction(0.9f); true }
     else -> false
+}
+
+/** The play queue, with per-entry removal and a clear-all button. */
+@Composable
+private fun QueueSection(
+    queue: List<net.newpipe.app.domain.MediaItem>,
+    onPlay: (net.newpipe.app.domain.MediaItem) -> Unit,
+    onRemove: (String) -> Unit,
+    onClear: () -> Unit
+) {
+    Row(
+        modifier = Modifier.fillMaxWidth(),
+        verticalAlignment = Alignment.CenterVertically
+    ) {
+        Text(
+            text = "Queue (${queue.size})",
+            color = Color.White,
+            style = MaterialTheme.typography.titleMedium,
+            fontWeight = FontWeight.Bold,
+            modifier = Modifier.weight(1f)
+        )
+        androidx.compose.material3.TextButton(onClick = onClear) {
+            Text("Clear queue", color = Color.White)
+        }
+    }
+    Spacer(modifier = Modifier.height(8.dp))
+    queue.forEach { item ->
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(vertical = 6.dp),
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            Text(
+                text = item.title,
+                color = Color.White,
+                style = MaterialTheme.typography.bodyMedium,
+                maxLines = 1,
+                modifier = Modifier
+                    .weight(1f)
+                    .clickable { onPlay(item) }
+            )
+            IconButton(onClick = { onRemove(item.url) }) {
+                Icon(
+                    imageVector = Icons.Filled.Close,
+                    contentDescription = "Remove from queue",
+                    tint = Color.White
+                )
+            }
+        }
+    }
 }

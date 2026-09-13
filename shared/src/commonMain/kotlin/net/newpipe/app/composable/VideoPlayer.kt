@@ -16,5 +16,7 @@ expect fun VideoPlayer(
     onPreviousVideo: () -> Unit = {},
     onNextVideo: () -> Unit = {},
     onPositionChange: (Long) -> Unit = {},
+    isFullscreen: Boolean = false,
+    playbackSpeed: Float = 1f,
     playerActions: PlayerActions = PlayerActions()
 )

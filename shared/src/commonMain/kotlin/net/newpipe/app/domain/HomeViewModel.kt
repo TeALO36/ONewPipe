@@ -40,6 +40,9 @@ class HomeViewModel(
     private var currentServiceId: Int = Service.YOUTUBE.serviceId
     private var currentQuery: String? = null
 
+    /** True while a channel page or the subscription feed replaces the default feed. */
+    private var showingCustomFeed = false
+
     init {
         viewModelScope.launch {
             settingsViewModel.currentService.collectLatest { service ->
@@ -49,8 +52,26 @@ class HomeViewModel(
         }
     }
 
+    /**
+     * Goes back to the default feed. A search, a channel page or the
+     * subscription feed is dropped; an unchanged default feed is not reloaded
+     * so switching tabs costs no network request.
+     */
+    fun openHome() {
+        val needsReload = showingCustomFeed ||
+            !currentQuery.isNullOrBlank() ||
+            _selectedCategory.value != TrendingCategory.ALL
+        showingCustomFeed = false
+        currentQuery = null
+        _searchQuery.value = null
+        _searchFilter.value = SearchFilter.ALL
+        _selectedCategory.value = TrendingCategory.ALL
+        if (needsReload) reload()
+    }
+
     fun selectCategory(category: TrendingCategory) {
-        if (category == _selectedCategory.value) return
+        if (category == _selectedCategory.value && !showingCustomFeed) return
+        showingCustomFeed = false
         _selectedCategory.value = category
         currentQuery = null
         _searchQuery.value = null
@@ -107,6 +128,7 @@ class HomeViewModel(
     }
 
     fun search(query: String, filter: SearchFilter = _searchFilter.value) {
+        showingCustomFeed = false
         val normalizedQuery = query.trim()
         currentQuery = normalizedQuery
         _searchQuery.value = normalizedQuery.takeIf { it.isNotBlank() }
@@ -139,8 +161,46 @@ class HomeViewModel(
         if (!query.isNullOrBlank()) search(query, filter)
     }
 
+    /**
+     * Builds the subscription feed: the newest videos of every subscribed
+     * channel, merged into one list.
+     *
+     * Channels that fail to load are skipped so one broken channel cannot
+     * empty the whole feed.
+     */
+    fun loadSubscriptionFeed(subscriptions: List<Subscription>) {
+        showingCustomFeed = true
+        currentQuery = null
+        _searchQuery.value = null
+        _searchFilter.value = SearchFilter.ALL
+        currentPageToken = null
+        if (subscriptions.isEmpty()) {
+            currentItems.clear()
+            _state.value = HomeState.Success(emptyList())
+            return
+        }
+        viewModelScope.launch {
+            _state.value = HomeState.Loading
+            val collected = mutableListOf<MediaItem>()
+            for (subscription in subscriptions.take(MAX_FEED_CHANNELS)) {
+                val channelItems = runCatching {
+                    repository.getChannel(currentServiceId, subscription.url).items
+                }.getOrDefault(emptyList())
+                collected += channelItems.take(MAX_VIDEOS_PER_CHANNEL)
+            }
+            currentItems.clear()
+            currentItems.addAll(collected.distinctBy { it.url })
+            _state.value = if (currentItems.isEmpty()) {
+                HomeState.Error("No videos found for your subscriptions")
+            } else {
+                HomeState.Success(currentItems.toList())
+            }
+        }
+    }
+
     fun openChannel(url: String) {
         if (url.isBlank()) return
+        showingCustomFeed = true
         currentQuery = null
         _searchQuery.value = null
         _searchFilter.value = SearchFilter.ALL
@@ -160,5 +220,11 @@ class HomeViewModel(
                 _state.value = HomeState.Error(e.message ?: "Unable to load channel")
             }
         }
+    }
+
+    companion object {
+        /** Keep the feed responsive: a handful of channels, a few videos each. */
+        const val MAX_FEED_CHANNELS = 20
+        const val MAX_VIDEOS_PER_CHANNEL = 6
     }
 }

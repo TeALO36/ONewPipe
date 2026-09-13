@@ -9,6 +9,7 @@ plugins {
     alias(libs.plugins.jetbrains.kotlin.jvm)
     alias(libs.plugins.jetbrains.kotlin.compose)
     alias(libs.plugins.jetbrains.compose.multiplatform)
+    alias(libs.plugins.about.libraries)
 }
 
 kotlin {
@@ -37,5 +38,13 @@ compose.desktop {
             // (black screen) in packaged builds.
             modules("jdk.unsupported")
         }
+    }
+}
+
+aboutLibraries {
+    export {
+        outputFile = file("../shared/src/jvmMain/resources/aboutlibraries.json")
+        prettyPrint = true
+        excludeFields.addAll("organization", "scm", "funding")
     }
 }

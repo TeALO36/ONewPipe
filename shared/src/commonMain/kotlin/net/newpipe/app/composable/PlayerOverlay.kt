@@ -195,6 +195,8 @@ fun PlayerOverlay(
                                         onPositionChange = { positionMs -> playerViewModel.onPositionUpdate(positionMs, 0L) },
                                         isFullscreen = isFullscreen,
                                         playbackSpeed = playbackSpeed,
+                                        subtitleUrl = state.selectedSubtitle?.url,
+                                        subtitleMimeType = state.selectedSubtitle?.mimeType,
                                         playerActions = playerActions
                                     )
                                 } else {

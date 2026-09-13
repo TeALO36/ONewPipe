@@ -50,7 +50,9 @@ import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.StrokeCap
 import androidx.compose.ui.input.pointer.pointerInput
+import androidx.compose.material3.MaterialTheme
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.platform.LocalContext
 import android.content.pm.ActivityInfo
@@ -60,6 +62,9 @@ import androidx.core.view.WindowInsetsCompat
 import androidx.core.view.WindowInsetsControllerCompat
 import androidx.media3.common.MediaItem
 import androidx.media3.common.Player
+import androidx.media3.common.C
+import androidx.media3.common.MimeTypes
+import androidx.media3.common.text.CueGroup
 import androidx.media3.exoplayer.ExoPlayer
 import androidx.media3.exoplayer.source.DefaultMediaSourceFactory
 import androidx.media3.exoplayer.source.MergingMediaSource
@@ -82,6 +87,8 @@ actual fun VideoPlayer(
     onPositionChange: (Long) -> Unit,
     isFullscreen: Boolean,
     playbackSpeed: Float,
+    subtitleUrl: String?,
+    subtitleMimeType: String?,
     playerActions: PlayerActions
 ) {
     val context = LocalContext.current
@@ -94,16 +101,32 @@ actual fun VideoPlayer(
     }
     var positionMs by remember(videoUrl, audioUrl) { mutableStateOf(startPositionMs) }
     var showSpeedMenu by remember { mutableStateOf(false) }
+    var subtitleText by remember(videoUrl, audioUrl, subtitleUrl) { mutableStateOf<String?>(null) }
     var durationMs by remember(videoUrl, audioUrl) { mutableStateOf(0L) }
     var seekFeedback by remember(videoUrl, audioUrl) { mutableStateOf<String?>(null) }
     var nativeFullscreen by remember(videoUrl, audioUrl) { mutableStateOf(false) }
 
-    val exoPlayer = remember(videoUrl, audioUrl) {
+    val exoPlayer = remember(videoUrl, audioUrl, subtitleUrl) {
         ExoPlayer.Builder(context).build().apply {
             val mediaSourceFactory = DefaultMediaSourceFactory(context)
-            val videoSource = mediaSourceFactory.createMediaSource(
-                MediaItem.fromUri(Uri.parse(videoUrl))
-            )
+            // The selected subtitle rides along as a side-loaded track, which
+            // is how a subtitle file that is not part of the stream is played.
+            val videoMediaItem = MediaItem.Builder()
+                .setUri(Uri.parse(videoUrl))
+                .apply {
+                    if (!subtitleUrl.isNullOrBlank()) {
+                        setSubtitleConfigurations(
+                            listOf(
+                                MediaItem.SubtitleConfiguration.Builder(Uri.parse(subtitleUrl))
+                                    .setMimeType(subtitleMimeType ?: MimeTypes.TEXT_VTT)
+                                    .setSelectionFlags(C.SELECTION_FLAG_DEFAULT)
+                                    .build()
+                            )
+                        )
+                    }
+                }
+                .build()
+            val videoSource = mediaSourceFactory.createMediaSource(videoMediaItem)
             val source = if (!audioUrl.isNullOrBlank()) {
                 val audioSource = mediaSourceFactory.createMediaSource(
                     MediaItem.fromUri(Uri.parse(audioUrl))
@@ -123,6 +146,15 @@ actual fun VideoPlayer(
 
                 override fun onPlaybackStateChanged(playbackState: Int) {
                     if (playbackState == Player.STATE_ENDED) onPlaybackEnded()
+                }
+
+                override fun onCues(cueGroup: CueGroup) {
+                    // TextureView has no subtitle view of its own, so the cues
+                    // are drawn by Compose over the video.
+                    subtitleText = cueGroup.cues
+                        .mapNotNull { it.text?.toString() }
+                        .joinToString("\n")
+                        .takeIf { it.isNotBlank() }
                 }
             })
         }
@@ -262,6 +294,21 @@ actual fun VideoPlayer(
             factory = { textureView },
             modifier = Modifier.fillMaxSize()
         )
+
+        // Subtitle cues, drawn above the video and below the controls.
+        subtitleText?.let { cue ->
+            Text(
+                text = cue,
+                color = Color.White,
+                textAlign = TextAlign.Center,
+                style = MaterialTheme.typography.titleMedium,
+                modifier = Modifier
+                    .align(Alignment.BottomCenter)
+                    .padding(bottom = if (controlsVisible) 96.dp else 32.dp, start = 24.dp, end = 24.dp)
+                    .background(Color.Black.copy(alpha = 0.6f), RoundedCornerShape(6.dp))
+                    .padding(horizontal = 12.dp, vertical = 6.dp)
+            )
+        }
 
         // This transparent gesture layer sits above TextureView, which otherwise
         // consumes all taps before Compose can show its controls.

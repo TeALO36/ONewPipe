@@ -197,6 +197,7 @@ fun App() {
                             onPrefetch = { media -> playerViewModel.prefetch(media.url) },
                             onDownloadClick = { media -> downloadViewModel.loadStreams(media.url, media.title) },
                             onLoadMore = homeViewModel::loadMore,
+                            onRetry = homeViewModel::reload,
                             isLoadingMore = homeViewModel.isLoadingMore,
                             modifier = Modifier.weight(1f)
                         )
@@ -263,6 +264,7 @@ fun App() {
                             onPrefetch = { media -> playerViewModel.prefetch(media.url) },
                             onDownloadClick = { media -> downloadViewModel.loadStreams(media.url, media.title) },
                             onLoadMore = homeViewModel::loadMore,
+                            onRetry = homeViewModel::reload,
                             isLoadingMore = homeViewModel.isLoadingMore,
                             modifier = Modifier.weight(1f)
                         )

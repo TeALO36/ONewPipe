@@ -23,3 +23,6 @@ expect fun openClassicInterface(): Boolean
  * no share sheet, so the caller can fall back to copying the link.
  */
 expect fun shareLink(url: String, title: String): Boolean
+
+/** True when the platform player can render subtitle tracks. */
+expect val subtitlesSupported: Boolean

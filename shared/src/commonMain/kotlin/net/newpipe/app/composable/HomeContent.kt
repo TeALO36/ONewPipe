@@ -96,6 +96,7 @@ fun HomeContent(
     onDownloadClick: (MediaItem) -> Unit,
     onPrefetch: (MediaItem) -> Unit = {},
     onLoadMore: () -> Unit = {},
+    onRetry: () -> Unit = {},
     isLoadingMore: Boolean = false,
     modifier: Modifier = Modifier
 ) {
@@ -253,7 +254,12 @@ fun HomeContent(
                                 )
                             }
                             is HomeState.Error -> {
-                                MediaGrid(items = emptyList(), errorMessage = state.message, modifier = Modifier.fillMaxSize())
+                                MediaGrid(
+                                    items = emptyList(),
+                                    errorMessage = state.message,
+                                    onRetry = onRetry,
+                                    modifier = Modifier.fillMaxSize()
+                                )
                             }
                         }
                     }

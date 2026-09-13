@@ -44,6 +44,7 @@ fun MediaGrid(
     onDownloadClick: (MediaItem) -> Unit = {},
     onPrefetch: (MediaItem) -> Unit = {},
     onLoadMore: () -> Unit = {},
+    onRetry: (() -> Unit)? = null,
     cardActions: (MediaItem) -> List<Pair<String, () -> Unit>> = { emptyList() },
     modifier: Modifier = Modifier
 ) {
@@ -54,11 +55,21 @@ fun MediaGrid(
 
     if (errorMessage != null) {
         Box(modifier = modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
-            Text(
-                text = errorMessage,
-                color = MaterialTheme.colorScheme.error,
-                style = MaterialTheme.typography.bodyLarge
-            )
+            Column(
+                horizontalAlignment = Alignment.CenterHorizontally,
+                verticalArrangement = Arrangement.spacedBy(12.dp)
+            ) {
+                Text(
+                    text = errorMessage,
+                    color = MaterialTheme.colorScheme.error,
+                    style = MaterialTheme.typography.bodyLarge
+                )
+                // A failed feed is usually a transient network or service
+                // error, so the user needs a way to try again on the spot.
+                if (onRetry != null) {
+                    Button(onClick = onRetry) { Text("Try again") }
+                }
+            }
         }
         return
     }

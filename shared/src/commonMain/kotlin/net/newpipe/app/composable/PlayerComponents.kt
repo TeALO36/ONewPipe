@@ -9,6 +9,7 @@ import androidx.compose.foundation.verticalScroll
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.ClosedCaption
 import androidx.compose.material.icons.filled.Headphones
 import androidx.compose.material.icons.filled.KeyboardArrowDown
 import androidx.compose.material.icons.filled.OpenInBrowser
@@ -41,6 +42,7 @@ import net.newpipe.app.domain.PlaylistItem
 import net.newpipe.app.domain.RepeatMode
 import net.newpipe.app.domain.Subscription
 import net.newpipe.app.openExternalUrl
+import net.newpipe.app.subtitlesSupported
 import net.newpipe.app.shareLink
 
 @Composable
@@ -223,6 +225,48 @@ fun VideoDetailsContent(
             Icon(imageVector = Icons.Default.Headphones, contentDescription = null, modifier = Modifier.size(18.dp))
             Spacer(Modifier.width(8.dp))
             Text(if (state.audioOnly) "Audio only" else "Audio mode")
+        }
+
+        if (subtitlesSupported && state.subtitles.isNotEmpty()) {
+            var expandedSubtitles by remember { mutableStateOf(false) }
+            Box {
+                OutlinedButton(
+                    onClick = { expandedSubtitles = true },
+                    colors = ButtonDefaults.outlinedButtonColors(
+                        contentColor = if (state.selectedSubtitle != null) {
+                            MaterialTheme.colorScheme.primary
+                        } else {
+                            Color.White
+                        }
+                    )
+                ) {
+                    Icon(imageVector = Icons.Default.ClosedCaption, contentDescription = null, modifier = Modifier.size(18.dp))
+                    Spacer(Modifier.width(8.dp))
+                    Text(state.selectedSubtitle?.label ?: "Subtitles")
+                }
+                DropdownMenu(
+                    expanded = expandedSubtitles,
+                    onDismissRequest = { expandedSubtitles = false },
+                    modifier = Modifier.heightIn(max = 320.dp).background(Color(0xFF2D2D2D))
+                ) {
+                    DropdownMenuItem(
+                        text = { Text("Off", color = Color.White) },
+                        onClick = {
+                            expandedSubtitles = false
+                            playerViewModel.selectSubtitle(null)
+                        }
+                    )
+                    state.subtitles.forEach { track ->
+                        DropdownMenuItem(
+                            text = { Text(track.label, color = Color.White) },
+                            onClick = {
+                                expandedSubtitles = false
+                                playerViewModel.selectSubtitle(track)
+                            }
+                        )
+                    }
+                }
+            }
         }
 
         val repeatMode by playerViewModel.repeatMode.collectAsState()

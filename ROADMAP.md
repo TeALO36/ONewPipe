@@ -35,7 +35,7 @@
 - [x] Page chaîne : avatar, nombre d'abonnés, bouton s'abonner/se désabonner, vidéos paginées (playlists de la chaîne à venir)
 - [x] Page recherche avec filtres (tout / vidéos / chaînes) + historique de recherche
 - [ ] Animations et transitions fluides
-- [ ] États vide/chargement/erreur soignés
+- [x] États vide/chargement/erreur soignés (bouton « Try again » qui relance exactement le contenu affiché)
 
 ### 1.3 Tendances par thèmes (jeux vidéo, musique, films/séries, podcasts)
 - [x] Onglets de catégories dans l'écran d'accueil (Tout, Gaming, Musique, Films & Séries, Podcasts)
@@ -48,7 +48,8 @@
 
 ### 1.4 Lecture & médias
 - [x] Lecteur : sélection de qualité (+ qualité préférée dans les réglages), **vitesse de lecture**, **file d'attente**, **répétition (off / file / vidéo)**, **mode audio seul**, précédent/suivant, muet, plein écran, cinéma, PiP
-- [ ] Sous-titres, doublage (pistes audio multiples)
+- [x] Sous-titres (Android : sélection de piste + affichage des sous-titres ; desktop : menu masqué tant que VLC n'est pas branché)
+- [ ] Doublage (pistes audio multiples)
 - [ ] Mini-player flottant (mobile)
 - [ ] Cast / Chromecast (optionnel)
 - [x] Lecture audio seule (mode « musique »)

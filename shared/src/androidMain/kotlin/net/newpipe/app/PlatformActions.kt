@@ -44,3 +44,5 @@ actual fun shareLink(url: String, title: String): Boolean {
         true
     }.getOrDefault(false)
 }
+
+actual val subtitlesSupported: Boolean = true

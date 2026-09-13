@@ -46,6 +46,8 @@ class HomeViewModel(
 
     /** True while a channel page or the subscription feed replaces the default feed. */
     private var showingCustomFeed = false
+    private var currentChannelUrl: String? = null
+    private var currentFeedSubscriptions: List<Subscription> = emptyList()
 
     init {
         viewModelScope.launch {
@@ -63,6 +65,8 @@ class HomeViewModel(
      */
     fun openHome() {
         _currentChannel.value = null
+        currentChannelUrl = null
+        currentFeedSubscriptions = emptyList()
         val needsReload = showingCustomFeed ||
             !currentQuery.isNullOrBlank() ||
             _selectedCategory.value != TrendingCategory.ALL
@@ -85,13 +89,16 @@ class HomeViewModel(
         reload()
     }
 
+    /** Reloads whatever the grid currently shows, including a retry after an error. */
     fun reload() {
         currentItems.clear()
         currentPageToken = null
-        if (currentQuery.isNullOrBlank()) {
-            loadTrending()
-        } else {
-            search(currentQuery!!, _searchFilter.value)
+        val channelUrl = currentChannelUrl
+        when {
+            channelUrl != null -> openChannel(channelUrl)
+            currentFeedSubscriptions.isNotEmpty() -> loadSubscriptionFeed(currentFeedSubscriptions)
+            currentQuery.isNullOrBlank() -> loadTrending()
+            else -> search(currentQuery!!, _searchFilter.value)
         }
     }
 
@@ -135,6 +142,8 @@ class HomeViewModel(
 
     fun search(query: String, filter: SearchFilter = _searchFilter.value) {
         _currentChannel.value = null
+        currentChannelUrl = null
+        currentFeedSubscriptions = emptyList()
         showingCustomFeed = false
         val normalizedQuery = query.trim()
         currentQuery = normalizedQuery
@@ -177,6 +186,8 @@ class HomeViewModel(
      */
     fun loadSubscriptionFeed(subscriptions: List<Subscription>) {
         _currentChannel.value = null
+        currentChannelUrl = null
+        currentFeedSubscriptions = subscriptions
         showingCustomFeed = true
         currentQuery = null
         _searchQuery.value = null
@@ -209,6 +220,8 @@ class HomeViewModel(
     fun openChannel(url: String) {
         if (url.isBlank()) return
         _currentChannel.value = null
+        currentChannelUrl = url
+        currentFeedSubscriptions = emptyList()
         showingCustomFeed = true
         currentQuery = null
         _searchQuery.value = null

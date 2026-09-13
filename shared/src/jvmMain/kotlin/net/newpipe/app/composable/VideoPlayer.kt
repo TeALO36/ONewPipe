@@ -42,6 +42,8 @@ actual fun VideoPlayer(
     onPositionChange: (Long) -> Unit,
     isFullscreen: Boolean,
     playbackSpeed: Float,
+    subtitleUrl: String?,
+    subtitleMimeType: String?,
     playerActions: PlayerActions
 ) {
     // Software decoding avoids the black-frame/audio-only issue seen with the

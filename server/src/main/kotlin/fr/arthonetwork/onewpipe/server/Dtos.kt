@@ -25,6 +25,8 @@ data class VideoInfoDto(
     val title: String,
     val streamUrl: String,
     val uploaderName: String,
+    val uploaderUrl: String = "",
+    val uploaderAvatarUrl: String = "",
     val uploaderSubscriberCount: Long,
     val viewCount: Long,
     val durationSeconds: Long,

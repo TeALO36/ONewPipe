@@ -118,6 +118,7 @@
       <select id="qualitySelect" aria-label="Video quality"></select>
       <a class="btn" id="downloadBtn" href="#" download>Download</a>
       <button class="btn" id="watchLaterBtn" type="button" hidden>Watch later</button>
+      <button class="btn" id="subscribeBtn" type="button" hidden>Subscribe</button>
     </div>
   </div>
   <h3 style="padding:0 20px;">Related</h3>
@@ -410,7 +411,11 @@ async function openVideo(url, title) {
         toast('Resumed at ' + Math.floor(entry.positionMs / 60000) + ':' + String(Math.floor(entry.positionMs / 1000) % 60).padStart(2, '0'));
       }
     }
+    currentUploader = info.uploaderUrl
+      ? { url: info.uploaderUrl, name: info.uploaderName || '', thumbnailUrl: info.uploaderAvatarUrl || '' }
+      : null;
     updateWatchLaterButton();
+    updateSubscribeButton();
     const rel = $('related');
     (info.relatedItems || []).slice(0, 12).forEach(i => {
       const d = document.createElement('div');
@@ -476,6 +481,31 @@ async function saveLibrary() {
 function isSaved(url) {
   return (library.watchLater || []).some(i => i.url === url);
 }
+
+let currentUploader = null;
+
+function isSubscribed(url) {
+  return (library.subscriptions || []).some(i => i.url === url);
+}
+
+function updateSubscribeButton() {
+  const button = $('subscribeBtn');
+  button.hidden = !state.token || !currentUploader || !currentUploader.url;
+  if (button.hidden) return;
+  button.textContent = isSubscribed(currentUploader.url) ? 'Subscribed' : 'Subscribe';
+}
+
+$('subscribeBtn').onclick = async () => {
+  if (!state.token || !currentUploader || !currentUploader.url) return;
+  if (isSubscribed(currentUploader.url)) {
+    library.subscriptions = library.subscriptions.filter(i => i.url !== currentUploader.url);
+  } else {
+    library.subscriptions = (library.subscriptions || []).concat([currentUploader]);
+  }
+  await saveLibrary();
+  updateSubscribeButton();
+  renderLibrary();
+};
 
 function updateWatchLaterButton() {
   const button = $('watchLaterBtn');
@@ -574,6 +604,7 @@ async function syncFromServer() {
     if (saved.length) toast('Synced ' + saved.length + ' watch position(s)');
     await loadLibrary();
     updateWatchLaterButton();
+    updateSubscribeButton();
   } catch (e) {}
 }
 

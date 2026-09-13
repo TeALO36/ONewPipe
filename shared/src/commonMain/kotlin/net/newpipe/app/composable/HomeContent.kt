@@ -32,6 +32,8 @@ import androidx.compose.material3.FilterChip
 import androidx.compose.material3.FilterChipDefaults
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.material3.Button
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
@@ -42,8 +44,11 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.draw.clip
 import androidx.compose.ui.text.style.TextAlign
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
+import net.newpipe.app.domain.ChannelHeader
 import net.newpipe.app.domain.HomeState
 import net.newpipe.app.domain.LibraryViewModel
 import net.newpipe.app.domain.MediaItem
@@ -85,6 +90,9 @@ fun HomeContent(
     onSearchHistoryRemove: (String) -> Unit = {},
     onSearchHistoryClear: () -> Unit = {},
     cardActions: (MediaItem) -> List<Pair<String, () -> Unit>> = { emptyList() },
+    channel: ChannelHeader? = null,
+    isChannelSubscribed: Boolean = false,
+    onToggleChannelSubscription: (ChannelHeader) -> Unit = {},
     onDownloadClick: (MediaItem) -> Unit,
     onPrefetch: (MediaItem) -> Unit = {},
     onLoadMore: () -> Unit = {},
@@ -149,6 +157,17 @@ fun HomeContent(
                 }
             }
 
+        // Channel header: the identity of the channel currently being browsed,
+        // with the subscribe button NewPipe shows on its channel page.
+        if (channel != null && (selectedItem == NavItem.HOME || selectedItem == NavItem.TRENDING) && !isSearching) {
+            ChannelHeaderRow(
+                channel = channel,
+                isSubscribed = isChannelSubscribed,
+                onToggleSubscription = { onToggleChannelSubscription(channel) },
+                isCompact = isCompact
+            )
+        }
+
         // Dynamic Title (crossfades when switching sections)
         AnimatedContent(
             targetState = selectedItem,
@@ -156,10 +175,10 @@ fun HomeContent(
             label = "title"
         ) { item ->
             Text(
-                text = if (isSearching && (item == NavItem.HOME || item == NavItem.TRENDING)) {
-                    "Search results"
-                } else {
-                    item.title
+                text = when {
+                    isSearching && (item == NavItem.HOME || item == NavItem.TRENDING) -> "Search results"
+                    channel != null && (item == NavItem.HOME || item == NavItem.TRENDING) -> "Videos"
+                    else -> item.title
                 },
                 style = MaterialTheme.typography.headlineMedium.copy(fontWeight = FontWeight.Bold),
                 color = MaterialTheme.colorScheme.onBackground,
@@ -420,6 +439,51 @@ private fun ServiceSwitcher(
                     }
                 )
             }
+        }
+    }
+}
+
+/** Channel identity plus the subscribe button, shown above the channel's videos. */
+@Composable
+private fun ChannelHeaderRow(
+    channel: ChannelHeader,
+    isSubscribed: Boolean,
+    onToggleSubscription: () -> Unit,
+    isCompact: Boolean
+) {
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(horizontal = if (isCompact) 16.dp else 24.dp, vertical = 8.dp),
+        verticalAlignment = Alignment.CenterVertically
+    ) {
+        if (channel.avatarUrl.isNotBlank()) {
+            AsyncImage(
+                model = channel.avatarUrl,
+                contentDescription = channel.name,
+                modifier = Modifier.size(56.dp).clip(CircleShape),
+                contentScale = androidx.compose.ui.layout.ContentScale.Crop
+            )
+            Spacer(modifier = Modifier.width(12.dp))
+        }
+        Column(modifier = Modifier.weight(1f)) {
+            Text(
+                text = if (channel.verified) "${channel.name} ✓" else channel.name,
+                style = MaterialTheme.typography.titleLarge,
+                fontWeight = FontWeight.Bold,
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis
+            )
+            if (channel.subscriberCount >= 0) {
+                Text(
+                    text = "${formatCount(channel.subscriberCount)} subscribers",
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                )
+            }
+        }
+        Button(onClick = onToggleSubscription) {
+            Text(if (isSubscribed) "Subscribed" else "Subscribe")
         }
     }
 }

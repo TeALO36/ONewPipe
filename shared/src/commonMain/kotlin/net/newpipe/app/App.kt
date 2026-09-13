@@ -41,6 +41,7 @@ import net.newpipe.app.domain.HomeViewModel
 import net.newpipe.app.domain.LibraryViewModel
 import net.newpipe.app.domain.MediaItem
 import net.newpipe.app.domain.PlaylistItem
+import net.newpipe.app.domain.Subscription
 import net.newpipe.app.domain.PlayerState
 import net.newpipe.app.domain.PlayerViewModel
 import net.newpipe.app.domain.ServerStatus
@@ -85,6 +86,7 @@ fun App() {
         val serverStatus by syncViewModel.status.collectAsState()
         val updateState by updateViewModel.state.collectAsState()
         val searchHistory by libraryViewModel.searchHistory.collectAsState()
+        val currentChannel by homeViewModel.currentChannel.collectAsState()
 
         var selectedItem by remember { mutableStateOf(NavItem.HOME) }
         var showServerDialog by remember { mutableStateOf(false) }
@@ -179,6 +181,19 @@ fun App() {
                             onSearchHistoryRemove = libraryViewModel::removeSearch,
                             onSearchHistoryClear = libraryViewModel::clearSearchHistory,
                             cardActions = cardActions,
+                            channel = currentChannel,
+                            isChannelSubscribed = currentChannel?.let { header ->
+                                subscriptions.any { it.url == header.url }
+                            } == true,
+                            onToggleChannelSubscription = { header ->
+                                settingsViewModel.toggleSubscription(
+                                    Subscription(
+                                        url = header.url,
+                                        name = header.name,
+                                        thumbnailUrl = header.avatarUrl
+                                    )
+                                )
+                            },
                             onPrefetch = { media -> playerViewModel.prefetch(media.url) },
                             onDownloadClick = { media -> downloadViewModel.loadStreams(media.url, media.title) },
                             onLoadMore = homeViewModel::loadMore,
@@ -232,6 +247,19 @@ fun App() {
                             onSearchHistoryRemove = libraryViewModel::removeSearch,
                             onSearchHistoryClear = libraryViewModel::clearSearchHistory,
                             cardActions = cardActions,
+                            channel = currentChannel,
+                            isChannelSubscribed = currentChannel?.let { header ->
+                                subscriptions.any { it.url == header.url }
+                            } == true,
+                            onToggleChannelSubscription = { header ->
+                                settingsViewModel.toggleSubscription(
+                                    Subscription(
+                                        url = header.url,
+                                        name = header.name,
+                                        thumbnailUrl = header.avatarUrl
+                                    )
+                                )
+                            },
                             onPrefetch = { media -> playerViewModel.prefetch(media.url) },
                             onDownloadClick = { media -> downloadViewModel.loadStreams(media.url, media.title) },
                             onLoadMore = homeViewModel::loadMore,

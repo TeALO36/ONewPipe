@@ -55,6 +55,31 @@ class NewPipeMediaRepositoryTest {
     }
 
     @Test
+    fun `channel page exposes its header and keeps paginating`() = runBlocking {
+        val channelUrl = repository().search(0, "Linus Tech Tips", SearchFilter.CHANNELS)
+            .items
+            .first()
+            .url
+
+        val page = repository().getChannel(0, channelUrl)
+        val header = page.channel
+        assertTrue(header != null, "Expected a channel header for $channelUrl")
+        assertTrue(header.name.isNotBlank(), "Expected the channel name")
+        assertTrue(page.items.isNotEmpty(), "Expected videos on the channel page")
+        println("Channel: ${header.name} (${header.subscriberCount} subs), ${page.items.size} videos")
+
+        val token = page.nextPageToken
+        if (token != null) {
+            val more = repository().loadMore(0, token)
+            assertTrue(more.items.isNotEmpty(), "Expected a second page of channel videos")
+            assertTrue(
+                more.items.none { first -> page.items.any { it.url == first.url } },
+                "The second page should bring new videos"
+            )
+        }
+    }
+
+    @Test
     fun `search returns items`() = runBlocking {
         val result = repository().search(0, "Linus Tech Tips")
         assertTrue(result.items.isNotEmpty(), "Expected search results")

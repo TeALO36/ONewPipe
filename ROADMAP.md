@@ -32,7 +32,7 @@
 - [ ] Mode adaptatif : layout smartphone ↔ tablette ↔ desktop (grille responsive)
 - [ ] Écran d'accueil : rangées thématiques (À la une, Musique, Gaming, Films & Séries, Podcasts…)
 - [x] Page vidéo moderne : miniatures, uploader, description dépliable, commentaires, vidéos liées
-- [ ] Page chaîne (abonnement, contenu, playlists)
+- [x] Page chaîne : avatar, nombre d'abonnés, bouton s'abonner/se désabonner, vidéos paginées (playlists de la chaîne à venir)
 - [x] Page recherche avec filtres (tout / vidéos / chaînes) + historique de recherche
 - [ ] Animations et transitions fluides
 - [ ] États vide/chargement/erreur soignés

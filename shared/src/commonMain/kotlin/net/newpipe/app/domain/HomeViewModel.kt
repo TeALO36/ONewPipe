@@ -31,6 +31,10 @@ class HomeViewModel(
     private val _searchFilter = MutableStateFlow(SearchFilter.ALL)
     val searchFilter: StateFlow<SearchFilter> = _searchFilter.asStateFlow()
 
+    private val _currentChannel = MutableStateFlow<ChannelHeader?>(null)
+    /** Set while the grid shows one channel, so its header can be displayed. */
+    val currentChannel: StateFlow<ChannelHeader?> = _currentChannel.asStateFlow()
+
     // Pagination state
     private var currentPageToken: String? = null
     private var currentItems = mutableListOf<MediaItem>()
@@ -58,6 +62,7 @@ class HomeViewModel(
      * so switching tabs costs no network request.
      */
     fun openHome() {
+        _currentChannel.value = null
         val needsReload = showingCustomFeed ||
             !currentQuery.isNullOrBlank() ||
             _selectedCategory.value != TrendingCategory.ALL
@@ -71,6 +76,7 @@ class HomeViewModel(
 
     fun selectCategory(category: TrendingCategory) {
         if (category == _selectedCategory.value && !showingCustomFeed) return
+        _currentChannel.value = null
         showingCustomFeed = false
         _selectedCategory.value = category
         currentQuery = null
@@ -128,6 +134,7 @@ class HomeViewModel(
     }
 
     fun search(query: String, filter: SearchFilter = _searchFilter.value) {
+        _currentChannel.value = null
         showingCustomFeed = false
         val normalizedQuery = query.trim()
         currentQuery = normalizedQuery
@@ -169,6 +176,7 @@ class HomeViewModel(
      * empty the whole feed.
      */
     fun loadSubscriptionFeed(subscriptions: List<Subscription>) {
+        _currentChannel.value = null
         showingCustomFeed = true
         currentQuery = null
         _searchQuery.value = null
@@ -200,6 +208,7 @@ class HomeViewModel(
 
     fun openChannel(url: String) {
         if (url.isBlank()) return
+        _currentChannel.value = null
         showingCustomFeed = true
         currentQuery = null
         _searchQuery.value = null
@@ -208,6 +217,7 @@ class HomeViewModel(
             _state.value = HomeState.Loading
             try {
                 val result = repository.getChannel(currentServiceId, url)
+                _currentChannel.value = result.channel
                 currentItems.clear()
                 currentItems.addAll(result.items)
                 currentPageToken = result.nextPageToken

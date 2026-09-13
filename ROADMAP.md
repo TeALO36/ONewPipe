@@ -30,7 +30,7 @@
 - [x] Navigation par onglets / sidebar cohérente mobile + desktop (Home = fil par défaut, Trending = catégories, Subscriptions, Library)
 - [ ] Thème dynamique par service (YouTube rouge, SoundCloud orange, Bandcamp bleu…) + thème sombre/clair + Material 3
 - [ ] Mode adaptatif : layout smartphone ↔ tablette ↔ desktop (grille responsive)
-- [ ] Écran d'accueil : rangées thématiques (À la une, Musique, Gaming, Films & Séries, Podcasts…)
+- [x] Écran d'accueil : rangées thématiques (Gaming, Musique, Films & Séries, Podcasts) chargées une par une + « See all » qui ouvre la grille de la catégorie
 - [x] Page vidéo moderne : miniatures, uploader, description dépliable, commentaires, vidéos liées
 - [x] Page chaîne : avatar, nombre d'abonnés, bouton s'abonner/se désabonner, vidéos paginées (playlists de la chaîne à venir)
 - [x] Page recherche avec filtres (tout / vidéos / chaînes) + historique de recherche

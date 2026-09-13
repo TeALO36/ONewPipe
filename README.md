@@ -6,7 +6,7 @@ ONewPipe is a privacy-focused, ad-free media frontend based on the NewPipe core.
 
 ## Features
 
-- **Home** — the default feed of the selected service, with infinite scrolling.
+- **Home** — themed rows (Gaming, Music, Movies & Series, Podcasts), each with a "See all" shortcut to its full grid.
 - **Trending** — All / Gaming / Music / Movies & Series / Podcasts categories.
 - **Search** — filter by videos or channels, with a recent-searches drop-down.
 - **Subscriptions** — follow channels without an account, open a channel,

@@ -125,6 +125,7 @@ kotlin {
         }
         commonTest.dependencies {
             implementation(libs.kotlin.test.core)
+            implementation(libs.kotlinx.coroutines.test)
             implementation(libs.jetbrains.compose.test.ui)
             implementation(libs.russhwolf.settings.test)
         }

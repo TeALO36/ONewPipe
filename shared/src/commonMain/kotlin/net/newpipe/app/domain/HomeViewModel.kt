@@ -5,9 +5,18 @@ import androidx.lifecycle.viewModelScope
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.Job
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.flow.collectLatest
 import net.newpipe.app.theme.Service
+
+/** One themed row of the home screen (Gaming, Music, …). */
+data class CategoryRow(
+    val category: TrendingCategory,
+    val items: List<MediaItem> = emptyList(),
+    val isLoading: Boolean = true,
+    val error: String? = null
+)
 
 sealed class HomeState {
     object Loading : HomeState()
@@ -30,6 +39,13 @@ class HomeViewModel(
 
     private val _searchFilter = MutableStateFlow(SearchFilter.ALL)
     val searchFilter: StateFlow<SearchFilter> = _searchFilter.asStateFlow()
+
+    private val _rows = MutableStateFlow(
+        TrendingCategory.entries.filter { it != TrendingCategory.ALL }.map { CategoryRow(it) }
+    )
+    /** Themed rows of the home screen, loaded one category at a time. */
+    val rows: StateFlow<List<CategoryRow>> = _rows.asStateFlow()
+    private var rowsJob: Job? = null
 
     private val _currentChannel = MutableStateFlow<ChannelHeader?>(null)
     /** Set while the grid shows one channel, so its header can be displayed. */
@@ -54,6 +70,8 @@ class HomeViewModel(
             settingsViewModel.currentService.collectLatest { service ->
                 currentServiceId = service.serviceId
                 reload()
+                // The rows belong to the selected service too.
+                loadRows(force = true)
             }
         }
     }
@@ -76,6 +94,42 @@ class HomeViewModel(
         _searchFilter.value = SearchFilter.ALL
         _selectedCategory.value = TrendingCategory.ALL
         if (needsReload) reload()
+    }
+
+    /**
+     * Loads the themed rows of the home screen. Rows are fetched one after the
+     * other so the first one appears quickly instead of waiting for all of them.
+     */
+    fun loadRows(force: Boolean = false) {
+        if (!force && _rows.value.any { it.items.isNotEmpty() }) return
+        if (rowsJob?.isActive == true) return
+        rowsJob = viewModelScope.launch {
+            _rows.value = _rows.value.map { it.copy(isLoading = true, error = null) }
+            _rows.value.forEach { row ->
+                val result = runCatching { repository.getTrending(currentServiceId, row.category) }
+                _rows.value = _rows.value.map { current ->
+                    if (current.category != row.category) {
+                        current
+                    } else {
+                        result.fold(
+                            onSuccess = { page ->
+                                current.copy(
+                                    items = page.items.take(ROW_SIZE),
+                                    isLoading = false,
+                                    error = if (page.items.isEmpty()) "Nothing to show here right now" else null
+                                )
+                            },
+                            onFailure = { error ->
+                                current.copy(
+                                    isLoading = false,
+                                    error = error.message ?: "Could not load this row"
+                                )
+                            }
+                        )
+                    }
+                }
+            }
+        }
     }
 
     fun selectCategory(category: TrendingCategory) {
@@ -249,5 +303,6 @@ class HomeViewModel(
         /** Keep the feed responsive: a handful of channels, a few videos each. */
         const val MAX_FEED_CHANNELS = 20
         const val MAX_VIDEOS_PER_CHANNEL = 6
+        const val ROW_SIZE = 12
     }
 }

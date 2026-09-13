@@ -87,6 +87,7 @@ fun App() {
         val updateState by updateViewModel.state.collectAsState()
         val searchHistory by libraryViewModel.searchHistory.collectAsState()
         val currentChannel by homeViewModel.currentChannel.collectAsState()
+        val homeRows by homeViewModel.rows.collectAsState()
 
         var selectedItem by remember { mutableStateOf(NavItem.HOME) }
         var showServerDialog by remember { mutableStateOf(false) }
@@ -136,7 +137,10 @@ fun App() {
             updateViewModel.checkForUpdates(force = true)
         }
 
-        LaunchedEffect(Unit) { updateViewModel.checkForUpdates() }
+        LaunchedEffect(Unit) {
+            updateViewModel.checkForUpdates()
+            homeViewModel.loadRows()
+        }
         Surface(
             // ComposeActivity opts into edge-to-edge. Keep the app shell below
             // the status bar and above the gesture/navigation area so the
@@ -181,6 +185,11 @@ fun App() {
                             onSearchHistoryRemove = libraryViewModel::removeSearch,
                             onSearchHistoryClear = libraryViewModel::clearSearchHistory,
                             cardActions = cardActions,
+                            rows = homeRows,
+                            onSeeAllCategory = { category ->
+                                selectedItem = NavItem.TRENDING
+                                homeViewModel.selectCategory(category)
+                            },
                             channel = currentChannel,
                             isChannelSubscribed = currentChannel?.let { header ->
                                 subscriptions.any { it.url == header.url }
@@ -248,6 +257,11 @@ fun App() {
                             onSearchHistoryRemove = libraryViewModel::removeSearch,
                             onSearchHistoryClear = libraryViewModel::clearSearchHistory,
                             cardActions = cardActions,
+                            rows = homeRows,
+                            onSeeAllCategory = { category ->
+                                selectedItem = NavItem.TRENDING
+                                homeViewModel.selectCategory(category)
+                            },
                             channel = currentChannel,
                             isChannelSubscribed = currentChannel?.let { header ->
                                 subscriptions.any { it.url == header.url }

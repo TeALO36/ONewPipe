@@ -48,6 +48,7 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
+import net.newpipe.app.domain.CategoryRow
 import net.newpipe.app.domain.ChannelHeader
 import net.newpipe.app.domain.HomeState
 import net.newpipe.app.domain.LibraryViewModel
@@ -90,6 +91,8 @@ fun HomeContent(
     onSearchHistoryRemove: (String) -> Unit = {},
     onSearchHistoryClear: () -> Unit = {},
     cardActions: (MediaItem) -> List<Pair<String, () -> Unit>> = { emptyList() },
+    rows: List<CategoryRow> = emptyList(),
+    onSeeAllCategory: (TrendingCategory) -> Unit = {},
     channel: ChannelHeader? = null,
     isChannelSubscribed: Boolean = false,
     onToggleChannelSubscription: (ChannelHeader) -> Unit = {},
@@ -229,6 +232,20 @@ fun HomeContent(
             label = "section"
         ) { item ->
             when (item) {
+                // Home is a set of themed rows (the default landing feed);
+                // Trending keeps the full grid with its category chips.
+                NavItem.HOME if !isSearching && channel == null && rows.isNotEmpty() -> {
+                    HomeRows(
+                        rows = rows,
+                        onMediaClick = onMediaClick,
+                        onChannelClick = onChannelClick,
+                        onDownloadClick = onDownloadClick,
+                        onPrefetch = onPrefetch,
+                        onSeeAll = onSeeAllCategory,
+                        cardActions = cardActions,
+                        isCompact = isCompact
+                    )
+                }
                 NavItem.HOME, NavItem.TRENDING -> {
                     // Crossfade between loading / content / error states
                     Crossfade(

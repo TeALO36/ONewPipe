@@ -23,6 +23,7 @@ sealed class LibrarySyncState {
 
 sealed class ServerStatus {
     object Disconnected : ServerStatus()
+    object Connecting : ServerStatus()
     data class Connected(val username: String, val serverUrl: String) : ServerStatus()
     data class Error(val message: String) : ServerStatus()
 }
@@ -49,8 +50,9 @@ class SyncViewModel(
     val librarySync: StateFlow<LibrarySyncState> = _librarySync.asStateFlow()
 
     fun connect(serverUrl: String, username: String, password: String, register: Boolean) {
+        if (_status.value is ServerStatus.Connecting) return
         viewModelScope.launch {
-            _status.value = ServerStatus.Disconnected
+            _status.value = ServerStatus.Connecting
             try {
                 val normalizedUrl = client.normalizeServerUrl(serverUrl)
                 val result = if (register) {

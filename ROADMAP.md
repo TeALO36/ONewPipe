@@ -78,7 +78,7 @@
 - [x] **Sync des playlists, abonnements et « à regarder plus tard »** (`/api/library`, fusion par URL, la copie la plus récente gagne)
 - [x] Sync de l'historique de lecture (300 entrées max, fusion par URL sur la date de visionnage)
 - [ ] Sync des likes
-- [ ] Indicateur visuel d'état de connexion + message d'erreur réseau dans le dialogue
+- [x] Indicateur visuel d'état de connexion (« Contacting the server… ») + message d'erreur dans le dialogue, mot de passe masqué, bouton « Close » toujours disponible
 
 ---
 

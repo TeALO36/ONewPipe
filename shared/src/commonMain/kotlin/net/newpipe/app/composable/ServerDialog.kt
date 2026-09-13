@@ -6,8 +6,10 @@ import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
+import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.OutlinedTextField
@@ -18,7 +20,10 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
+import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.text.input.KeyboardType
+import androidx.compose.ui.text.input.PasswordVisualTransformation
 import androidx.compose.ui.unit.dp
 import net.newpipe.app.domain.ServerStatus
 import net.newpipe.app.domain.SyncViewModel
@@ -38,6 +43,7 @@ fun ServerDialog(
     var password by remember { mutableStateOf("") }
 
     val connected = status is ServerStatus.Connected
+    val connecting = status is ServerStatus.Connecting
 
     AlertDialog(
         onDismissRequest = onDismiss,
@@ -75,8 +81,19 @@ fun ServerDialog(
                         onValueChange = { password = it },
                         label = { Text("Password") },
                         singleLine = true,
+                        visualTransformation = PasswordVisualTransformation(),
+                        keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Password),
                         modifier = Modifier.fillMaxWidth()
                     )
+                    if (connecting) {
+                        Row(
+                            verticalAlignment = Alignment.CenterVertically,
+                            horizontalArrangement = Arrangement.spacedBy(8.dp)
+                        ) {
+                            CircularProgressIndicator(modifier = Modifier.width(18.dp))
+                            Text("Contacting the server…")
+                        }
+                    }
                     if (status is ServerStatus.Error) {
                         Text(
                             text = status.message,
@@ -92,15 +109,17 @@ fun ServerDialog(
                     Text("Disconnect")
                 }
             } else {
+                val canSubmit = !connecting &&
+                    serverUrl.isNotBlank() && username.isNotBlank() && password.isNotBlank()
                 Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                     Button(
-                        enabled = serverUrl.isNotBlank() && username.isNotBlank() && password.isNotBlank(),
+                        enabled = canSubmit,
                         onClick = { syncViewModel.connect(serverUrl, username, password, register = false) }
                     ) {
-                        Text("Sign in")
+                        Text(if (connecting) "Connecting…" else "Sign in")
                     }
                     OutlinedButton(
-                        enabled = serverUrl.isNotBlank() && username.isNotBlank() && password.isNotBlank(),
+                        enabled = canSubmit,
                         onClick = { syncViewModel.connect(serverUrl, username, password, register = true) }
                     ) {
                         Text("Create account")
@@ -109,8 +128,10 @@ fun ServerDialog(
             }
         },
         dismissButton = {
-            if (status is ServerStatus.Disconnected || status is ServerStatus.Error) {
-                TextButton(onClick = onDismiss) { Text("Cancel") }
+            // Always offer a way out: a connected user had no close button and
+            // could only dismiss the dialog by tapping outside it.
+            TextButton(onClick = onDismiss) {
+                Text(if (connected) "Close" else "Cancel")
             }
         }
     )

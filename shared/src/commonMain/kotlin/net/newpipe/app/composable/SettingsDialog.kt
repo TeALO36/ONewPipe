@@ -169,6 +169,7 @@ fun SettingsDialog(
                 Text(
                     text = when (serverStatus) {
                         is ServerStatus.Connected -> "Connected as ${serverStatus.username}. Watch positions sync through your server."
+                        ServerStatus.Connecting -> "Contacting the server…"
                         is ServerStatus.Error -> "Account connection failed: ${serverStatus.message}"
                         else -> "Connect a self-hosted ONewPipe account to sync videos across devices."
                     },

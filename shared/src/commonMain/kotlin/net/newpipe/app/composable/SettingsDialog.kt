@@ -31,7 +31,9 @@ import androidx.compose.ui.text.AnnotatedString
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import fr.arthonetwork.onewpipe.BuildConfig
+import net.newpipe.app.domain.LibrarySyncState
 import net.newpipe.app.domain.LibraryViewModel
+import net.newpipe.app.domain.SyncViewModel
 import net.newpipe.app.domain.ServerStatus
 import net.newpipe.app.domain.UpdateState
 import net.newpipe.app.domain.SettingsViewModel
@@ -43,6 +45,7 @@ import net.newpipe.app.openExternalUrl
 fun SettingsDialog(
     settingsViewModel: SettingsViewModel,
     libraryViewModel: LibraryViewModel? = null,
+    syncViewModel: SyncViewModel? = null,
     themeMode: String,
     serverStatus: ServerStatus,
     updateState: UpdateState,
@@ -177,6 +180,37 @@ fun SettingsDialog(
                     modifier = Modifier.fillMaxWidth()
                 ) {
                     Text(if (serverStatus is ServerStatus.Connected) "Manage server account" else "Sign in or create account")
+                }
+
+                if (serverStatus is ServerStatus.Connected && syncViewModel != null && libraryViewModel != null) {
+                    val librarySync by syncViewModel.librarySync.collectAsState()
+                    OutlinedButton(
+                        onClick = { syncViewModel.syncLibrary(libraryViewModel, settingsViewModel) },
+                        enabled = librarySync !is LibrarySyncState.Syncing,
+                        modifier = Modifier.fillMaxWidth()
+                    ) {
+                        Text(
+                            if (librarySync is LibrarySyncState.Syncing) {
+                                "Synchronizing…"
+                            } else {
+                                "Sync subscriptions and playlists"
+                            }
+                        )
+                    }
+                    when (val state = librarySync) {
+                        is LibrarySyncState.Done -> Text(
+                            text = "Synchronized: ${state.subscriptions} subscriptions, " +
+                                "${state.playlists} playlists, ${state.watchLater} saved videos.",
+                            style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                        )
+                        is LibrarySyncState.Failed -> Text(
+                            text = state.message,
+                            style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.error
+                        )
+                        else -> Unit
+                    }
                 }
 
                 HorizontalDivider()

@@ -33,6 +33,19 @@ data class WatchStateItem(
     val updatedAt: Long = 0
 )
 
+/**
+ * Library shared between devices: subscriptions, playlists and the watch-later
+ * list. Watch positions have their own endpoint because they change during
+ * playback.
+ */
+@Serializable
+data class LibrarySnapshot(
+    val subscriptions: List<Subscription> = emptyList(),
+    val playlists: List<LocalPlaylist> = emptyList(),
+    val watchLater: List<PlaylistItem> = emptyList(),
+    val updatedAt: Long = 0
+)
+
 @Serializable
 private data class AuthRequest(val username: String, val password: String)
 
@@ -118,6 +131,42 @@ class ServerClient {
             }
             if (response.status.value !in 200..299) throw ServerException("Sync failed (${response.status.value})", response.status.value)
             json.decodeFromString<WatchStateResponse>(response.body<String>()).synced
+        } finally {
+            client.close()
+        }
+    }
+
+    /** Send the local library to the server and return the copy it kept. */
+    suspend fun pushLibrary(config: ServerConfig, snapshot: LibrarySnapshot): LibrarySnapshot {
+        if (!config.isConnected) return snapshot
+        val client = httpClient()
+        return try {
+            val response = client.post("${baseUrl(config.serverUrl)}/api/library") {
+                bearerAuth(config.token)
+                contentType(ContentType.Application.Json)
+                setBody(snapshot)
+            }
+            if (response.status.value !in 200..299) {
+                throw ServerException("Library sync failed (${response.status.value})", response.status.value)
+            }
+            json.decodeFromString<LibrarySnapshot>(response.body<String>())
+        } finally {
+            client.close()
+        }
+    }
+
+    /** Read the library stored on the server. */
+    suspend fun pullLibrary(config: ServerConfig): LibrarySnapshot {
+        if (!config.isConnected) return LibrarySnapshot()
+        val client = httpClient()
+        return try {
+            val response = client.get("${baseUrl(config.serverUrl)}/api/library") {
+                bearerAuth(config.token)
+            }
+            if (response.status.value !in 200..299) {
+                throw ServerException("Library sync failed (${response.status.value})", response.status.value)
+            }
+            json.decodeFromString<LibrarySnapshot>(response.body<String>())
         } finally {
             client.close()
         }

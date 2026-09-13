@@ -280,6 +280,7 @@ fun App() {
                     SettingsDialog(
                         settingsViewModel = settingsViewModel,
                         libraryViewModel = libraryViewModel,
+                        syncViewModel = syncViewModel,
                         themeMode = themeMode,
                         serverStatus = serverStatus,
                         updateState = updateState,

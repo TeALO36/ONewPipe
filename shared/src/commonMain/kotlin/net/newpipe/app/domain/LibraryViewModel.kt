@@ -299,6 +299,12 @@ class LibraryViewModel(
         return backup.subscriptions
     }
 
+    /** Replaces the synchronized parts of the library after a server sync. */
+    fun replaceLibrary(playlists: List<LocalPlaylist>, watchLater: List<PlaylistItem>) {
+        update(_playlists, KEY_PLAYLISTS, playlists)
+        update(_watchLater, KEY_WATCH_LATER, watchLater.distinctBy { it.url })
+    }
+
     // ----------------------------------------------------------------- shared
 
     private inline fun <reified T> read(key: String, fallback: List<T>): List<T> =

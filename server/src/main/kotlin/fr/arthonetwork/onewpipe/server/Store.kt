@@ -21,7 +21,8 @@ data class AccountRecord(
 data class StoreFile(
     val accounts: List<AccountRecord> = emptyList(),
     val watchState: Map<String, Map<String, WatchStateItem>> = emptyMap(),
-    val sessionRevokedBefore: Map<String, Long> = emptyMap()
+    val sessionRevokedBefore: Map<String, Long> = emptyMap(),
+    val library: Map<String, LibraryDto> = emptyMap()
 )
 
 /**
@@ -38,6 +39,7 @@ class Store(dataDir: File) {
     private val accounts = ConcurrentHashMap<String, AccountRecord>()
     private val watchState = ConcurrentHashMap<String, ConcurrentHashMap<String, WatchStateItem>>()
     private val sessionRevokedBefore = ConcurrentHashMap<String, Long>()
+    private val library = ConcurrentHashMap<String, LibraryDto>()
 
     init {
         dataDir.mkdirs()
@@ -54,6 +56,7 @@ class Store(dataDir: File) {
                     watchState[user] = ConcurrentHashMap(items)
                 }
                 sessionRevokedBefore.putAll(data.sessionRevokedBefore)
+                library.putAll(data.library)
             } catch (e: Exception) {
                 System.err.println("WARNING: could not read $file: ${e.message}")
             }
@@ -65,7 +68,8 @@ class Store(dataDir: File) {
             val data = StoreFile(
                 accounts = accounts.values.sortedBy { it.createdAt },
                 watchState = watchState.mapValues { it.value.toMap() },
-                sessionRevokedBefore = sessionRevokedBefore.toMap()
+                sessionRevokedBefore = sessionRevokedBefore.toMap(),
+                library = library.toMap()
             )
             val tmp = File(file.path + ".tmp")
             tmp.writeText(json.encodeToString(data))
@@ -99,6 +103,27 @@ class Store(dataDir: File) {
 
     fun watchStateCount(username: String): Int = watchState[username]?.size ?: 0
 
+    // ---- Library (subscriptions, playlists, watch later) ----
+
+    fun getLibrary(username: String): LibraryDto = library[username] ?: LibraryDto()
+
+    /**
+     * Stores the library of a device. The newest copy wins: a device that has
+     * not been used for a while cannot overwrite more recent changes.
+     */
+    fun saveLibrary(username: String, incoming: LibraryDto): LibraryDto {
+        synchronized(lock) {
+            val current = library[username]
+            if (current != null && current.updatedAt > incoming.updatedAt) return current
+            val stored = incoming.copy(
+                updatedAt = if (incoming.updatedAt > 0) incoming.updatedAt else System.currentTimeMillis()
+            )
+            library[username] = stored
+            persist()
+            return stored
+        }
+    }
+
     fun updatePassword(username: String, password: String): Boolean {
         synchronized(lock) {
             val account = accounts[username] ?: return false
@@ -115,6 +140,7 @@ class Store(dataDir: File) {
             if (accounts.remove(username) == null) return false
             watchState.remove(username)
             sessionRevokedBefore.remove(username)
+            library.remove(username)
             persist()
             return true
         }

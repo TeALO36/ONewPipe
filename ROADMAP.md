@@ -74,7 +74,8 @@
 - [x] Inscription + connexion + déconnexion, token JWT persisté localement
 - [x] **Sync des positions de lecture** : reprise à la position sauvegardée à l'ouverture, push à la fermeture
 - [x] Client multiplateforme (ktor-client, okhttp/darwin) + test d'intégration contre un serveur live (register → push → pull, 0 échec)
-- [ ] Sync des likes, playlists, abonnements, historique (API prête à étendre)
+- [x] **Sync des playlists, abonnements et « à regarder plus tard »** (`/api/library`, fusion par URL, la copie la plus récente gagne)
+- [ ] Sync des likes et de l'historique complet
 - [ ] Indicateur visuel d'état de connexion + message d'erreur réseau dans le dialogue
 
 ---
@@ -92,10 +93,10 @@
 ### 2.2 Données synchronisées
 - [x] **Positions de lecture** (reprise d'une lecture sur un autre appareil — mobile ↔ PC ↔ web)
 - [ ] Likes / « J'aime »
-- [ ] Enregistrements (« plus tard » / favoris)
-- [ ] Playlists (création, partage, collaboration)
+- [x] Enregistrements (« plus tard » / favoris) — synchronisés
+- [x] Playlists (création + synchronisation multi-appareils ; partage/collaboration à venir)
 - [ ] Historique synchronisé (optionnel, avec respect de la vie privée)
-- [ ] Abonnements synchronisés
+- [x] Abonnements synchronisés
 
 ### 2.3 Recommandations
 - [ ] Collecte des signaux (vues, likes, recherches…) — opt-in

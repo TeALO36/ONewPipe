@@ -44,9 +44,6 @@ fun main() {
         Localization(contentLanguage, contentCountry),
         ContentCountry(contentCountry)
     )
-    // The web player uses one progressive stream for the fastest first frame.
-    // Native clients enable the slower iOS response only from their quality menu.
-    org.schabi.newpipe.extractor.services.youtube.extractors.YoutubeStreamExtractor.setFetchIosClient(false)
 
     val store = Store(dataDir)
     println("ONewPipe server listening on http://$host:$port (data: ${dataDir.absolutePath})")
@@ -218,6 +215,19 @@ fun Application.module(
             val request = call.receive<WatchStateRequest>()
             val synced = store.upsertWatchState(username, request.items)
             call.respond(WatchStateResponse(synced = synced, items = store.getWatchState(username)))
+        }
+
+        // ---- Library sync (bearer token) ----
+
+        get("/api/library") {
+            val username = call.authenticate(jwtSecret, store) ?: return@get
+            call.respond(store.getLibrary(username))
+        }
+
+        post("/api/library") {
+            val username = call.authenticate(jwtSecret, store) ?: return@post
+            val incoming = call.receive<LibraryDto>()
+            call.respond(store.saveLibrary(username, incoming))
         }
 
         get("/health") {

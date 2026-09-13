@@ -6,6 +6,15 @@ import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.launch
+import net.newpipe.app.currentTimeMillis
+
+/** Result of a manual library synchronization, shown in the settings dialog. */
+sealed class LibrarySyncState {
+    object Idle : LibrarySyncState()
+    object Syncing : LibrarySyncState()
+    data class Done(val subscriptions: Int, val playlists: Int, val watchLater: Int) : LibrarySyncState()
+    data class Failed(val message: String) : LibrarySyncState()
+}
 
 sealed class ServerStatus {
     object Disconnected : ServerStatus()
@@ -30,6 +39,9 @@ class SyncViewModel(
         }
     )
     val status: StateFlow<ServerStatus> = _status.asStateFlow()
+
+    private val _librarySync = MutableStateFlow<LibrarySyncState>(LibrarySyncState.Idle)
+    val librarySync: StateFlow<LibrarySyncState> = _librarySync.asStateFlow()
 
     fun connect(serverUrl: String, username: String, password: String, register: Boolean) {
         viewModelScope.launch {
@@ -65,6 +77,60 @@ class SyncViewModel(
         val config = settingsViewModel.serverConfig.value
         if (!config.isConnected || items.isEmpty()) return 0
         return client.pushWatchState(config, items)
+    }
+
+    /**
+     * Merges the local library with the one stored on the server and writes the
+     * result on both sides. Entries are merged by URL, so a device that was
+     * offline never loses what it added while the other device was in use.
+     */
+    fun syncLibrary(libraryViewModel: LibraryViewModel, settings: SettingsViewModel) {
+        val config = settingsViewModel.serverConfig.value
+        if (!config.isConnected) {
+            _librarySync.value = LibrarySyncState.Failed("Connect a server account first")
+            return
+        }
+        if (_librarySync.value is LibrarySyncState.Syncing) return
+        _librarySync.value = LibrarySyncState.Syncing
+        viewModelScope.launch {
+            try {
+                val remote = client.pullLibrary(config)
+                val merged = LibrarySnapshot(
+                    subscriptions = (settings.subscriptions.value + remote.subscriptions).distinctBy { it.url },
+                    playlists = mergePlaylists(libraryViewModel.playlists.value, remote.playlists),
+                    watchLater = (libraryViewModel.watchLater.value + remote.watchLater).distinctBy { it.url },
+                    updatedAt = currentTimeMillis()
+                )
+                val stored = client.pushLibrary(config, merged)
+                settings.replaceSubscriptions(stored.subscriptions)
+                libraryViewModel.replaceLibrary(stored.playlists, stored.watchLater)
+                _librarySync.value = LibrarySyncState.Done(
+                    subscriptions = stored.subscriptions.size,
+                    playlists = stored.playlists.size,
+                    watchLater = stored.watchLater.size
+                )
+            } catch (e: Exception) {
+                _librarySync.value = LibrarySyncState.Failed(e.message ?: "Library sync failed")
+            }
+        }
+    }
+
+    /** Playlists with the same name are one playlist; their entries are merged. */
+    private fun mergePlaylists(
+        local: List<LocalPlaylist>,
+        remote: List<LocalPlaylist>
+    ): List<LocalPlaylist> {
+        val byName = linkedMapOf<String, LocalPlaylist>()
+        (local + remote).forEach { playlist ->
+            val key = playlist.name.lowercase()
+            val existing = byName[key]
+            byName[key] = if (existing == null) {
+                playlist
+            } else {
+                existing.copy(items = (existing.items + playlist.items).distinctBy { it.url })
+            }
+        }
+        return byName.values.toList()
     }
 
     /** Pull the watch position for one video URL, or null when not connected / unknown. */

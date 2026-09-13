@@ -74,6 +74,10 @@ docker compose up -d --build
 
 For a jar deployment, run `./gradlew :server:fatJar` and start `server/build/libs/onewpipe-server-all.jar`. On Windows, use `server/run-server.bat` beside the jar. The first visitor selects **Create account**; Android and desktop use **Settings → Server connection** with `SERVER_IP:8080` and the same credentials. The client accepts a bare IP and adds `http://` plus the default port 8080 automatically. The web UI is served at `/`, so `http://SERVER_IP:8080` is the complete site address.
 
+Once connected, **Settings → Account → Sync subscriptions and playlists** merges the
+subscriptions, playlists and watch-later list of every device through `/api/library`;
+watch positions keep syncing on their own during playback.
+
 Set a strong `JWT_SECRET`, keep `DATA_DIR` persistent, allow TCP port 8080 on the local firewall and use HTTPS behind a reverse proxy for internet access. See [server/README.md](server/README.md) for the complete setup.
 
 ## Development

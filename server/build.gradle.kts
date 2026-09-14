@@ -59,8 +59,14 @@ tasks.named("build") {
 }
 
 // The web interface (webapp/, Vite + React) is built with npm and shipped in
-// the jar under "webapp". Pass -PskipWebapp to build the server without Node.
+// the jar under "webapp". Pass -PskipWebapp to build the server without Node:
+// an existing webapp/dist (built elsewhere, as in the Docker image) is still shipped.
 val webappDir = rootProject.layout.projectDirectory.dir("webapp")
+tasks.named<ProcessResources>("processResources") {
+    from(webappDir.dir("dist")) {
+        into("webapp")
+    }
+}
 // Read once at configuration time: the configuration cache forbids using project in task actions.
 val skipWebapp = providers.gradleProperty("skipWebapp").isPresent
 val isWindows = System.getProperty("os.name").lowercase().contains("windows")
@@ -101,8 +107,5 @@ if (!skipWebapp) {
 
     tasks.named<ProcessResources>("processResources") {
         dependsOn(buildWebapp)
-        from(webappDir.dir("dist")) {
-            into("webapp")
-        }
     }
 }

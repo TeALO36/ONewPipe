@@ -13,6 +13,8 @@ export interface Task {
   status: TaskStatus;
   createdAt: number;
   cancel?: () => void;
+  /** A link offered once the task is finished, such as saving the file again. */
+  action?: { label: string; href: string };
 }
 
 let tasks: Task[] = [];
@@ -48,8 +50,10 @@ export const notifications = {
     tasks = tasks.map((t) => (t.id === id ? { ...t, progress, detail: detail ?? t.detail } : t));
     emit();
   },
-  finish(id: string, status: Exclude<TaskStatus, 'running'>, detail?: string) {
-    tasks = tasks.map((t) => (t.id === id ? { ...t, status, detail: detail ?? t.detail, cancel: undefined } : t));
+  finish(id: string, status: Exclude<TaskStatus, 'running'>, detail?: string, action?: Task['action']) {
+    const task = tasks.find((t) => t.id === id);
+    if (!task || task.status !== 'running') return;
+    tasks = tasks.map((t) => (t.id === id ? { ...t, status, detail: detail ?? t.detail, cancel: undefined, action } : t));
     if (status !== 'cancelled') unseen++;
     emit();
   },

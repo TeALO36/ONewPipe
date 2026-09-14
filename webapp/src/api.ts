@@ -1,5 +1,6 @@
 // Typed client for the ONewPipe server. The shapes mirror the Kotlin DTOs in
-// server/src/main/kotlin/fr/arthonetwork/onewpipe/server/Browse.kt.
+// server/src/main/kotlin/fr/arthonetwork/onewpipe/server/Browse.kt and Downloads.kt.
+import { localAccountToken } from './account';
 
 export type ItemKind = 'video' | 'channel' | 'playlist';
 
@@ -80,6 +81,34 @@ export interface Comments {
   disabled: boolean;
 }
 
+export interface DownloadOption {
+  id: string;
+  label: string;
+  kind: 'video' | 'audio';
+  extension: string;
+  sizeBytes: number;
+}
+
+export interface DownloadOptions {
+  title: string;
+  options: DownloadOption[];
+}
+
+export type DownloadStatus = 'queued' | 'downloading' | 'muxing' | 'done' | 'failed' | 'cancelled';
+
+export interface DownloadJob {
+  id: string;
+  url: string;
+  title: string;
+  fileName: string;
+  status: DownloadStatus;
+  /** 0..1, or -1 while it cannot be measured. */
+  progress: number;
+  sizeBytes: number;
+  error?: string | null;
+  createdAt: number;
+}
+
 export type SearchFilter = 'all' | 'videos' | 'channels' | 'playlists';
 export type Category = 'all' | 'gaming' | 'music' | 'movies' | 'podcasts';
 
@@ -93,7 +122,21 @@ export class ApiError extends Error {
 }
 
 async function getJson<T>(path: string, signal?: AbortSignal): Promise<T> {
-  const response = await fetch(path, { signal });
+  return requestJson<T>(path, { signal });
+}
+
+/**
+ * Downloads use this server's disk, so it asks for the account when the page
+ * is not opened on the server's own machine. The token is only sent when the
+ * account belongs to this server.
+ */
+function serverAuthorization(): Record<string, string> {
+  const token = localAccountToken();
+  return token ? { Authorization: `Bearer ${token}` } : {};
+}
+
+async function requestJson<T>(path: string, init: RequestInit): Promise<T> {
+  const response = await fetch(path, init);
   if (!response.ok) {
     let message = `Request failed (${response.status})`;
     try {
@@ -104,6 +147,7 @@ async function getJson<T>(path: string, signal?: AbortSignal): Promise<T> {
     }
     throw new ApiError(message, response.status);
   }
+  if (response.status === 204) return undefined as T;
   return response.json() as Promise<T>;
 }
 
@@ -128,8 +172,28 @@ export const api = {
     getJson<Comments>(`/api/v2/comments?${query({ url })}`, signal),
   moreComments: (page: string, signal?: AbortSignal) =>
     getJson<Comments>(`/api/v2/comments/more?${query({ page })}`, signal),
-  manifestUrl: (url: string) => `/api/manifest?${query({ url })}`
+  manifestUrl: (url: string) => `/api/manifest?${query({ url })}`,
+  downloadOptions: (url: string, signal?: AbortSignal) =>
+    getJson<DownloadOptions>(`/api/downloads/options?${query({ url })}`, signal),
+  startDownload: (url: string, option: string) =>
+    requestJson<DownloadJob>('/api/downloads', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', ...serverAuthorization() },
+      body: JSON.stringify({ url, option })
+    }),
+  downloads: () => requestJson<DownloadJob[]>('/api/downloads', { headers: serverAuthorization() }),
+  download: (id: string) => getJson<DownloadJob>(`/api/downloads/${encodeURIComponent(id)}`),
+  cancelDownload: (id: string) => requestJson<void>(`/api/downloads/${encodeURIComponent(id)}`, { method: 'DELETE' }),
+  downloadFileUrl: (id: string) => `/api/downloads/${encodeURIComponent(id)}/file`
 };
+
+export function formatBytes(bytes: number): string {
+  if (bytes < 0) return '';
+  if (bytes >= 1024 ** 3) return `${(bytes / 1024 ** 3).toFixed(1)} GB`;
+  if (bytes >= 1024 ** 2) return `${(bytes / 1024 ** 2).toFixed(1)} MB`;
+  if (bytes >= 1024) return `${Math.round(bytes / 1024)} KB`;
+  return `${bytes} B`;
+}
 
 export function formatCount(value: number): string {
   if (value < 0) return '';

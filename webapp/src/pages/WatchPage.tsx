@@ -1,7 +1,9 @@
 import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
+import { reportPosition } from '../account';
 import { api, formatCount, type Comments, type Item, type Subtitle, type Watch } from '../api';
 import { Description } from '../components/Description';
 import { AddToPlaylistDialog } from '../components/Dialogs';
+import { DownloadDialog } from '../components/DownloadDialog';
 import { Avatar, metaLine } from '../components/MediaCard';
 import { ErrorState } from '../components/MediaGrid';
 import { toast } from '../components/Toast';
@@ -12,6 +14,7 @@ import {
   CheckIcon,
   CloseIcon,
   CommentIcon,
+  DownloadIcon,
   OpenInNewIcon,
   PlaylistAddIcon,
   QueueIcon,
@@ -180,6 +183,7 @@ export function WatchPage({ url, startTime }: { url: string; startTime: number }
   const [openMenu, setOpenMenu] = useState<string | null>(null);
   const [descriptionOpen, setDescriptionOpen] = useState(false);
   const [playlistDialog, setPlaylistDialog] = useState(false);
+  const [downloadDialog, setDownloadDialog] = useState(false);
 
   const watch = result.status === 'ready' ? result.data : null;
   const saved = useMemo(() => (watch ? watchToSaved(watch) : null), [watch]);
@@ -200,6 +204,15 @@ export function WatchPage({ url, startTime }: { url: string; startTime: number }
     if (watch) document.title = `${watch.title} · ONewPipe`;
     return () => {
       document.title = 'ONewPipe';
+    };
+  }, [watch]);
+
+  // Leaving the video: send the last position right away for the other devices.
+  useEffect(() => {
+    if (!watch) return;
+    return () => {
+      const video = playerRef.current?.video;
+      if (video && video.currentTime > 0) reportPosition(watch.url, watch.title, video.currentTime, watch.durationSeconds, true);
     };
   }, [watch]);
 
@@ -295,7 +308,10 @@ export function WatchPage({ url, startTime }: { url: string; startTime: number }
               speed={speed}
               loop={repeat === 'one'}
               onReady={onReady}
-              onTimeUpdate={(seconds) => library.updatePosition(watch.url, seconds)}
+              onTimeUpdate={(seconds) => {
+                library.updatePosition(watch.url, seconds);
+                reportPosition(watch.url, watch.title, seconds, watch.durationSeconds);
+              }}
               onEnded={onEnded}
               onError={setPlaybackError}
             />
@@ -414,6 +430,11 @@ export function WatchPage({ url, startTime }: { url: string; startTime: number }
                 <button type="button" className="button tonal" onClick={() => setPlaylistDialog(true)}>
                   <PlaylistAddIcon size={18} /> Save
                 </button>
+                {!watch.isLive && (
+                  <button type="button" className="button tonal" onClick={() => setDownloadDialog(true)}>
+                    <DownloadIcon size={18} /> Download
+                  </button>
+                )}
                 <button
                   type="button"
                   className="button tonal"
@@ -496,6 +517,7 @@ export function WatchPage({ url, startTime }: { url: string; startTime: number }
       </aside>
 
       {playlistDialog && saved && <AddToPlaylistDialog video={saved} onClose={() => setPlaylistDialog(false)} />}
+      {downloadDialog && watch && <DownloadDialog url={watch.url} onClose={() => setDownloadDialog(false)} />}
     </div>
   );
 }

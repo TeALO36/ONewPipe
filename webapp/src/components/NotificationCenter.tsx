@@ -70,6 +70,11 @@ export function NotificationCenter() {
                   <span />
                 )}
                 {task.detail && <div className="detail">{task.detail}</div>}
+                {task.action && (
+                  <a className="button notification-action" href={task.action.href} download>
+                    {task.action.label}
+                  </a>
+                )}
                 {task.status === 'running' && <LinearWavyProgress value={task.progress} label={task.title} />}
               </div>
             ))

@@ -176,6 +176,9 @@ fun Application.module(
         // DASH manifest + range relay, so browsers get video and audio together.
         dashRoutes()
 
+        // Richer API for the web interface (webapp/).
+        browseRoutes()
+
         // ---- Account API ----
 
         post("/api/register") {
@@ -237,11 +240,15 @@ fun Application.module(
             call.respond(mapOf("status" to "ok"))
         }
 
-        // Web UI (same origin as the API: no CORS needed). Keep this catch-all
-        // after every API/admin route so missing static files do not swallow them.
-        staticResources("/", "web") {
-            default("index.html")
-        }
+        // Web UIs (same origin as the API: no CORS needed). Keep them after every
+        // API/admin route so missing static files do not swallow those routes.
+        // - the previous single-page UI stays at /classic (account sync lives there);
+        // - the web interface (webapp/) is served at /; it routes with "#", so it
+        //   needs no fallback and missing files still fall through;
+        // - the classic UI's absolute assets (/vendor, /sw.js, the manifest) come last.
+        staticResources("/classic", "web")
+        staticResources("/", "webapp")
+        staticResources("/", "web", index = null)
     }
 }
 

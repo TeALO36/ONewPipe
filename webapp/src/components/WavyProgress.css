@@ -1,0 +1,103 @@
+.wavy-linear {
+  width: 100%;
+  height: 12px;
+  color: var(--primary);
+}
+
+.wavy-linear svg {
+  width: 100%;
+  height: 100%;
+  overflow: visible;
+}
+
+.wavy-wave {
+  fill: none;
+  stroke: currentColor;
+  stroke-width: 3;
+  stroke-linecap: round;
+  animation: wavy-travel 0.9s linear infinite;
+}
+
+.wavy-track {
+  stroke: var(--primary-container);
+  stroke-width: 3;
+  stroke-linecap: round;
+}
+
+.wavy-dot {
+  fill: currentColor;
+}
+
+.wavy-clip {
+  transition: width 0.3s var(--ease-emphasized);
+}
+
+.wavy-linear.indeterminate .wavy-clip {
+  animation: wavy-indeterminate 1.6s var(--ease-emphasized) infinite;
+}
+
+@keyframes wavy-travel {
+  from {
+    transform: translateX(-40px);
+  }
+  to {
+    transform: translateX(-20px);
+  }
+}
+
+@keyframes wavy-indeterminate {
+  0% {
+    x: 0;
+    width: 0;
+  }
+  50% {
+    x: 80px;
+    width: 240px;
+  }
+  100% {
+    x: 400px;
+    width: 0;
+  }
+}
+
+.wavy-circular {
+  color: var(--primary);
+  animation: wavy-rotate 1.4s linear infinite;
+}
+
+.wavy-circular-track {
+  fill: none;
+  stroke: var(--primary-container);
+  stroke-width: 3.5;
+  opacity: 0.55;
+}
+
+.wavy-circular-arc {
+  fill: none;
+  stroke: currentColor;
+  stroke-width: 3.5;
+  stroke-linecap: round;
+  stroke-dasharray: 30 70;
+  animation: wavy-arc 1.4s var(--ease-emphasized) infinite;
+}
+
+@keyframes wavy-rotate {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+@keyframes wavy-arc {
+  0% {
+    stroke-dasharray: 8 92;
+    stroke-dashoffset: 0;
+  }
+  50% {
+    stroke-dasharray: 60 40;
+    stroke-dashoffset: -20;
+  }
+  100% {
+    stroke-dasharray: 8 92;
+    stroke-dashoffset: -100;
+  }
+}

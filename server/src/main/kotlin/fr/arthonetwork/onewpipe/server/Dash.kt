@@ -76,9 +76,7 @@ internal fun relayTarget(token: String): String? =
  */
 suspend fun buildDashManifest(videoUrl: String, relayUrl: (String) -> String): String =
     withContext(Dispatchers.IO) {
-        val service = NewPipe.getServiceByUrl(videoUrl)
-            ?: throw IllegalArgumentException("No service found for URL")
-        val info = StreamInfo.getInfo(service, videoUrl)
+        val info = cachedStreamInfo(videoUrl)
         val duration = info.duration ?: 0L
 
         val streams: List<Stream> = info.videoOnlyStreams.orEmpty() + info.audioStreams.orEmpty()

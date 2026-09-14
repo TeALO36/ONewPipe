@@ -57,9 +57,9 @@ fun VideoDetailsContent(
     libraryViewModel: LibraryViewModel? = null
 ) {
     // Title & Views
-    Text(text = state.title, color = Color.White, style = MaterialTheme.typography.titleLarge)
+    Text(text = state.title, color = MaterialTheme.colorScheme.onSurface, style = MaterialTheme.typography.titleLarge)
     Spacer(modifier = Modifier.height(4.dp))
-    Text(text = "${formatCount(state.viewCount)} views", color = Color.Gray, style = MaterialTheme.typography.bodyMedium)
+    Text(text = "${formatCount(state.viewCount)} views", color = MaterialTheme.colorScheme.onSurfaceVariant, style = MaterialTheme.typography.bodyMedium)
     
     Spacer(modifier = Modifier.height(16.dp))
     
@@ -70,7 +70,7 @@ fun VideoDetailsContent(
             .then(if (state.uploaderUrl.isNotBlank()) Modifier.clickable { onChannelClick(state.uploaderUrl) } else Modifier),
         verticalAlignment = Alignment.CenterVertically
     ) {
-        Box(modifier = Modifier.size(40.dp).background(Color.DarkGray, shape = CircleShape), contentAlignment = Alignment.Center) {
+        Box(modifier = Modifier.size(40.dp).background(MaterialTheme.colorScheme.surfaceVariant, shape = CircleShape), contentAlignment = Alignment.Center) {
             if (state.uploaderAvatarUrl.isNotBlank()) {
                 AsyncImage(
                     model = state.uploaderAvatarUrl,
@@ -79,13 +79,13 @@ fun VideoDetailsContent(
                     contentScale = ContentScale.Crop
                 )
             } else {
-                Text(state.uploaderName.take(1).uppercase(), color = Color.White)
+                Text(state.uploaderName.take(1).uppercase(), color = MaterialTheme.colorScheme.onSurface)
             }
         }
         Spacer(modifier = Modifier.width(12.dp))
         Column(modifier = Modifier.weight(1f)) {
-            Text(text = state.uploaderName, color = Color.White, style = MaterialTheme.typography.titleMedium)
-            Text(text = "${formatCount(state.uploaderSubscriberCount)} subscribers", color = Color.Gray, style = MaterialTheme.typography.bodySmall)
+            Text(text = state.uploaderName, color = MaterialTheme.colorScheme.onSurface, style = MaterialTheme.typography.titleMedium)
+            Text(text = "${formatCount(state.uploaderSubscriberCount)} subscribers", color = MaterialTheme.colorScheme.onSurfaceVariant, style = MaterialTheme.typography.bodySmall)
         }
         Button(
             onClick = {
@@ -101,8 +101,8 @@ fun VideoDetailsContent(
             },
             enabled = state.uploaderUrl.isNotBlank(),
             colors = ButtonDefaults.buttonColors(
-                containerColor = if (isSubscribed) MaterialTheme.colorScheme.primary else Color.White,
-                contentColor = if (isSubscribed) MaterialTheme.colorScheme.onPrimary else Color.Black
+                containerColor = if (isSubscribed) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.inverseSurface,
+                contentColor = if (isSubscribed) MaterialTheme.colorScheme.onPrimary else MaterialTheme.colorScheme.inverseOnSurface
             )
         ) {
             Text(if (isSubscribed) "Subscribed" else "Subscribe")
@@ -128,7 +128,7 @@ fun VideoDetailsContent(
                     shareText = "Copied!"
                 }
             },
-            colors = ButtonDefaults.outlinedButtonColors(contentColor = Color.White)
+            colors = ButtonDefaults.outlinedButtonColors(contentColor = MaterialTheme.colorScheme.onSurface)
         ) {
             Icon(imageVector = Icons.Default.Share, contentDescription = null, modifier = Modifier.size(18.dp))
             Spacer(Modifier.width(8.dp))
@@ -138,7 +138,7 @@ fun VideoDetailsContent(
         OutlinedButton(
             onClick = { openExternalUrl(state.originalUrl) },
             enabled = state.originalUrl.isNotBlank(),
-            colors = ButtonDefaults.outlinedButtonColors(contentColor = Color.White)
+            colors = ButtonDefaults.outlinedButtonColors(contentColor = MaterialTheme.colorScheme.onSurface)
         ) {
             Icon(imageVector = Icons.Default.OpenInBrowser, contentDescription = null, modifier = Modifier.size(18.dp))
             Spacer(Modifier.width(8.dp))
@@ -147,7 +147,7 @@ fun VideoDetailsContent(
 
         OutlinedButton(
             onClick = { downloadViewModel.loadStreams(state.originalUrl, state.title) },
-            colors = ButtonDefaults.outlinedButtonColors(contentColor = Color.White)
+            colors = ButtonDefaults.outlinedButtonColors(contentColor = MaterialTheme.colorScheme.onSurface)
         ) {
             Icon(imageVector = Icons.Default.KeyboardArrowDown, contentDescription = null, modifier = Modifier.size(18.dp))
             Spacer(Modifier.width(8.dp))
@@ -164,7 +164,7 @@ fun VideoDetailsContent(
 
         OutlinedButton(
             onClick = { playerViewModel.enqueue(mediaItem) },
-            colors = ButtonDefaults.outlinedButtonColors(contentColor = Color.White)
+            colors = ButtonDefaults.outlinedButtonColors(contentColor = MaterialTheme.colorScheme.onSurface)
         ) {
             Icon(imageVector = Icons.Default.QueueMusic, contentDescription = null, modifier = Modifier.size(18.dp))
             Spacer(Modifier.width(8.dp))
@@ -186,7 +186,7 @@ fun VideoDetailsContent(
                         )
                     )
                 },
-                colors = ButtonDefaults.outlinedButtonColors(contentColor = Color.White)
+                colors = ButtonDefaults.outlinedButtonColors(contentColor = MaterialTheme.colorScheme.onSurface)
             ) {
                 Icon(imageVector = Icons.Default.WatchLater, contentDescription = null, modifier = Modifier.size(18.dp))
                 Spacer(Modifier.width(8.dp))
@@ -196,7 +196,7 @@ fun VideoDetailsContent(
             var showPlaylistPicker by remember { mutableStateOf(false) }
             OutlinedButton(
                 onClick = { showPlaylistPicker = true },
-                colors = ButtonDefaults.outlinedButtonColors(contentColor = Color.White)
+                colors = ButtonDefaults.outlinedButtonColors(contentColor = MaterialTheme.colorScheme.onSurface)
             ) {
                 Icon(imageVector = Icons.Default.PlaylistAdd, contentDescription = null, modifier = Modifier.size(18.dp))
                 Spacer(Modifier.width(8.dp))
@@ -220,7 +220,7 @@ fun VideoDetailsContent(
         OutlinedButton(
             onClick = { playerViewModel.toggleAudioOnly() },
             colors = ButtonDefaults.outlinedButtonColors(
-                contentColor = if (state.audioOnly) MaterialTheme.colorScheme.primary else Color.White
+                contentColor = if (state.audioOnly) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurface
             )
         ) {
             Icon(imageVector = Icons.Default.Headphones, contentDescription = null, modifier = Modifier.size(18.dp))
@@ -237,7 +237,7 @@ fun VideoDetailsContent(
             Box {
                 OutlinedButton(
                     onClick = { expandedAudio = true },
-                    colors = ButtonDefaults.outlinedButtonColors(contentColor = Color.White)
+                    colors = ButtonDefaults.outlinedButtonColors(contentColor = MaterialTheme.colorScheme.onSurface)
                 ) {
                     Icon(imageVector = Icons.Default.Translate, contentDescription = null, modifier = Modifier.size(18.dp))
                     Spacer(Modifier.width(8.dp))
@@ -246,7 +246,7 @@ fun VideoDetailsContent(
                 DropdownMenu(
                     expanded = expandedAudio,
                     onDismissRequest = { expandedAudio = false },
-                    modifier = Modifier.heightIn(max = 320.dp).background(Color(0xFF2D2D2D))
+                    modifier = Modifier.heightIn(max = 320.dp).background(MaterialTheme.colorScheme.surfaceContainerHigh)
                 ) {
                     audioTracks.forEach { track ->
                         DropdownMenuItem(
@@ -256,7 +256,7 @@ fun VideoDetailsContent(
                                     color = if (track.url == state.audioUrl) {
                                         MaterialTheme.colorScheme.primary
                                     } else {
-                                        Color.White
+                                        MaterialTheme.colorScheme.onSurface
                                     }
                                 )
                             },
@@ -279,7 +279,7 @@ fun VideoDetailsContent(
                         contentColor = if (state.selectedSubtitle != null) {
                             MaterialTheme.colorScheme.primary
                         } else {
-                            Color.White
+                            MaterialTheme.colorScheme.onSurface
                         }
                     )
                 ) {
@@ -290,10 +290,10 @@ fun VideoDetailsContent(
                 DropdownMenu(
                     expanded = expandedSubtitles,
                     onDismissRequest = { expandedSubtitles = false },
-                    modifier = Modifier.heightIn(max = 320.dp).background(Color(0xFF2D2D2D))
+                    modifier = Modifier.heightIn(max = 320.dp).background(MaterialTheme.colorScheme.surfaceContainerHigh)
                 ) {
                     DropdownMenuItem(
-                        text = { Text("Off", color = Color.White) },
+                        text = { Text("Off", color = MaterialTheme.colorScheme.onSurface) },
                         onClick = {
                             expandedSubtitles = false
                             playerViewModel.selectSubtitle(null)
@@ -301,7 +301,7 @@ fun VideoDetailsContent(
                     )
                     state.subtitles.forEach { track ->
                         DropdownMenuItem(
-                            text = { Text(track.label, color = Color.White) },
+                            text = { Text(track.label, color = MaterialTheme.colorScheme.onSurface) },
                             onClick = {
                                 expandedSubtitles = false
                                 playerViewModel.selectSubtitle(track)
@@ -316,7 +316,7 @@ fun VideoDetailsContent(
         OutlinedButton(
             onClick = { playerViewModel.cycleRepeatMode() },
             colors = ButtonDefaults.outlinedButtonColors(
-                contentColor = if (repeatMode == RepeatMode.OFF) Color.White else MaterialTheme.colorScheme.primary
+                contentColor = if (repeatMode == RepeatMode.OFF) MaterialTheme.colorScheme.onSurface else MaterialTheme.colorScheme.primary
             )
         ) {
             Icon(imageVector = Icons.Default.Repeat, contentDescription = null, modifier = Modifier.size(18.dp))
@@ -342,7 +342,7 @@ fun VideoDetailsContent(
         Box {
             OutlinedButton(
                 onClick = { expandedQuality = true },
-                colors = ButtonDefaults.outlinedButtonColors(contentColor = Color.White)
+                colors = ButtonDefaults.outlinedButtonColors(contentColor = MaterialTheme.colorScheme.onSurface)
             ) {
                 Icon(imageVector = Icons.Default.Settings, contentDescription = null, modifier = Modifier.size(18.dp))
                 Spacer(Modifier.width(8.dp))
@@ -355,11 +355,11 @@ fun VideoDetailsContent(
                 modifier = Modifier
                     .width(250.dp)
                     .heightIn(max = 360.dp)
-                    .background(Color(0xFF2D2D2D))
+                    .background(MaterialTheme.colorScheme.surfaceContainerHigh)
             ) {
                 if (qualityProfiles.isEmpty()) {
                     DropdownMenuItem(
-                        text = { Text("No video quality available", color = Color.LightGray) },
+                        text = { Text("No video quality available", color = MaterialTheme.colorScheme.onSurfaceVariant) },
                         onClick = { expandedQuality = false }
                     )
                 } else {
@@ -367,10 +367,10 @@ fun VideoDetailsContent(
                         DropdownMenuItem(
                             text = {
                                 Column {
-                                    Text(profile.label, color = Color.White)
+                                    Text(profile.label, color = MaterialTheme.colorScheme.onSurface)
                                     Text(
                                         profile.description,
-                                        color = Color.LightGray,
+                                        color = MaterialTheme.colorScheme.onSurfaceVariant,
                                         style = MaterialTheme.typography.labelSmall
                                     )
                                 }
@@ -487,7 +487,7 @@ fun RelatedVideosContent(
     state: PlayerState.Playing,
     playerViewModel: PlayerViewModel
 ) {
-    Text("Related Videos", color = Color.White, style = MaterialTheme.typography.titleMedium)
+    Text("Related Videos", color = MaterialTheme.colorScheme.onSurface, style = MaterialTheme.typography.titleMedium)
     Spacer(modifier = Modifier.height(12.dp))
     
     state.relatedItems.forEach { item ->
@@ -496,7 +496,7 @@ fun RelatedVideosContent(
                 playerViewModel.loadVideo(item.url ?: "", item.name ?: "", item.thumbnails.firstOrNull()?.url.orEmpty())
             }
         ) {
-            Box(modifier = Modifier.width(160.dp).aspectRatio(16f/9f).background(Color.DarkGray, shape = RoundedCornerShape(8.dp))) {
+            Box(modifier = Modifier.width(160.dp).aspectRatio(16f/9f).background(MaterialTheme.colorScheme.surfaceVariant, shape = RoundedCornerShape(8.dp))) {
                 AsyncImage(
                     model = item.thumbnails?.firstOrNull()?.url ?: "",
                     contentDescription = null,
@@ -506,9 +506,9 @@ fun RelatedVideosContent(
             }
             Spacer(modifier = Modifier.width(12.dp))
             Column(modifier = Modifier.weight(1f)) {
-                Text(item.name ?: "", color = Color.White, style = MaterialTheme.typography.bodyMedium, maxLines = 2, overflow = TextOverflow.Ellipsis)
+                Text(item.name ?: "", color = MaterialTheme.colorScheme.onSurface, style = MaterialTheme.typography.bodyMedium, maxLines = 2, overflow = TextOverflow.Ellipsis)
                 Spacer(modifier = Modifier.height(4.dp))
-                Text(item.uploaderName ?: "", color = Color.Gray, style = MaterialTheme.typography.bodySmall)
+                Text(item.uploaderName ?: "", color = MaterialTheme.colorScheme.onSurfaceVariant, style = MaterialTheme.typography.bodySmall)
             }
         }
     }
@@ -607,7 +607,7 @@ fun VideoExtrasContent(
     if (state.description.isNotBlank()) {
         OutlinedButton(
             onClick = { showDescription = !showDescription },
-            colors = ButtonDefaults.outlinedButtonColors(contentColor = Color.White)
+            colors = ButtonDefaults.outlinedButtonColors(contentColor = MaterialTheme.colorScheme.onSurface)
         ) {
             Text(if (showDescription) "Hide description" else "Show description")
         }
@@ -616,14 +616,14 @@ fun VideoExtrasContent(
             if (state.uploadDate.isNotBlank()) {
                 Text(
                     text = state.uploadDate,
-                    color = Color.Gray,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
                     style = MaterialTheme.typography.labelMedium
                 )
                 Spacer(Modifier.height(4.dp))
             }
             Text(
                 text = state.description,
-                color = Color.LightGray,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
                 style = MaterialTheme.typography.bodyMedium,
                 modifier = Modifier.heightIn(max = 320.dp).verticalScroll(rememberScrollState())
             )
@@ -636,7 +636,7 @@ fun VideoExtrasContent(
             showComments = !showComments
             if (showComments) playerViewModel.loadComments(state.originalUrl)
         },
-        colors = ButtonDefaults.outlinedButtonColors(contentColor = Color.White)
+        colors = ButtonDefaults.outlinedButtonColors(contentColor = MaterialTheme.colorScheme.onSurface)
     ) {
         Text(if (showComments) "Hide comments" else "Show comments")
     }
@@ -645,10 +645,10 @@ fun VideoExtrasContent(
         Spacer(Modifier.height(8.dp))
         when (val comments = commentsState) {
             CommentsState.Idle, CommentsState.Loading -> {
-                Text("Loading comments…", color = Color.Gray, style = MaterialTheme.typography.bodySmall)
+                Text("Loading comments…", color = MaterialTheme.colorScheme.onSurfaceVariant, style = MaterialTheme.typography.bodySmall)
             }
             is CommentsState.Error -> {
-                Text(comments.message, color = Color.Gray, style = MaterialTheme.typography.bodySmall)
+                Text(comments.message, color = MaterialTheme.colorScheme.onSurfaceVariant, style = MaterialTheme.typography.bodySmall)
             }
             is CommentsState.Loaded -> {
                 comments.comments.forEach { comment ->
@@ -659,19 +659,19 @@ fun VideoExtrasContent(
                                 if (comment.pinned) append(" • pinned")
                                 if (comment.publishedAt.isNotBlank()) append(" • ${comment.publishedAt}")
                             },
-                            color = Color.Gray,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
                             style = MaterialTheme.typography.labelMedium
                         )
                         Spacer(Modifier.height(2.dp))
                         Text(
                             text = comment.text,
-                            color = Color.White,
+                            color = MaterialTheme.colorScheme.onSurface,
                             style = MaterialTheme.typography.bodyMedium
                         )
                         if (comment.likeCount > 0) {
                             Text(
                                 text = "${formatCount(comment.likeCount)} likes",
-                                color = Color.Gray,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant,
                                 style = MaterialTheme.typography.labelSmall
                             )
                         }

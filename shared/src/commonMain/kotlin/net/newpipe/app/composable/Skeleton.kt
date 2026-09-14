@@ -35,15 +35,15 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 
-private val SkeletonBase = Color(0xFF212121)
-private val SkeletonHighlight = Color(0xFF2E2E2E)
-
 /**
  * A single moving highlight brush shared by every placeholder block of a
  * skeleton screen, so the whole screen shimmers in sync (YouTube style).
+ * Its colours follow the theme, so a light theme does not get dark blocks.
  */
 @Composable
 fun shimmerBrush(): Brush {
+    val base = androidx.compose.material3.MaterialTheme.colorScheme.surfaceVariant
+    val highlight = androidx.compose.material3.MaterialTheme.colorScheme.surfaceContainerHighest
     val transition = rememberInfiniteTransition(label = "skeletonShimmer")
     val shift by transition.animateFloat(
         initialValue = -700f,
@@ -55,7 +55,7 @@ fun shimmerBrush(): Brush {
         label = "skeletonShift"
     )
     return Brush.linearGradient(
-        colors = listOf(SkeletonBase, SkeletonHighlight, SkeletonBase),
+        colors = listOf(base, highlight, base),
         start = Offset(shift - 400f, 0f),
         end = Offset(shift + 400f, 0f)
     )
@@ -154,7 +154,7 @@ fun PlayerSkeleton(
                 if (title.isNotBlank()) {
                     androidx.compose.material3.Text(
                         text = title,
-                        color = Color.White,
+                        color = androidx.compose.material3.MaterialTheme.colorScheme.onSurface,
                         style = androidx.compose.material3.MaterialTheme.typography.titleLarge,
                         maxLines = 2
                     )

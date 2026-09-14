@@ -86,7 +86,7 @@ fun PlayerOverlay(
     Box(
         modifier = modifier
             .fillMaxSize()
-            .background(Color.Black.copy(alpha = 0.9f))
+            .background(MaterialTheme.colorScheme.background)
             .onPreviewKeyEvent { event ->
                 if (state is PlayerState.Playing) handlePlayerKey(event, playerActions) else false
             }
@@ -125,7 +125,7 @@ fun PlayerOverlay(
                 // Opaque like the playing screen: the translucent overlay let
                 // the home grid show through the skeleton.
                 PlayerSkeleton(
-                    modifier = Modifier.fillMaxSize().background(Color(0xFF121212)),
+                    modifier = Modifier.fillMaxSize().background(MaterialTheme.colorScheme.background),
                     thumbnailUrl = state.thumbnailUrl,
                     title = state.title
                 )
@@ -181,7 +181,7 @@ fun PlayerOverlay(
                     if (isCovered) playerViewModel.rememberPlaybackPosition()
                 }
 
-                BoxWithConstraints(modifier = Modifier.fillMaxSize().background(Color(0xFF121212))) {
+                BoxWithConstraints(modifier = Modifier.fillMaxSize().background(MaterialTheme.colorScheme.background)) {
                     val isWide = maxWidth > 1000.dp
                     val showRelated = isWide && !isFullscreen && !isCinema && !pictureInPictureMode
                     val scrollModifier = if (isFullscreen || pictureInPictureMode) {
@@ -208,7 +208,7 @@ fun PlayerOverlay(
                                 Icon(
                                     imageVector = Icons.Default.ArrowBack,
                                     contentDescription = "Back",
-                                    tint = Color.White
+                                    tint = MaterialTheme.colorScheme.onSurface
                                 )
                             }
                         }
@@ -303,7 +303,7 @@ fun PlayerOverlay(
 
                                 if (!isWide && !isCinema) {
                                     Spacer(modifier = Modifier.height(24.dp))
-                                    Divider(color = Color.DarkGray)
+                                    Divider(color = MaterialTheme.colorScheme.outlineVariant)
                                     Spacer(modifier = Modifier.height(16.dp))
                                     RelatedVideosContent(state, playerViewModel)
                                 }
@@ -423,13 +423,13 @@ private fun QueueSection(
     ) {
         Text(
             text = "Queue (${queue.size})",
-            color = Color.White,
+            color = MaterialTheme.colorScheme.onSurface,
             style = MaterialTheme.typography.titleMedium,
             fontWeight = FontWeight.Bold,
             modifier = Modifier.weight(1f)
         )
         androidx.compose.material3.TextButton(onClick = onClear) {
-            Text("Clear queue", color = Color.White)
+            Text("Clear queue", color = MaterialTheme.colorScheme.onSurface)
         }
     }
     Spacer(modifier = Modifier.height(8.dp))
@@ -442,7 +442,7 @@ private fun QueueSection(
         ) {
             Text(
                 text = item.title,
-                color = Color.White,
+                color = MaterialTheme.colorScheme.onSurface,
                 style = MaterialTheme.typography.bodyMedium,
                 maxLines = 1,
                 modifier = Modifier
@@ -453,7 +453,7 @@ private fun QueueSection(
                 Icon(
                     imageVector = Icons.Filled.Close,
                     contentDescription = "Remove from queue",
-                    tint = Color.White
+                    tint = MaterialTheme.colorScheme.onSurface
                 )
             }
         }

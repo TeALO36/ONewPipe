@@ -123,7 +123,7 @@ fun DownloadDialog(
                         item {
                             Text(
                                 text = "No compatible download format was found.",
-                                color = Color.Gray,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant,
                                 modifier = Modifier.padding(vertical = 16.dp)
                             )
                         }
@@ -167,7 +167,7 @@ private fun FormatRow(
     ) {
         Column(modifier = Modifier.weight(1f)) {
             Text(label)
-            Text(hint, style = MaterialTheme.typography.bodySmall, color = Color.Gray)
+            Text(hint, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
         }
         Text("Download", color = MaterialTheme.colorScheme.secondary)
     }

@@ -1,32 +1,8 @@
-# React + TypeScript + Vite
+# ONewPipe web interface
 
-This template provides a minimal setup to get React working in Vite with HMR and some Oxlint rules.
+The interface of the ONewPipe server, also shown by the Electron desktop shell (`../desktopWeb`). Built with Vite, React and TypeScript.
 
-Currently, two official plugins are available:
+- `npm run dev` starts the dev server on port 5173. It forwards `/api` and `/health` to `http://127.0.0.1:18080`; set `ONEWPIPE_SERVER` to use another server.
+- `npm run build` writes `dist/`. `./gradlew :server:fatJar` runs this build and ships the result in the server jar at `/`.
 
-- [@vitejs/plugin-react](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react) uses [Oxc](https://oxc.rs)
-- [@vitejs/plugin-react-swc](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react-swc) uses [SWC](https://swc.rs/)
-
-## React Compiler
-
-The React Compiler is not enabled on this template because of its impact on dev & build performances. To add it, see [this documentation](https://react.dev/learn/react-compiler/installation).
-
-## Expanding the Oxlint configuration
-
-If you are developing a production application, we recommend enabling type-aware lint rules by installing `oxlint-tsgolint` and editing `.oxlintrc.json`:
-
-```json
-{
-  "$schema": "./node_modules/oxlint/configuration_schema.json",
-  "plugins": ["react", "typescript", "oxc"],
-  "options": {
-    "typeAware": true
-  },
-  "rules": {
-    "react/rules-of-hooks": "error",
-    "react/only-export-components": ["warn", { "allowConstantExport": true }]
-  }
-}
-```
-
-See the [Oxlint rules documentation](https://oxc.rs/docs/guide/usage/linter/rules) for the full list of rules and categories.
+Playback uses Shaka Player with the DASH manifest built by the server (`/api/manifest`). The library (history, playlists, subscriptions, settings) is stored in the browser.

@@ -196,6 +196,25 @@ actual fun VideoPlayer(
         playerActions.setSpeed(playbackSpeed)
     }
 
+    // libVLC can only add a subtitle slave once the media is playing, and it
+    // picks the subtitle demuxer from the file extension. The chosen track is
+    // therefore fetched into a temporary file with the extension matching its
+    // MIME type, then attached (and selected) on the running player. A new
+    // media resets hasVideoFrame, which re-attaches the track after a quality
+    // change or when moving to the next video.
+    LaunchedEffect(subtitleUrl, videoUrl, audioUrl, hasVideoFrame) {
+        if (!hasVideoFrame) return@LaunchedEffect
+        val player = mediaPlayerComponent.mediaPlayer()
+        if (subtitleUrl.isNullOrBlank()) {
+            try { player.subpictures().setTrack(-1) } catch (_: Throwable) { }
+            return@LaunchedEffect
+        }
+        val file = kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.IO) {
+            runCatching { writeSubtitleFile(subtitleUrl, subtitleMimeType) }.getOrNull()
+        } ?: return@LaunchedEffect
+        try { player.subpictures().setSubTitleFile(file) } catch (_: Throwable) { }
+    }
+
     // The callback component itself is not the video child on every VLCJ
     // backend. Attach to the actual video surface so a center click always
     // toggles play/pause; double-click remains the fullscreen gesture.

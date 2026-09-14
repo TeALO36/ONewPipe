@@ -90,6 +90,12 @@ Set a strong `JWT_SECRET`, keep `DATA_DIR` persistent, allow TCP port 8080 on th
 ./gradlew :app:assembleDebug
 ```
 
+The desktop application is moving to a web interface shown by Electron:
+
+- `webapp/` is the interface (Vite + React + TypeScript). `./gradlew :server:fatJar` builds it with npm and ships it in the server jar at `/`; pass `-PskipWebapp` to build the server without Node. The previous web UI stays available at `/classic`.
+- For interface work, start the server on port 18080 and run `npm run dev` in `webapp/`; Vite forwards `/api` to that server (override with `ONEWPIPE_SERVER`).
+- `desktopWeb/` is the Electron shell. After building the jar, run `npm install` then `npx electron .` in `desktopWeb/`. It starts the server on a free loopback port and opens the interface.
+
 The upstream base currently merged into this fork is NewPipe 0.29.1 (`dev`).
 
 ONewPipe is free software released under the [GNU GPL v3 or later](LICENSE). It is not affiliated with the official NewPipe project; it is a fork built on the NewPipe code and extractor. See [PRIVACY.md](PRIVACY.md) for what the application sends and stores.

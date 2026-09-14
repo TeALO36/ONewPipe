@@ -19,7 +19,7 @@
 - [x] Clone + build app PC (MSI : `desktopApp/build/compose/binaries/main/msi/`)
 - [x] Corriger le build Android cassé (package namespace, tri `libs.versions.toml`, bugs compilateur Kotlin 2.3 sur `const val`)
 - [x] **Mettre à jour NewPipeExtractor** vers la dernière version upstream (`4de221b`, poToken + correctifs YouTube)
-- [ ] Rebaser/merger le dernier code upstream NewPipe (le fork est sur 0.28.7)
+- [x] **Merger le dernier code upstream NewPipe** (base actuelle : NewPipe 0.29.1 / branche `dev`, extractor `13a655f`)
 - [x] Corriger le target Android de `shared` (n'a jamais compilé : import `androidContext` cassé dans `ComposeActivity.kt`)
 - [ ] Implémenter un fournisseur poToken côté desktop (le kiosk `FEtrending` est bloqué par YouTube → tendances officielles indisponibles, voir issue upstream #12805)
 - [ ] Revoir `settings.gradle.kts` / CI (workflows GitHub Actions à valider sur `main`)
@@ -27,15 +27,15 @@
 ### 1.2 Interface — grande refonte
 - [x] Éclater `App.kt` (monolithe ~400 lignes) en écrans modulaires : `HomeContent` (recherche + catégories + grille), `PlayerOverlay` (lecteur + détails + liées), `DownloadOverlay` (téléchargements)
 - [x] **Navigation sidebar fonctionnelle** : chaque menu affiche son contenu (Home/Trending → grille, Subscriptions/Library → états vides explicites au lieu de réutiliser l'accueil)
-- [ ] Navigation par onglets / sidebar cohérente mobile + desktop
+- [x] Navigation par onglets / sidebar cohérente mobile + desktop (Home = fil par défaut, Trending = catégories, Subscriptions, Library)
 - [ ] Thème dynamique par service (YouTube rouge, SoundCloud orange, Bandcamp bleu…) + thème sombre/clair + Material 3
 - [ ] Mode adaptatif : layout smartphone ↔ tablette ↔ desktop (grille responsive)
-- [ ] Écran d'accueil : rangées thématiques (À la une, Musique, Gaming, Films & Séries, Podcasts…)
-- [ ] Page vidéo moderne : miniatures, uploader, description, commentaires, vidéos liées
-- [ ] Page chaîne (abonnement, contenu, playlists)
-- [ ] Page recherche avec filtres (vidéo / chaîne / playlist / date / durée)
+- [x] Écran d'accueil : rangées thématiques (Gaming, Musique, Films & Séries, Podcasts) chargées une par une + « See all » qui ouvre la grille de la catégorie
+- [x] Page vidéo moderne : miniatures, uploader, description dépliable, commentaires, vidéos liées
+- [x] Page chaîne : avatar, nombre d'abonnés, bouton s'abonner/se désabonner, vidéos paginées (playlists de la chaîne à venir)
+- [x] Page recherche avec filtres (tout / vidéos / chaînes) + historique de recherche
 - [ ] Animations et transitions fluides
-- [ ] États vide/chargement/erreur soignés
+- [x] États vide/chargement/erreur soignés (bouton « Try again » qui relance exactement le contenu affiché)
 
 ### 1.3 Tendances par thèmes (jeux vidéo, musique, films/séries, podcasts)
 - [x] Onglets de catégories dans l'écran d'accueil (Tout, Gaming, Musique, Films & Séries, Podcasts)
@@ -47,18 +47,23 @@
 - [ ] Personnalisation des catégories par l'utilisateur
 
 ### 1.4 Lecture & médias
-- [ ] Lecteur : qualité auto, vitesse, file d'attente, lecture en arrière-plan (déjà dans NewPipe Android — à porter/valider côté shared)
-- [ ] Sous-titres, doublage (pistes audio multiples)
+- [x] Lecteur : sélection de qualité (+ qualité préférée dans les réglages), **vitesse de lecture**, **file d'attente**, **répétition (off / file / vidéo)**, **mode audio seul**, précédent/suivant, muet, plein écran, cinéma, PiP
+- [x] Sous-titres sur Android et desktop (desktop : la piste choisie est téléchargée puis ajoutée au lecteur VLC en cours de lecture ; « Off » la retire)
+- [x] Bouton retour du lecteur en haut à gauche de l'écran (comme YouTube), fixe pendant le défilement
+- [x] Changer de sous-titres, de piste audio ou ouvrir le menu qualité ne recrée plus le lecteur (sur desktop la vidéo restait noire et figée)
+- [ ] Ouverture d'une vidéo plus rapide : mesuré ~1 s d'extraction + ~2,5 s avant la première image VLC (flux YouTube vidéo seule + audio séparé ; YouTube ne fournit plus de flux « vidéo + audio »)
+- [x] Doublage : menu « Audio track » quand la vidéo propose plusieurs pistes (bascule automatiquement sur un flux vidéo seul pour éviter deux pistes superposées)
 - [ ] Mini-player flottant (mobile)
 - [ ] Cast / Chromecast (optionnel)
-- [ ] Lecture audio seule (mode « musique »)
+- [x] Lecture audio seule (mode « musique »)
 
 ### 1.5 Bibliothèque locale (déjà dans NewPipe, à harmoniser avec la nouvelle UI)
-- [ ] Abonnements sans compte
-- [ ] Historique de lecture
-- [ ] Playlists locales
-- [ ] Téléchargements (video/audio) — déjà en partie porté dans `shared`
-- [ ] Export/import (abonnements OPML, historique…)
+- [x] Abonnements sans compte (+ désabonnement et fil « nouvelles vidéos » des chaînes suivies)
+- [x] Historique de lecture (reprise à la position, suppression d'une entrée, effacement complet, activation/désactivation)
+- [x] Playlists locales (création, renommage, suppression, ajout/retrait de vidéos) + liste « à regarder plus tard »
+- [x] Téléchargements (video/audio) avec liste des fichiers et progression (desktop)
+- [x] Téléchargement vidéo dans toutes les qualités, vidéo et audio réunis dans un seul fichier (Android : MediaMuxer ; desktop : remux VLC, MP4 ou MKV selon les codecs, téléchargement par tranches de 10 Mo pour éviter le bridage YouTube)
+- [x] Export/import : sauvegarde JSON complète (historique, playlists, à regarder plus tard, abonnements) depuis les réglages
 
 ### 1.6 Apps PC & mobile
 - [x] Installateurs : MSI/EXE Windows, DEB Linux (ciblés par Compose + workflow CI)
@@ -66,6 +71,7 @@
 - [x] App iOS (`iosApp`) — utilise la nouvelle UI `shared` (MainViewController)
 - [ ] Notifications de nouveaux contenus des abonnements
 - [ ] Tester l'APK sur un vrai appareil Android
+- [x] Accès à l'interface NewPipe classique depuis les réglages Android (toutes les fonctions d'origine restent atteignables)
 - [ ] **Porter la nouvelle UI `shared` sur Android** : l'app Android actuelle (`app`) est l'app NewPipe d'origine et ne dépend pas de `shared` — la refonte UI (tendances par catégories, navigation, sync serveur) n'est donc pour l'instant disponible que sur PC et iOS. Brancher `ComposeActivity` (déjà dans `shared/androidMain`) dans un launcher Android
 
 ### 1.7 Connexion au serveur (menu dans les apps)
@@ -73,8 +79,10 @@
 - [x] Inscription + connexion + déconnexion, token JWT persisté localement
 - [x] **Sync des positions de lecture** : reprise à la position sauvegardée à l'ouverture, push à la fermeture
 - [x] Client multiplateforme (ktor-client, okhttp/darwin) + test d'intégration contre un serveur live (register → push → pull, 0 échec)
-- [ ] Sync des likes, playlists, abonnements, historique (API prête à étendre)
-- [ ] Indicateur visuel d'état de connexion + message d'erreur réseau dans le dialogue
+- [x] **Sync des playlists, abonnements et « à regarder plus tard »** (`/api/library`, fusion par URL, la copie la plus récente gagne)
+- [x] Sync de l'historique de lecture (300 entrées max, fusion par URL sur la date de visionnage)
+- [ ] Sync des likes
+- [x] Indicateur visuel d'état de connexion (« Contacting the server… ») + message d'erreur dans le dialogue, mot de passe masqué, bouton « Close » toujours disponible
 
 ---
 
@@ -91,10 +99,10 @@
 ### 2.2 Données synchronisées
 - [x] **Positions de lecture** (reprise d'une lecture sur un autre appareil — mobile ↔ PC ↔ web)
 - [ ] Likes / « J'aime »
-- [ ] Enregistrements (« plus tard » / favoris)
-- [ ] Playlists (création, partage, collaboration)
-- [ ] Historique synchronisé (optionnel, avec respect de la vie privée)
-- [ ] Abonnements synchronisés
+- [x] Enregistrements (« plus tard » / favoris) — synchronisés
+- [x] Playlists (création + synchronisation multi-appareils ; partage/collaboration à venir)
+- [x] Historique synchronisé (optionnel : uniquement sur demande depuis les réglages, vers votre propre serveur)
+- [x] Abonnements synchronisés
 
 ### 2.3 Recommandations
 - [ ] Collecte des signaux (vues, likes, recherches…) — opt-in
@@ -111,7 +119,7 @@
 - [x] API REST du serveur consommée par le web (`/api/trending`, `/api/search`, `/api/video`, `/api/register`, `/api/login`, `/api/watchstate`)
 - [x] Hébergement : **Docker** (`server/Dockerfile` + `docker-compose.yml`, volume persistant) + jar autonome
 - [ ] Raccourci navigateur → un clic et on est sur son YouTube
-- [ ] Abonnements, playlists dans la web UI
+- [x] Abonnements, playlists et « à regarder plus tard » dans la web UI (via `/api/library`, partagés avec les apps)
 - [ ] Mode « serveur web » installable (barre d'outils / exe serveur pour Windows)
 
 ---
@@ -141,7 +149,7 @@
 
 - [x] **Workflow CI** `.github/workflows/build.yml` : APK Android + MSI Windows + exe portable + .deb Linux + jar serveur + image Docker (poussée sur GHCR sur `main`)
 - [x] Poussé sur GitHub (`main`)
-- [ ] Tests automatisés (unitaires UI `shared`, tests extractor)
+- [x] Tests automatisés (bibliothèque locale, file d'attente du lecteur, UI `shared`, extractor)
 - [ ] Signature APK et mises à jour
 - [ ] Telemetry/CRASH reporting (opt-in)
 - [ ] Documentation développeur + utilisateur
@@ -149,7 +157,28 @@
 
 ---
 
-### État actuel (août 2026)
+### État actuel (septembre 2026)
+
+**Retours d'utilisation — lecteur et téléchargements**
+
+- ✅ **Sous-titres sur desktop** : piste téléchargée (YouTube sert du TTML) puis ajoutée à VLC pendant la lecture — vérifié dans l'app : paroles affichées, « Off » les retire, la lecture continue
+- ✅ **Lecteur figé corrigé** : le fondu d'état recréait tout le lecteur à chaque mise à jour (choix de sous-titres, piste audio, menu qualité) → vidéo noire et figée sur desktop
+- ✅ **Bouton retour** en haut à gauche de l'écran, fixe pendant le défilement
+- ✅ **Téléchargement vidéo** : YouTube ne fournit plus aucun flux « vidéo + audio » (seul l'audio était proposé) → toutes les qualités sont proposées et réunies avec l'audio ; sur desktop, remux VLC vérifié sur une vraie vidéo (2 pistes, < 1 s)
+- ⚠️ **Temps d'ouverture d'une vidéo** mesuré : ~1 s d'extraction + ~2,5 s avant la première image VLC ; ni la création de VLC (~50 ms), ni l'audio séparé, ni le format audio n'en sont la cause — reste à creuser
+
+**Mise au point 1.3.0 — synchronisation upstream + menus complets**
+
+- ✅ **Base upstream à jour** : 126 commits de NewPipe `dev` (0.29.1) mergés, NewPipeExtractor `13a655f`, API supprimée `setFetchIosClient` retirée du code du fork
+- ✅ **Bibliothèque** (nouvel onglet) : Historique / Playlists / À regarder plus tard / Téléchargements, chaque ligne jouable, chaque liste effaçable
+- ✅ **Lecteur complet** : file d'attente, répétition, vitesse, audio seul, ouvrir dans le navigateur, ajouter à une playlist, description, commentaires
+- ✅ **Abonnements** : désabonnement, ouverture de chaîne, fil « nouvelles vidéos »
+- ✅ **Réglages** : lecture (autoplay, reprise, qualité préférée), historique (activation + effacement), sauvegarde/restauration, interface classique (Android), à propos
+- ✅ **Boutons corrigés** : bouton lecture du survol des cartes (ne faisait rien), icône de téléchargement (« + »), icône plein écran figée, boutons précédent/muet/vitesse absents sur desktop
+- ✅ **Liens « À propos » réparés** : le rebranding avait cassé les URL (`TeamONewPipe/ONewPipe`, `https://ONewPipe.net/…`) → dépôt réel + `PRIVACY.md`
+- ✅ **Bug de reprise de lecture** : la durée était stockée en secondes et comparée à des millisecondes, la reprise ne se déclenchait jamais
+
+### État précédent (août 2026)
 
 - ✅ Poussé sur GitHub (`main`) — tout le travail consolidé et commité
 - ✅ **Serveur ONewPipe** : module `server` (Ktor) — comptes (register/login JWT), sync des positions de lecture, **web UI complète** (recherche, tendances par catégories, lecteur, reprise des lectures), **Docker** (Dockerfile + compose), jar autonome. Testé de bout en bout (register → push → pull watchstate, trending/search/video OK)

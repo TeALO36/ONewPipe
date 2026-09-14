@@ -8,7 +8,9 @@ plugins {
     alias(libs.plugins.jetbrains.kotlin.multiplatform)
     alias(libs.plugins.jetbrains.kotlin.compose)
     alias(libs.plugins.jetbrains.compose.multiplatform)
+    alias(libs.plugins.koin)
     alias(libs.plugins.jetbrains.kotlinx.serialization)
+    alias(libs.plugins.about.libraries)
 }
 
 // Better than adding a third-party dependency for something as simple as this
@@ -21,6 +23,7 @@ val buildConfigGenerator by tasks.registering(Sync::class) {
 
         object BuildConfig {
             const val VERSION_NAME = "$buildVersionName"
+            const val APP_NAME = "ONewPipe"
         }
     """.trimIndent()
     from(resources.text.fromString(rawClass)) {
@@ -102,11 +105,14 @@ kotlin {
 
                 implementation(libs.jetbrains.lifecycle.viewmodel)
 
-                implementation(libs.jetbrains.navigation3.ui)
+                // Use API as java compiler cannot see NavKey for some reason
+                api(libs.jetbrains.navigation3.ui)
                 implementation(libs.jetbrains.lifecycle.navigation3)
                 implementation(libs.kotlinx.serialization.json)
 
+                implementation(libs.koin.compose.navigation3)
                 implementation(libs.koin.compose.viewmodel)
+                implementation(libs.koin.annotations)
 
                 implementation(libs.russhwolf.settings.core)
                 implementation(libs.coil.compose)
@@ -114,10 +120,12 @@ kotlin {
                 implementation(libs.ktor.client.core)
                 implementation(libs.ktor.client.content.negotiation)
                 implementation(libs.ktor.serialization.kotlinx.json)
+                implementation(libs.touchlab.kermit)
             }
         }
         commonTest.dependencies {
             implementation(libs.kotlin.test.core)
+            implementation(libs.kotlinx.coroutines.test)
             implementation(libs.jetbrains.compose.test.ui)
             implementation(libs.russhwolf.settings.test)
         }
@@ -133,6 +141,7 @@ kotlin {
             implementation(libs.media3.ui)
             implementation(libs.androidx.media)
             implementation(libs.ktor.client.okhttp)
+            implementation(libs.androidx.browser)
         }
         val iosMain by getting {
             dependencies {
@@ -187,3 +196,11 @@ dependencies {
 }
 
 
+aboutLibraries {
+    export {
+        outputFile = file("src/iosMain/resources/aboutlibraries.json")
+        prettyPrint = true
+        variant = "metadataIosMain"
+        excludeFields.addAll("organization", "scm", "funding")
+    }
+}

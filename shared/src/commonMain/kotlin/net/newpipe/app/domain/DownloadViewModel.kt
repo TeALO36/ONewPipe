@@ -27,11 +27,26 @@ sealed class DownloadState {
     data class Error(val message: String) : DownloadState()
 }
 
-class DownloadViewModel : ViewModel() {
+class DownloadViewModel(
+    private val libraryViewModel: LibraryViewModel? = null
+) : ViewModel() {
     private val _state = MutableStateFlow<DownloadState>(DownloadState.Idle)
     val state: StateFlow<DownloadState> = _state.asStateFlow()
 
+    private var currentUrl: String = ""
+
+    /** Adds a started download to the library so the user can find the file again. */
+    fun recordDownload(fileName: String, title: String, isAudioOnly: Boolean) {
+        libraryViewModel?.recordDownload(
+            fileName = fileName,
+            sourceUrl = currentUrl,
+            title = title,
+            isAudioOnly = isAudioOnly
+        )
+    }
+
     fun loadStreams(url: String, title: String) {
+        currentUrl = url
         _state.value = DownloadState.Loading
         viewModelScope.launch {
             try {

@@ -9,7 +9,7 @@ import javax.swing.SwingUtilities
 
 actual fun downloadFile(url: String, defaultName: String) {
     SwingUtilities.invokeLater {
-        val dialog = FileDialog(null as Frame?, "Enregistrer sous...", FileDialog.SAVE)
+        val dialog = FileDialog(null as Frame?, "Save as…", FileDialog.SAVE)
         dialog.file = defaultName
         dialog.isVisible = true
 
@@ -23,21 +23,31 @@ actual fun downloadFile(url: String, defaultName: String) {
                 try {
                     val connection = URL(url).openConnection()
                     connection.connect()
-                    val input = connection.getInputStream()
-                    val output = FileOutputStream(destPath)
-                    
-                    val data = ByteArray(4096)
-                    var count: Int
-                    while (input.read(data).also { count = it } != -1) {
-                        output.write(data, 0, count)
+                    val total = connection.contentLengthLong
+                    DownloadProgressBus.report(file, 0)
+                    connection.getInputStream().use { input ->
+                        FileOutputStream(destPath).use { output ->
+                            val data = ByteArray(64 * 1024)
+                            var downloaded = 0L
+                            var lastPercent = -1
+                            var count: Int
+                            while (input.read(data).also { count = it } != -1) {
+                                output.write(data, 0, count)
+                                downloaded += count
+                                if (total > 0) {
+                                    val percent = ((downloaded * 100) / total).toInt()
+                                    if (percent != lastPercent) {
+                                        lastPercent = percent
+                                        DownloadProgressBus.report(file, percent)
+                                    }
+                                }
+                            }
+                            output.flush()
+                        }
                     }
-                    output.flush()
-                    output.close()
-                    input.close()
-                    println("Download complete: $destPath")
+                    DownloadProgressBus.complete(file)
                 } catch (e: Exception) {
-                    e.printStackTrace()
-                    println("Download failed: ${e.message}")
+                    DownloadProgressBus.fail(file, e.message ?: "Download failed")
                 }
             }
         }

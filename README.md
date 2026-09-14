@@ -4,6 +4,25 @@ ONewPipe is a privacy-focused, ad-free media frontend based on the NewPipe core.
 
 **Official public repository:** <https://github.com/TeALO36/ONewPipe>
 
+## Features
+
+- **Home** — themed rows (Gaming, Music, Movies & Series, Podcasts), each with a "See all" shortcut to its full grid.
+- **Trending** — All / Gaming / Music / Movies & Series / Podcasts categories.
+- **Search** — filter by videos or channels, with a recent-searches drop-down.
+- **Subscriptions** — follow channels without an account, open a channel,
+  unsubscribe, and load a feed of the newest videos from every followed channel.
+- **Library** — watch history with resume positions, local playlists,
+  a watch-later list, and the list of downloaded files.
+- **Player** — quality selection, playback speed, play queue, repeat modes,
+  audio-only (background) mode, subtitles, audio tracks, picture-in-picture,
+  fullscreen, keyboard shortcuts, video description and comments.
+- **Downloads** — every video quality saved as one file with its audio track
+  (on desktop the two streams are combined with VLC, which the player already
+  needs), or audio only.
+- **Settings** — theme, playback preferences, history controls, backup and
+  restore, self-hosted account, updates. On Android the classic NewPipe
+  interface remains reachable from here.
+
 ## Install from GitHub Releases
 
 Use the **latest non-draft release** on the [Releases page](https://github.com/TeALO36/ONewPipe/releases). The file names are deliberately explicit:
@@ -58,6 +77,10 @@ docker compose up -d --build
 
 For a jar deployment, run `./gradlew :server:fatJar` and start `server/build/libs/onewpipe-server-all.jar`. On Windows, use `server/run-server.bat` beside the jar. The first visitor selects **Create account**; Android and desktop use **Settings → Server connection** with `SERVER_IP:8080` and the same credentials. The client accepts a bare IP and adds `http://` plus the default port 8080 automatically. The web UI is served at `/`, so `http://SERVER_IP:8080` is the complete site address.
 
+Once connected, **Settings → Account → Sync subscriptions and playlists** merges the
+subscriptions, playlists and watch-later list of every device through `/api/library`;
+watch positions keep syncing on their own during playback.
+
 Set a strong `JWT_SECRET`, keep `DATA_DIR` persistent, allow TCP port 8080 on the local firewall and use HTTPS behind a reverse proxy for internet access. See [server/README.md](server/README.md) for the complete setup.
 
 ## Development
@@ -67,4 +90,6 @@ Set a strong `JWT_SECRET`, keep `DATA_DIR` persistent, allow TCP port 8080 on th
 ./gradlew :app:assembleDebug
 ```
 
-ONewPipe is free software released under the [GNU GPL v3 or later](LICENSE). It is not affiliated with the official NewPipe project; it is a fork built on the NewPipe code and extractor.
+The upstream base currently merged into this fork is NewPipe 0.29.1 (`dev`).
+
+ONewPipe is free software released under the [GNU GPL v3 or later](LICENSE). It is not affiliated with the official NewPipe project; it is a fork built on the NewPipe code and extractor. See [PRIVACY.md](PRIVACY.md) for what the application sends and stores.

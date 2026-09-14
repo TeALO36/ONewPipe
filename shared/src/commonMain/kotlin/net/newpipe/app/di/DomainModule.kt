@@ -1,6 +1,7 @@
 package net.newpipe.app.di
 
 import net.newpipe.app.domain.HomeViewModel
+import net.newpipe.app.domain.LibraryViewModel
 import net.newpipe.app.domain.PlayerViewModel
 import net.newpipe.app.domain.SettingsViewModel
 import net.newpipe.app.domain.SyncViewModel
@@ -11,8 +12,9 @@ import org.koin.dsl.module
 val domainModule = module {
     single { SettingsViewModel(get()) }
     single { SyncViewModel(get()) }
+    single { LibraryViewModel(get()) }
     factory { HomeViewModel(get(), get()) }
-    factory { PlayerViewModel(get()) }
-    factory { DownloadViewModel() }
+    factory { PlayerViewModel(get(), get(), get()) }
+    factory { DownloadViewModel(get()) }
     factory { UpdateViewModel(get()) }
 }

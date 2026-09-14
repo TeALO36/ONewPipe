@@ -39,11 +39,6 @@ class ComposeActivity : ComponentActivity() {
             NewPipe.init(OkHttpDownloader(OkHttpClient.Builder().build()))
             // Use the device locale for trending/search results.
             net.newpipe.app.backend.applySystemGeoLocalization()
-            // Keep the initial extraction to the fast progressive response. The
-            // quality menu explicitly enables the slower iOS response when HD
-            // and 4K formats are requested.
-            org.schabi.newpipe.extractor.services.youtube.extractors.YoutubeStreamExtractor
-                .setFetchIosClient(false)
             net.newpipe.app.di.KoinApp.init {
                 androidContext(this@ComposeActivity)
             }

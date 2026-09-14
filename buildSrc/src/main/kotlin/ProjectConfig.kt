@@ -3,13 +3,16 @@
  * SPDX-License-Identifier: GPL-3.0-or-later
  */
 
-const val NEWPIPE_VERSION_SDK_COMPILE_MAJOR = 36
-const val NEWPIPE_VERSION_SDK_COMPILE_MINOR = 1
+const val NEWPIPE_VERSION_SDK_COMPILE_MAJOR = 37
+const val NEWPIPE_VERSION_SDK_COMPILE_MINOR = 0
 const val NEWPIPE_VERSION_SDK_MIN = 23
 const val NEWPIPE_VERSION_SDK_TARGET = 35
 
-const val NEWPIPE_VERSION_CODE = 1202
-const val NEWPIPE_VERSION_NAME = "1.2.2"
+// ONewPipe versioning is independent of upstream NewPipe. The upstream base
+// currently merged into this fork is NewPipe 0.29.1 (dev).
+const val NEWPIPE_VERSION_CODE = 1300
+const val NEWPIPE_VERSION_NAME = "1.3.0"
+const val UPSTREAM_NEWPIPE_VERSION_NAME = "0.29.1"
 
 // The namespace determines the package of generated R/BuildConfig classes.
 // The whole app codebase still references org.schabi.newpipe.R and

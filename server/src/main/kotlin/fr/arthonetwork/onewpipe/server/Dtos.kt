@@ -25,6 +25,8 @@ data class VideoInfoDto(
     val title: String,
     val streamUrl: String,
     val uploaderName: String,
+    val uploaderUrl: String = "",
+    val uploaderAvatarUrl: String = "",
     val uploaderSubscriberCount: Long,
     val viewCount: Long,
     val durationSeconds: Long,
@@ -93,4 +95,55 @@ data class WatchStateRequest(
 data class WatchStateResponse(
     val synced: Int,
     val items: List<WatchStateItem> = emptyList()
+)
+
+/** One followed channel, synchronized between devices. */
+@Serializable
+data class SubscriptionDto(
+    val url: String,
+    val name: String = "",
+    val thumbnailUrl: String = ""
+)
+
+/** One entry of a synchronized playlist or of the watch-later list. */
+@Serializable
+data class PlaylistItemDto(
+    val url: String,
+    val title: String = "",
+    val uploaderName: String = "",
+    val thumbnailUrl: String = "",
+    val durationText: String = ""
+)
+
+@Serializable
+data class PlaylistDto(
+    val id: String,
+    val name: String,
+    val items: List<PlaylistItemDto> = emptyList()
+)
+
+/**
+ * The part of the local library that is worth sharing between devices:
+ * subscriptions, playlists and the watch-later list. The watch positions keep
+ * their own endpoint because they change constantly during playback.
+ */
+@Serializable
+data class HistoryEntryDto(
+    val url: String,
+    val title: String = "",
+    val uploaderName: String = "",
+    val thumbnailUrl: String = "",
+    val durationText: String = "",
+    val positionMs: Long = 0,
+    val durationMs: Long = 0,
+    val watchedAt: Long = 0
+)
+
+@Serializable
+data class LibraryDto(
+    val subscriptions: List<SubscriptionDto> = emptyList(),
+    val playlists: List<PlaylistDto> = emptyList(),
+    val watchLater: List<PlaylistItemDto> = emptyList(),
+    val history: List<HistoryEntryDto> = emptyList(),
+    val updatedAt: Long = 0
 )

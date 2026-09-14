@@ -62,11 +62,12 @@ class DownloadDialogTest {
 
         onNodeWithText("Download: Test Video").assertIsDisplayed()
         onNodeWithText("Video + audio").assertIsDisplayed()
-        onNodeWithText("High quality · packaged MP4").performScrollTo().assertIsDisplayed()
+        onNodeWithText("Video + audio · all qualities").performScrollTo().assertIsDisplayed()
         onNodeWithText("Audio only").performScrollTo().assertIsDisplayed()
         onNodeWithText("360p · MPEG-4").assertIsDisplayed()
-        onNodeWithText("1080p · video + audio").performScrollTo().assertIsDisplayed()
-        onNodeWithText("720p · video + audio").performScrollTo().assertIsDisplayed()
+        // MP4 video + M4A audio fit an MP4 file; WebM video is packaged as MKV.
+        onNodeWithText("1080p · MP4").performScrollTo().assertIsDisplayed()
+        onNodeWithText("720p · MKV").performScrollTo().assertIsDisplayed()
         onNodeWithText("128 kbps · m4a").performScrollTo().assertIsDisplayed()
     }
 }

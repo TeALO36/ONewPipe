@@ -38,11 +38,20 @@ fun DownloadDialog(
     onDownloadAudio: (AudioStream) -> Unit,
     showCombinedVideoOptions: Boolean = net.newpipe.app.backend.supportsCombinedVideoDownload()
 ) {
-    val bestAudio = audioStreams
-        .filter { !(it.content ?: it.url).isNullOrBlank() }
-        .maxByOrNull { it.averageBitrate }
+    // Every resolution above the ready-to-play ones is a video-only stream on
+    // YouTube, so all of them are offered (one entry per resolution, MP4
+    // first) with a matching audio track packaged in.
+    val readyHeights = videoStreams.map { resolutionHeight(it.resolution) }.toSet()
     val highQualityVideos = if (showCombinedVideoOptions) {
-        videoOnlyStreams.filter { resolutionHeight(it.resolution) >= 720 }
+        videoOnlyStreams
+            .filter { !(it.content ?: it.url).isNullOrBlank() }
+            .groupBy { resolutionHeight(it.resolution) }
+            .filterKeys { it > 0 && it !in readyHeights }
+            .mapNotNull { (_, streams) ->
+                streams.firstOrNull { it.format == org.schabi.newpipe.extractor.MediaFormat.MPEG_4 }
+                    ?: streams.firstOrNull()
+            }
+            .sortedByDescending { resolutionHeight(it.resolution) }
     } else {
         emptyList()
     }
@@ -79,15 +88,20 @@ fun DownloadDialog(
                         }
                     }
 
-                    if (highQualityVideos.isNotEmpty() && bestAudio != null) {
+                    val packagedVideos = highQualityVideos.mapNotNull { stream ->
+                        net.newpipe.app.backend.audioForCombinedDownload(stream, audioStreams)
+                            ?.let { audio -> stream to audio }
+                    }
+                    if (packagedVideos.isNotEmpty()) {
                         item {
-                            SectionTitle("High quality · packaged MP4")
+                            SectionTitle("Video + audio · all qualities")
                         }
-                        items(highQualityVideos) { stream ->
+                        items(packagedVideos) { (stream, audio) ->
+                            val extension = net.newpipe.app.backend.combinedDownloadExtension(stream, audio)
                             FormatRow(
-                                label = "${stream.resolution} · video + audio",
+                                label = "${stream.resolution} · ${extension.removePrefix(".").uppercase()}",
                                 hint = "The audio track will be combined automatically",
-                                onClick = { onDownloadVideoWithAudio(stream, bestAudio) }
+                                onClick = { onDownloadVideoWithAudio(stream, audio) }
                             )
                         }
                     }

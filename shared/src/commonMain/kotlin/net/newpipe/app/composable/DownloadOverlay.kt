@@ -63,12 +63,14 @@ fun DownloadOverlay(
                     val audioUrl = audioStream.content ?: audioStream.url
                     if (!videoUrl.isNullOrBlank() && !audioUrl.isNullOrBlank()) {
                         val safeTitle = state.title.replace(Regex("[\\\\/:*?\"<>|]"), "_")
+                        val fileName = safeTitle +
+                            net.newpipe.app.backend.combinedDownloadExtension(videoStream, audioStream)
                         net.newpipe.app.backend.downloadVideoWithAudio(
                             videoUrl,
                             audioUrl,
-                            "$safeTitle.mp4"
+                            fileName
                         )
-                        downloadViewModel.recordDownload("$safeTitle.mp4", state.title, isAudioOnly = false)
+                        downloadViewModel.recordDownload(fileName, state.title, isAudioOnly = false)
                     }
                     downloadViewModel.dismiss()
                 },

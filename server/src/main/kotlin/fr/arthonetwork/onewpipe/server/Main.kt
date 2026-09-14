@@ -173,6 +173,9 @@ fun Application.module(
             call.respond(fetchVideoInfo(url))
         }
 
+        // DASH manifest + range relay, so browsers get video and audio together.
+        dashRoutes()
+
         // ---- Account API ----
 
         post("/api/register") {

@@ -493,7 +493,7 @@ fun RelatedVideosContent(
     state.relatedItems.forEach { item ->
         Row(
             modifier = Modifier.fillMaxWidth().padding(vertical = 8.dp).clickable {
-                playerViewModel.loadVideo(item.url ?: "", item.name ?: "")
+                playerViewModel.loadVideo(item.url ?: "", item.name ?: "", item.thumbnails.firstOrNull()?.url.orEmpty())
             }
         ) {
             Box(modifier = Modifier.width(160.dp).aspectRatio(16f/9f).background(Color.DarkGray, shape = RoundedCornerShape(8.dp))) {

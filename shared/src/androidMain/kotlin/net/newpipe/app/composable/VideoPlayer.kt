@@ -105,6 +105,8 @@ actual fun VideoPlayer(
     var durationMs by remember(videoUrl, audioUrl) { mutableStateOf(0L) }
     var seekFeedback by remember(videoUrl, audioUrl) { mutableStateOf<String?>(null) }
     var nativeFullscreen by remember(videoUrl, audioUrl) { mutableStateOf(false) }
+    /** False until ExoPlayer renders a frame; the thumbnail covers the black surface meanwhile. */
+    var firstFrameRendered by remember(videoUrl, audioUrl) { mutableStateOf(false) }
 
     val exoPlayer = remember(videoUrl, audioUrl, subtitleUrl) {
         ExoPlayer.Builder(context).build().apply {
@@ -146,6 +148,10 @@ actual fun VideoPlayer(
 
                 override fun onPlaybackStateChanged(playbackState: Int) {
                     if (playbackState == Player.STATE_ENDED) onPlaybackEnded()
+                }
+
+                override fun onRenderedFirstFrame() {
+                    firstFrameRendered = true
                 }
 
                 override fun onCues(cueGroup: CueGroup) {
@@ -294,6 +300,17 @@ actual fun VideoPlayer(
             factory = { textureView },
             modifier = Modifier.fillMaxSize()
         )
+
+        // The thumbnail covers the black surface until the first frame is
+        // rendered, so opening a video shows what is coming.
+        if (!firstFrameRendered && !thumbnailUrl.isNullOrBlank()) {
+            coil3.compose.AsyncImage(
+                model = thumbnailUrl,
+                contentDescription = null,
+                contentScale = androidx.compose.ui.layout.ContentScale.Fit,
+                modifier = Modifier.fillMaxSize()
+            )
+        }
 
         // Subtitle cues, drawn above the video and below the controls.
         subtitleText?.let { cue ->

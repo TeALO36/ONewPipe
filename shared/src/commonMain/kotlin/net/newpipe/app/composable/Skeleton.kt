@@ -118,23 +118,52 @@ fun MediaGridSkeleton(modifier: Modifier = Modifier) {
  * and (on wide windows) skeleton rows for the related videos.
  */
 @Composable
-fun PlayerSkeleton(modifier: Modifier = Modifier) {
+fun PlayerSkeleton(
+    modifier: Modifier = Modifier,
+    thumbnailUrl: String = "",
+    title: String = ""
+) {
     val brush = shimmerBrush()
     BoxWithConstraints(modifier = modifier.fillMaxSize()) {
         val isWide = maxWidth > 1000.dp
         Row(modifier = Modifier.fillMaxSize().padding(16.dp)) {
             Column(modifier = Modifier.weight(if (isWide) 0.65f else 1f)) {
-                // Video area placeholder
-                SkeletonBox(
-                    brush = brush,
-                    modifier = Modifier.fillMaxWidth().aspectRatio(16f / 9f),
-                    shape = RoundedCornerShape(4.dp)
-                )
+                // Video area: the thumbnail of the video being opened, so the
+                // wait shows what is coming instead of an empty grey box.
+                Box(modifier = Modifier.fillMaxWidth().aspectRatio(16f / 9f)) {
+                    SkeletonBox(
+                        brush = brush,
+                        modifier = Modifier.fillMaxSize(),
+                        shape = RoundedCornerShape(4.dp)
+                    )
+                    if (thumbnailUrl.isNotBlank()) {
+                        coil3.compose.AsyncImage(
+                            model = thumbnailUrl,
+                            contentDescription = null,
+                            contentScale = androidx.compose.ui.layout.ContentScale.Crop,
+                            modifier = Modifier.fillMaxSize()
+                        )
+                    }
+                    androidx.compose.material3.CircularProgressIndicator(
+                        modifier = Modifier.align(Alignment.Center).size(48.dp),
+                        color = Color.White,
+                        strokeWidth = 4.dp
+                    )
+                }
                 Spacer(modifier = Modifier.height(20.dp))
-                // Title lines
-                SkeletonLine(brush = brush, modifier = Modifier, widthFraction = 0.85f, height = 18.dp)
-                Spacer(modifier = Modifier.height(8.dp))
-                SkeletonLine(brush = brush, modifier = Modifier, widthFraction = 0.55f, height = 18.dp)
+                if (title.isNotBlank()) {
+                    androidx.compose.material3.Text(
+                        text = title,
+                        color = Color.White,
+                        style = androidx.compose.material3.MaterialTheme.typography.titleLarge,
+                        maxLines = 2
+                    )
+                } else {
+                    // Title lines
+                    SkeletonLine(brush = brush, modifier = Modifier, widthFraction = 0.85f, height = 18.dp)
+                    Spacer(modifier = Modifier.height(8.dp))
+                    SkeletonLine(brush = brush, modifier = Modifier, widthFraction = 0.55f, height = 18.dp)
+                }
                 Spacer(modifier = Modifier.height(20.dp))
                 // Channel row
                 Row(verticalAlignment = Alignment.CenterVertically) {

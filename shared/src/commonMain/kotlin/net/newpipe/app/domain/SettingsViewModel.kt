@@ -76,6 +76,15 @@ class SettingsViewModel(private val settings: Settings) : ViewModel() {
         _preferredQuality.value = quality
     }
 
+    private val _newVideoNotifications = MutableStateFlow(settings.getBoolean(KEY_NEW_VIDEO_NOTIFICATIONS, false))
+    /** Notify videos published on followed channels (checked in the background). */
+    val newVideoNotifications: StateFlow<Boolean> = _newVideoNotifications.asStateFlow()
+
+    fun setNewVideoNotifications(enabled: Boolean) {
+        settings.putBoolean(KEY_NEW_VIDEO_NOTIFICATIONS, enabled)
+        _newVideoNotifications.value = enabled
+    }
+
     fun setService(service: Service) {
         settings.putString(KEY_STREAMING_SERVICE, service.serviceName)
         _currentService.value = service
@@ -121,6 +130,7 @@ class SettingsViewModel(private val settings: Settings) : ViewModel() {
         const val KEY_AUTOPLAY_NEXT = "autoplay_next"
         const val KEY_RESUME_PLAYBACK = "resume_playback"
         const val KEY_PREFERRED_QUALITY = "preferred_quality"
+        const val KEY_NEW_VIDEO_NOTIFICATIONS = "new_video_notifications"
         const val QUALITY_AUTO = "auto"
         val QUALITY_CHOICES = listOf(QUALITY_AUTO, "360", "480", "720", "1080")
     }

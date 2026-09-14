@@ -1,6 +1,6 @@
 # ONewPipe
 
-ONewPipe is a privacy-focused, ad-free media frontend based on the NewPipe core. It is available as an Android application and as a native desktop application for Windows, Linux, and macOS.
+ONewPipe is a privacy-focused, ad-free media frontend based on the NewPipe core. It is available as an Android application, as a desktop application for Windows, Linux, and macOS, and as a self-hosted web interface.
 
 **Official public repository:** <https://github.com/TeALO36/ONewPipe>
 
@@ -16,9 +16,10 @@ ONewPipe is a privacy-focused, ad-free media frontend based on the NewPipe core.
 - **Player** — quality selection, playback speed, play queue, repeat modes,
   audio-only (background) mode, subtitles, audio tracks, picture-in-picture,
   fullscreen, keyboard shortcuts, video description and comments.
-- **Downloads** — every video quality saved as one file with its audio track
-  (on desktop the two streams are combined with VLC, which the player already
-  needs), or audio only.
+- **Downloads** — every video quality saved as one file with its audio track,
+  or audio only. On desktop and in the web interface the server downloads the
+  two streams and combines them with NewPipe's muxers (MP4 or WebM); progress
+  and cancellation live in the notification centre, and the page stays usable.
 - **Settings** — theme, playback preferences, history controls, backup and
   restore, self-hosted account, updates. On Android the classic NewPipe
   interface remains reachable from here.
@@ -30,10 +31,13 @@ Use the **latest non-draft release** on the [Releases page](https://github.com/T
 | Device | File to download | What it is |
 | --- | --- | --- |
 | Android | `ONewPipe-vX.Y.Z-android.apk` | Android application package |
-| Windows | `ONewPipe-vX.Y.Z-windows-setup.msi` | Recommended Windows installer |
-| Windows | `ONewPipe-vX.Y.Z-windows-portable.zip` | Portable version; extract it and run the application |
-| Linux (Debian/Ubuntu) | `ONewPipe-vX.Y.Z-linux.deb` | Native Debian package |
-| macOS | `ONewPipe-vX.Y.Z-macos.dmg` | macOS disk image |
+| Windows | `ONewPipe-vX.Y.Z-windows-setup.exe` | Recommended Windows installer |
+| Windows | `ONewPipe-vX.Y.Z-windows-portable.exe` | Portable version; runs without installation |
+| Linux (Debian/Ubuntu) | `ONewPipe-vX.Y.Z-linux.deb` | Debian package |
+| Linux (other distributions) | `ONewPipe-vX.Y.Z-linux.AppImage` | Make it executable, then run it |
+| macOS | `ONewPipe-vX.Y.Z-macos.dmg` | macOS disk image (not notarized: open it with right-click → Open the first time) |
+
+The desktop application bundles its own Java runtime and the ONewPipe server, which it starts on the local machine; nothing else needs to be installed.
 
 `X.Y.Z` is the release version shown in the release title. Do not download `ONewPipe-vX.Y.Z-server.jar`: that is the self-hosted server component, not an application for watching videos. Do not use files from **Actions artifacts** for a normal installation; those are CI builds and may not be signed for upgrades.
 
@@ -41,7 +45,7 @@ Use the **latest non-draft release** on the [Releases page](https://github.com/T
 
 - **F-Droid:** when the ONewPipe repository is published there, install and update it from F-Droid. F-Droid signs its own APKs, so an F-Droid installation must not be replaced by the GitHub APK updater.
 - **Build from source:** developers can build the Android or desktop targets with Gradle. Debug builds are for testing and are not compatible with signed release updates.
-- **Windows portable:** this is intentionally an archive rather than a self-installing executable; it can be moved or deleted without an uninstall step.
+- **Windows portable:** a single executable that runs without installation; it can be moved or deleted without an uninstall step.
 
 ## Updates
 
@@ -56,7 +60,9 @@ The notification opens the matching GitHub release APK. Android verifies the sig
 
 ### Desktop
 
-The update icon in the left sidebar checks GitHub automatically when the application starts. It also provides a manual check button. When an update is found, **Open download page** takes you to the public release page so you can select the correct installer for Windows, Linux, or macOS. The application does not silently replace an installer while it is running.
+The desktop application checks GitHub for a newer release when it starts. When one is found, **Open download page** takes you to the public release page so you can select the correct installer for Windows, Linux, or macOS. The application does not silently replace itself while it is running.
+
+Versions up to 1.3.0 were a Compose/VLC application (`.msi` and `.zip` files); later releases publish the Electron application listed above.
 
 ## Release and compatibility rules
 
@@ -81,6 +87,10 @@ Once connected, **Settings → Account → Sync subscriptions and playlists** me
 subscriptions, playlists and watch-later list of every device through `/api/library`;
 watch positions keep syncing on their own during playback.
 
+In the web interface and the desktop application, **Settings → Account** signs in to this server or to another ONewPipe server (for the desktop application, enter the address of your server, as in the Android app). The first sign-in on a device merges its library with the account's; later changes, history and playback positions synchronize automatically.
+
+Downloads use the server's disk and bandwidth: the desktop application may always download from its own local server, while a server reached over the network requires signing in with an account on that server.
+
 Set a strong `JWT_SECRET`, keep `DATA_DIR` persistent, allow TCP port 8080 on the local firewall and use HTTPS behind a reverse proxy for internet access. See [server/README.md](server/README.md) for the complete setup.
 
 ## Development
@@ -89,6 +99,12 @@ Set a strong `JWT_SECRET`, keep `DATA_DIR` persistent, allow TCP port 8080 on th
 ./gradlew :desktopApp:run
 ./gradlew :app:assembleDebug
 ```
+
+The desktop application is moving to a web interface shown by Electron:
+
+- `webapp/` is the interface (Vite + React + TypeScript). `./gradlew :server:fatJar` builds it with npm and ships it in the server jar at `/`; pass `-PskipWebapp` to build the server without Node. The previous web UI stays available at `/classic`.
+- For interface work, start the server on port 18080 and run `npm run dev` in `webapp/`; Vite forwards `/api` to that server (override with `ONEWPIPE_SERVER`).
+- `desktopWeb/` is the Electron shell. After building the jar, run `npm install` then `npx electron .` in `desktopWeb/`. It starts the server on a free loopback port and opens the interface.
 
 The upstream base currently merged into this fork is NewPipe 0.29.1 (`dev`).
 

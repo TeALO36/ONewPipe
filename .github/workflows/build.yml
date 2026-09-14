@@ -127,6 +127,55 @@ jobs:
           name: macos-dmg
           path: desktopApp/build/compose/binaries/main/dmg/*
 
+  # ---- Desktop app - web interface in Electron (the app published by releases) ----
+  desktop-web-linux:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+
+    steps:
+      - uses: actions/checkout@v6
+
+      - name: Set up JDK
+        uses: actions/setup-java@v5
+        with:
+          java-version: 21
+          distribution: "temurin"
+          cache: "gradle"
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: |
+            webapp/package-lock.json
+            desktopWeb/package-lock.json
+
+      - name: Build server jar with the web interface
+        run: ./gradlew :server:fatJar --stacktrace
+
+      - name: Bundle a Java runtime
+        run: |
+          jlink \
+            --add-modules java.base,java.logging,java.management,java.naming,java.net.http,java.scripting,java.sql,java.xml,jdk.crypto.ec,jdk.unsupported,jdk.zipfs \
+            --strip-debug --no-header-files --no-man-pages --compress zip-6 \
+            --output desktopWeb/runtime
+
+      - name: Package AppImage and .deb
+        working-directory: desktopWeb
+        run: |
+          npm ci --no-audit --no-fund
+          npx electron-builder --linux --publish never
+
+      - name: Upload Linux packages
+        uses: actions/upload-artifact@v7
+        with:
+          name: desktop-web-linux
+          path: |
+            desktopWeb/dist/*.AppImage
+            desktopWeb/dist/*.deb
+
   # ---- Server (jar + Docker image) ----
   server:
     runs-on: ubuntu-latest
@@ -143,6 +192,14 @@ jobs:
           java-version: 21
           distribution: "temurin"
           cache: "gradle"
+
+      # The jar ships the web interface (webapp/), built with npm.
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: webapp/package-lock.json
 
       - name: Build server fat jar
         run: ./gradlew :server:fatJar --stacktrace

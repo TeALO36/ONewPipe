@@ -5,6 +5,10 @@ import io.ktor.http.HttpStatusCode
 import io.ktor.serialization.kotlinx.json.json
 import io.ktor.server.application.Application
 import io.ktor.server.application.call
+import io.ktor.server.application.createApplicationPlugin
+import io.ktor.server.request.path
+import io.ktor.server.response.header
+import io.ktor.server.routing.options
 import io.ktor.server.application.install
 import io.ktor.server.application.log
 import io.ktor.server.engine.embeddedServer
@@ -62,6 +66,7 @@ fun Application.module(
         json(Json { ignoreUnknownKeys = true })
     }
     install(CallLogging)
+    install(AccountCors)
     install(StatusPages) {
         exception<Throwable> { call, cause ->
             call.application.log.error("Request failed", cause)
@@ -173,6 +178,21 @@ fun Application.module(
             call.respond(fetchVideoInfo(url))
         }
 
+        // DASH manifest + range relay, so browsers get video and audio together.
+        dashRoutes()
+
+        // Richer API for the web interface (webapp/).
+        browseRoutes()
+
+        // Downloads muxed on the server, followed by the web interface.
+        downloadRoutes(jwtSecret, store)
+
+        // The web interface can use an account on another ONewPipe server
+        // (the desktop app talks to its own local server): allow those calls.
+        for (path in ACCOUNT_CORS_PATHS) {
+            options(path) { call.respond(HttpStatusCode.NoContent) }
+        }
+
         // ---- Account API ----
 
         post("/api/register") {
@@ -234,10 +254,32 @@ fun Application.module(
             call.respond(mapOf("status" to "ok"))
         }
 
-        // Web UI (same origin as the API: no CORS needed). Keep this catch-all
-        // after every API/admin route so missing static files do not swallow them.
-        staticResources("/", "web") {
-            default("index.html")
+        // Web UIs (same origin as the API: no CORS needed). Keep them after every
+        // API/admin route so missing static files do not swallow those routes.
+        // - the previous single-page UI stays at /classic (account sync lives there);
+        // - the web interface (webapp/) is served at /; it routes with "#", so it
+        //   needs no fallback and missing files still fall through;
+        // - the classic UI's absolute assets (/vendor, /sw.js, the manifest) come last.
+        staticResources("/classic", "web")
+        staticResources("/", "webapp")
+        staticResources("/", "web", index = null)
+    }
+}
+
+/** Account endpoints a web page served by another origin may call with a bearer token. */
+private val ACCOUNT_CORS_PATHS = listOf("/api/login", "/api/register", "/api/library", "/api/watchstate")
+
+/**
+ * CORS for the account endpoints only. They authenticate with a bearer token,
+ * never with cookies, so any origin may call them without exposing a session.
+ */
+private val AccountCors = createApplicationPlugin("AccountCors") {
+    onCall { call ->
+        if (call.request.path() in ACCOUNT_CORS_PATHS) {
+            call.response.header("Access-Control-Allow-Origin", "*")
+            call.response.header("Access-Control-Allow-Headers", "Authorization, Content-Type")
+            call.response.header("Access-Control-Allow-Methods", "GET, POST, OPTIONS")
+            call.response.header("Access-Control-Max-Age", "600")
         }
     }
 }

@@ -154,6 +154,7 @@
 </div>
 <div id="toast"></div>
 
+<script src="/vendor/shaka-player.compiled.js"></script>
 <script>
 const CATS = ['all','gaming','music','movies','podcasts'];
 const state = { token: localStorage.getItem('token') || '', username: localStorage.getItem('username') || '' };
@@ -366,6 +367,57 @@ async function doSearch(q) {
   } catch (e) { grid.innerHTML = '<p style="color:var(--muted);padding:20px">Search failed.</p>'; }
 }
 
+// YouTube only serves separate video and audio streams, so the player loads a
+// DASH manifest from the server (the streams are relayed through /api/stream)
+// and Shaka Player plays them together. A plain <video src> stays as fallback.
+let shakaPlayer = null;
+
+function dashSupported() {
+  return Boolean(window.shaka && shaka.Player.isBrowserSupported());
+}
+
+async function loadDash(url) {
+  if (!shakaPlayer) {
+    shaka.polyfill.installAll();
+    shakaPlayer = new shaka.Player();
+    await shakaPlayer.attach(video);
+    shakaPlayer.configure({ streaming: { bufferingGoal: 30, rebufferingGoal: 1.5 } });
+  }
+  shakaPlayer.configure({ abr: { enabled: true } });
+  // The manifest URL has no .mpd extension; giving the MIME type avoids a
+  // HEAD request Shaka would otherwise send to guess it.
+  await shakaPlayer.load('/api/manifest?url=' + encodeURIComponent(url), null, 'application/dash+xml');
+}
+
+function fillDashQualities() {
+  qualitySelect.innerHTML = '';
+  const auto = document.createElement('option');
+  auto.value = 'auto';
+  auto.textContent = 'Auto';
+  qualitySelect.appendChild(auto);
+  const heights = [...new Set(shakaPlayer.getVariantTracks().map(t => t.height).filter(Boolean))].sort((a, b) => b - a);
+  heights.forEach(height => {
+    const option = document.createElement('option');
+    option.value = String(height);
+    option.textContent = height + 'p';
+    qualitySelect.appendChild(option);
+  });
+  qualitySelect.value = 'auto';
+  qualitySelect.onchange = () => {
+    if (qualitySelect.value === 'auto') {
+      shakaPlayer.configure({ abr: { enabled: true } });
+      return;
+    }
+    const height = Number(qualitySelect.value);
+    const tracks = shakaPlayer.getVariantTracks()
+      .filter(t => t.height === height)
+      .sort((a, b) => b.bandwidth - a.bandwidth);
+    if (!tracks.length) return;
+    shakaPlayer.configure({ abr: { enabled: false } });
+    shakaPlayer.selectVariantTrack(tracks[0], true);
+  };
+}
+
 let currentVideoUrl = '';
 async function openVideo(url, title) {
   currentVideoUrl = url;
@@ -378,30 +430,47 @@ async function openVideo(url, title) {
     const info = await prefetchVideo(url);
     $('pmeta').textContent = [info.uploaderName, formatViews(info.viewCount), fmt(info.durationSeconds)].filter(Boolean).join(' • ');
     const formats = info.videoFormats || [];
-    qualitySelect.innerHTML = '';
-    formats.forEach((format, index) => {
-      const option = document.createElement('option');
-      option.value = format.url;
-      option.textContent = format.label;
-      qualitySelect.appendChild(option);
-      if (index === 0) qualitySelect.value = format.url;
-    });
-    if (!formats.length) {
-      const option = document.createElement('option');
-      option.textContent = 'Default';
-      qualitySelect.appendChild(option);
+    let usingDash = false;
+    if (dashSupported()) {
+      try {
+        await loadDash(url);
+        usingDash = true;
+        fillDashQualities();
+      } catch (error) {
+        console.warn('DASH playback failed, using the direct stream', error);
+      }
     }
-    const selectedUrl = formats[0]?.url || info.streamUrl;
-    video.src = selectedUrl;
-    downloadBtn.href = selectedUrl;
-    downloadBtn.download = (info.title || 'ONewPipe-video').replace(/[\\\\/:*?"<>|]/g, '_') + '.mp4';
-    qualitySelect.onchange = () => {
-      const position = video.currentTime;
-      const wasPlaying = !video.paused;
-      video.src = qualitySelect.value;
-      video.addEventListener('loadedmetadata', () => { video.currentTime = position; if (wasPlaying) video.play().catch(() => {}); }, { once: true });
-      downloadBtn.href = qualitySelect.value;
-    };
+    if (!usingDash) {
+      if (shakaPlayer) await shakaPlayer.unload().catch(() => {});
+      qualitySelect.innerHTML = '';
+      formats.forEach((format, index) => {
+        const option = document.createElement('option');
+        option.value = format.url;
+        option.textContent = format.label;
+        qualitySelect.appendChild(option);
+        if (index === 0) qualitySelect.value = format.url;
+      });
+      if (!formats.length) {
+        const option = document.createElement('option');
+        option.textContent = 'Default';
+        qualitySelect.appendChild(option);
+      }
+      video.src = formats[0]?.url || info.streamUrl;
+      qualitySelect.onchange = () => {
+        const position = video.currentTime;
+        const wasPlaying = !video.paused;
+        video.src = qualitySelect.value;
+        video.addEventListener('loadedmetadata', () => { video.currentTime = position; if (wasPlaying) video.play().catch(() => {}); }, { once: true });
+      };
+    }
+    // A direct download needs a file that already holds video and audio;
+    // YouTube rarely serves one, and the audio-only stream is not a video.
+    const downloadUrl = formats[0]?.url;
+    downloadBtn.style.display = downloadUrl ? '' : 'none';
+    if (downloadUrl) {
+      downloadBtn.href = downloadUrl;
+      downloadBtn.download = (info.title || 'ONewPipe-video').replace(/[\\\\/:*?"<>|]/g, '_') + '.mp4';
+    }
     // resume from synced position
     if (state.token) {
       const saved = await (await fetch('/api/watchstate', { headers: { Authorization: 'Bearer ' + state.token } })).json();

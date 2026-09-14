@@ -61,7 +61,8 @@ sealed class CommentsState {
 
 sealed class PlayerState {
     object Idle : PlayerState()
-    object Loading : PlayerState()
+    /** The stream is being extracted; title and thumbnail come from the card that was opened. */
+    data class Loading(val title: String = "", val thumbnailUrl: String = "") : PlayerState()
     data class Playing(
         val title: String,
         val originalUrl: String,
@@ -152,12 +153,12 @@ class PlayerViewModel(
         }
     }
 
-    fun loadVideo(url: String, title: String) {
+    fun loadVideo(url: String, title: String, thumbnailUrl: String = "") {
         if (currentUrl.isNotBlank() && currentUrl != url) {
             playbackHistory += currentUrl to currentTitle
             if (playbackHistory.size > 50) playbackHistory.removeAt(0)
         }
-        _state.value = PlayerState.Loading
+        _state.value = PlayerState.Loading(title = title, thumbnailUrl = thumbnailUrl)
         _comments.value = CommentsState.Idle
         viewModelScope.launch {
             try {

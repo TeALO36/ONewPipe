@@ -1,0 +1,85 @@
+.settings {
+  max-width: 820px;
+}
+
+.settings-section {
+  padding: 8px 0 20px;
+  border-bottom: 1px solid var(--outline-variant);
+}
+
+.settings-section h2 {
+  font-size: 14px;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: var(--primary);
+  margin: 16px 0 8px;
+}
+
+.setting {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  padding: 10px 0;
+  cursor: pointer;
+}
+
+.setting-text {
+  display: grid;
+  gap: 2px;
+}
+
+.setting-label {
+  font-size: 15px;
+  font-weight: 600;
+}
+
+.setting-description {
+  color: var(--on-surface-variant);
+  font-size: 13px;
+}
+
+.setting-buttons {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-top: 8px;
+}
+
+.switch {
+  appearance: none;
+  position: relative;
+  width: 52px;
+  height: 32px;
+  flex-shrink: 0;
+  border-radius: var(--radius-full);
+  border: 2px solid var(--outline);
+  background: var(--surface-container-highest);
+  cursor: pointer;
+  transition: background 0.2s var(--ease-emphasized), border-color 0.2s;
+}
+
+.switch::after {
+  content: '';
+  position: absolute;
+  top: 6px;
+  left: 6px;
+  width: 16px;
+  height: 16px;
+  border-radius: 50%;
+  background: var(--outline);
+  transition: transform 0.2s var(--ease-emphasized), width 0.2s, height 0.2s, top 0.2s, background 0.2s;
+}
+
+.switch:checked {
+  background: var(--primary);
+  border-color: var(--primary);
+}
+
+.switch:checked::after {
+  top: 2px;
+  width: 24px;
+  height: 24px;
+  transform: translateX(20px);
+  background: var(--on-primary);
+}

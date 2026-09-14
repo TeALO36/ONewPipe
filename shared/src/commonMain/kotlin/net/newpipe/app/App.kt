@@ -111,7 +111,7 @@ fun App() {
         // offers on a long press.
         val cardActions: (MediaItem) -> List<Pair<String, () -> Unit>> = { media ->
             listOf(
-                "Play" to { playerViewModel.loadVideo(media.url, media.title) },
+                "Play" to { playerViewModel.loadVideo(media.url, media.title, media.thumbnailUrl) },
                 "Play next" to { playerViewModel.playNext(media) },
                 "Add to queue" to { playerViewModel.enqueue(media) },
                 "Watch later" to {
@@ -167,7 +167,7 @@ fun App() {
                             onSearchFilterSelected = homeViewModel::selectSearchFilter,
                             onServiceSelected = settingsViewModel::setService,
                             onCategorySelected = homeViewModel::selectCategory,
-                            onMediaClick = { media -> playerViewModel.loadVideo(media.url, media.title) },
+                            onMediaClick = { media -> playerViewModel.loadVideo(media.url, media.title, media.thumbnailUrl) },
                             onChannelClick = { media -> homeViewModel.openChannel(media.url) },
                             subscriptions = subscriptions,
                             onSubscriptionClick = { subscription ->
@@ -239,7 +239,7 @@ fun App() {
                             onSearchFilterSelected = homeViewModel::selectSearchFilter,
                             onServiceSelected = settingsViewModel::setService,
                             onCategorySelected = homeViewModel::selectCategory,
-                            onMediaClick = { media -> playerViewModel.loadVideo(media.url, media.title) },
+                            onMediaClick = { media -> playerViewModel.loadVideo(media.url, media.title, media.thumbnailUrl) },
                             onChannelClick = { media -> homeViewModel.openChannel(media.url) },
                             subscriptions = subscriptions,
                             onSubscriptionClick = { subscription ->

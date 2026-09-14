@@ -114,7 +114,7 @@
 
 ## 🟣 PHASE 3 — Serveur YouTube local (web)
 
-- [x] Le même serveur que la Phase 2 sert aussi une **interface web** (vanilla JS, servie sur `/`)
+- [x] Le même serveur que la Phase 2 sert aussi une **interface web** (React + TypeScript dans `webapp/`, servie sur `/` ; l'ancienne interface vanilla JS reste sur `/classic`)
 - [x] « Son propre YouTube » : recherche, tendances par catégories, lecture, comptes, reprise des lectures dans le navigateur
 - [x] API REST du serveur consommée par le web (`/api/trending`, `/api/search`, `/api/video`, `/api/register`, `/api/login`, `/api/watchstate`)
 - [x] Hébergement : **Docker** (`server/Dockerfile` + `docker-compose.yml`, volume persistant) + jar autonome
@@ -158,6 +158,21 @@
 ---
 
 ### État actuel (septembre 2026)
+
+**PC : passage à une interface web (Electron)**
+
+L'app Compose/VLC dessinait parfois la vidéo hors du lecteur et ralentissait l'interface. Le PC passe donc à une interface web affichée par Electron.
+
+- ✅ **Coque Electron** (`desktopWeb/`) : lance le serveur sur un port local libre, attend `/health`, secret JWT par installation, instance unique, icône ONewPipe
+- ✅ **Lecture web** : YouTube ne sert plus de flux « vidéo + audio » → le serveur construit un manifeste DASH et relaie les flux (`/api/manifest`, `/api/stream`, jetons, pas de proxy ouvert) ; Shaka Player lit dans Chromium — vérifié en 1080p dans le jar
+- ✅ **Nouvelle interface** (`webapp/`, React + TypeScript), servie sur `/` (l'ancienne reste sur `/classic`) : accueil, tendances, recherche filtrée, chaînes, fil d'abonnements, bibliothèque (historique, à regarder plus tard, playlists), réglages avec sauvegarde, page vidéo (qualité, vitesse, sous-titres, répétition, file d'attente, commentaires, suggestions, raccourcis clavier)
+- ✅ **Centre de notifications** en haut à droite et **indicateurs de chargement ondulés** (style Android récent)
+- ✅ **API v2** (`/api/v2/watch|search|trending|channel|comments|more`) avec pagination, testée sur le réseau réel
+- ✅ Android : thème clair/sombre qui ne se mélange plus, icône ONewPipe, notifications de nouvelles vidéos, miniature pendant le chargement
+- ✅ **Téléchargements dans l'interface web** : le serveur télécharge vidéo et audio par tranches de 10 Mo puis les réunit avec les muxers de NewPipe (MP4 H.264 + AAC, WebM VP9 + Opus, M4A) ; progression, file d'attente (2 à la fois) et annulation dans le centre de notifications, la page reste utilisable — vérifié : fichiers MP4/WebM lus avec image et son, annulation d'un 2160p en cours (fichiers temporaires supprimés). Réservé à la machine locale ou à un compte connecté
+- ✅ **Compte dans la nouvelle interface** (Réglages → Compte) : connexion ou création sur ce serveur ou un autre (CORS limité aux routes de compte, jeton bearer), fusion à la première connexion, synchro automatique de la bibliothèque, de l'historique et des positions de lecture
+- ✅ **Installateurs Electron dans la CI** : `release.yml` publie `windows-setup.exe`, `windows-portable.exe`, `linux.deb`, `linux.AppImage`, `macos.dmg`, avec le jar serveur et un runtime Java réduit (jlink) — paquet Windows construit et lancé en local (serveur démarré avec le runtime embarqué) ; l'app vérifie les mises à jour GitHub au démarrage
+- ✅ Image Docker : l'interface est construite dans une étape Node dédiée
 
 **Retours d'utilisation — lecteur et téléchargements**
 

@@ -57,3 +57,55 @@ tasks.register<Jar>("fatJar") {
 tasks.named("build") {
     dependsOn("fatJar")
 }
+
+// The web interface (webapp/, Vite + React) is built with npm and shipped in
+// the jar under "webapp". Pass -PskipWebapp to build the server without Node:
+// an existing webapp/dist (built elsewhere, as in the Docker image) is still shipped.
+val webappDir = rootProject.layout.projectDirectory.dir("webapp")
+tasks.named<ProcessResources>("processResources") {
+    from(webappDir.dir("dist")) {
+        into("webapp")
+    }
+}
+// Read once at configuration time: the configuration cache forbids using project in task actions.
+val skipWebapp = providers.gradleProperty("skipWebapp").isPresent
+val isWindows = System.getProperty("os.name").lowercase().contains("windows")
+fun npm(vararg args: String): List<String> =
+    if (isWindows) listOf("cmd", "/c", "npm", *args) else listOf("npm", *args)
+
+// Decided at configuration time: task actions must not reference the build
+// script, or the configuration cache cannot store them.
+if (!skipWebapp) {
+    // `npm ci` deletes node_modules first, which fails on Windows while a Vite
+    // dev server holds files there. Install only when no complete install exists
+    // (npm writes node_modules/.package-lock.json once an install finishes).
+    val installWebapp = if (!webappDir.file("node_modules/.package-lock.json").asFile.exists()) {
+        tasks.register<Exec>("installWebapp") {
+            description = "Installs the web interface dependencies."
+            workingDir = webappDir.asFile
+            commandLine(npm("ci", "--no-audit", "--no-fund"))
+        }
+    } else {
+        null
+    }
+
+    val buildWebapp = tasks.register<Exec>("buildWebapp") {
+        description = "Builds the web interface served at /."
+        installWebapp?.let { dependsOn(it) }
+        workingDir = webappDir.asFile
+        commandLine(npm("run", "build"))
+        inputs.dir(webappDir.dir("src"))
+        inputs.dir(webappDir.dir("public"))
+        inputs.files(
+            webappDir.file("index.html"),
+            webappDir.file("package.json"),
+            webappDir.file("vite.config.ts"),
+            webappDir.file("tsconfig.app.json")
+        )
+        outputs.dir(webappDir.dir("dist"))
+    }
+
+    tasks.named<ProcessResources>("processResources") {
+        dependsOn(buildWebapp)
+    }
+}

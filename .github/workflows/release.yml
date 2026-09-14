@@ -63,71 +63,62 @@ jobs:
           name: Android-APK
           path: app/build/outputs/apk/release/*.apk
 
+  # Desktop app: the web interface in Electron, with the server jar and a
+  # trimmed Java runtime bundled (desktopWeb/).
   build-desktop:
     name: Build Desktop (${{ matrix.os }})
     strategy:
       fail-fast: false
       matrix:
-        include:
-          - os: windows-latest
-            ext: msi
-          - os: ubuntu-latest
-            ext: deb
-          - os: macos-latest
-            ext: dmg
+        os: [windows-latest, ubuntu-latest, macos-latest]
     runs-on: ${{ matrix.os }}
     steps:
       - uses: actions/checkout@v4
-      - name: Set up JDK 17 (toolchain for shared/desktopApp)
+      - name: Set up JDK 21
         uses: actions/setup-java@v4
         with:
-          java-version: '17'
+          java-version: '21'
           distribution: 'temurin'
           cache: gradle
-      - name: Install WiX Toolset (Windows MSI only)
-        if: runner.os == 'Windows'
-        shell: pwsh
-        run: |
-          $wix = "$env:TEMP\wix311"
-          Invoke-WebRequest "https://github.com/wixtoolset/wix3/releases/download/wix3112rtm/wix311-binaries.zip" -OutFile "$env:TEMP\wix.zip"
-          Expand-Archive "$env:TEMP\wix.zip" -DestinationPath $wix -Force
-          echo "$wix" | Out-File -FilePath $env:GITHUB_PATH -Encoding utf8 -Append
-      - name: Build Desktop Distribution
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: npm
+          cache-dependency-path: |
+            webapp/package-lock.json
+            desktopWeb/package-lock.json
+      - name: Build server jar with the web interface
         shell: bash
+        run: ./gradlew :server:fatJar --stacktrace
+      - name: Bundle a Java runtime
+        shell: bash
+        run: |
+          jlink \
+            --add-modules java.base,java.logging,java.management,java.naming,java.net.http,java.scripting,java.sql,java.xml,jdk.crypto.ec,jdk.unsupported,jdk.zipfs \
+            --strip-debug --no-header-files --no-man-pages --compress zip-6 \
+            --output desktopWeb/runtime
+      - name: Package the desktop app
+        shell: bash
+        working-directory: desktopWeb
         env:
           VERSION: ${{ github.ref_name }}
-        run: ./gradlew :desktopApp:packageDistributionForCurrentOS -DversionNameOverride="${VERSION#v}"
-      - name: Upload Desktop Installer
+          CSC_IDENTITY_AUTO_DISCOVERY: 'false'
+        run: |
+          npm ci --no-audit --no-fund
+          # Tags set the version; manual runs keep the one in package.json.
+          args=()
+          if [[ "$VERSION" == v* ]]; then args+=("-c.extraMetadata.version=${VERSION#v}"); fi
+          npx electron-builder --publish never "${args[@]}"
+      - name: Upload Desktop Installers
         uses: actions/upload-artifact@v4
         with:
           name: Desktop-${{ matrix.os }}
           path: |
-            desktopApp/build/compose/binaries/main/**/*.${{ matrix.ext }}
-
-  build-desktop-portable:
-    name: Build Portable Windows EXE (ZIP)
-    runs-on: windows-latest
-    steps:
-      - uses: actions/checkout@v4
-      - name: Set up JDK 17 (toolchain for shared/desktopApp)
-        uses: actions/setup-java@v4
-        with:
-          java-version: '17'
-          distribution: 'temurin'
-          cache: gradle
-      - name: Build portable distributable
-        shell: bash
-        env:
-          VERSION: ${{ github.ref_name }}
-        run: ./gradlew :desktopApp:createDistributable -DversionNameOverride="${VERSION#v}"
-      - name: Zip portable app
-        run: |
-          powershell Compress-Archive -Path desktopApp/build/compose/binaries/main/app -DestinationPath "ONewPipe-portable-win.zip" -Force
-      - name: Upload Portable ZIP
-        uses: actions/upload-artifact@v4
-        with:
-          name: Desktop-Portable-Windows
-          path: ONewPipe-portable-win.zip
+            desktopWeb/dist/*.exe
+            desktopWeb/dist/*.deb
+            desktopWeb/dist/*.AppImage
+            desktopWeb/dist/*.dmg
 
   build-server-windows:
     name: Build Windows server launcher
@@ -140,6 +131,10 @@ jobs:
           java-version: '21'
           distribution: 'temurin'
           cache: gradle
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '22'
       - name: Build server fat jar
         shell: bash
         run: ./gradlew :server:fatJar
@@ -174,6 +169,10 @@ jobs:
           java-version: '21'
           distribution: 'temurin'
           cache: gradle
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '22'
       - name: Build server fat jar
         run: ./gradlew :server:fatJar
       - name: Upload Server jar
@@ -218,7 +217,7 @@ jobs:
 
   release:
     name: Create GitHub Release
-    needs: [build-android, build-desktop, build-desktop-portable, build-server, build-server-windows]
+    needs: [build-android, build-desktop, build-server, build-server-windows]
     runs-on: ubuntu-latest
     steps:
       - name: Download build artifacts
@@ -226,7 +225,7 @@ jobs:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
           mkdir -p artifacts
-          for a in Android-APK Desktop-ubuntu-latest Desktop-windows-latest Desktop-macos-latest Desktop-Portable-Windows Server-jar Server-Windows; do
+          for a in Android-APK Desktop-ubuntu-latest Desktop-windows-latest Desktop-macos-latest Server-jar Server-Windows; do
             gh run download "${{ github.run_id }}" -R "${{ github.repository }}" --dir artifacts --name "$a"
           done
 
@@ -235,16 +234,17 @@ jobs:
           VERSION: ${{ github.ref_name }}
         run: |
           mkdir -p release-files
-          for f in $(find artifacts -type f \( -name "*.apk" -o -name "*.msi" -o -name "*.deb" -o -name "*.dmg" -o -name "*.jar" -o -name "*.zip" \)); do
+          find artifacts -type f \( -name "*.apk" -o -name "*.exe" -o -name "*.deb" -o -name "*.AppImage" -o -name "*.dmg" -o -name "*.jar" -o -name "*.zip" \) | while read -r f; do
             case "$f" in
               *.apk)  dest="ONewPipe-${VERSION}-android.apk" ;;
-              *.msi)  dest="ONewPipe-${VERSION}-windows-setup.msi" ;;
+              *windows-setup.exe) dest="ONewPipe-${VERSION}-windows-setup.exe" ;;
+              *windows-portable.exe) dest="ONewPipe-${VERSION}-windows-portable.exe" ;;
               *server-windows.zip) dest="ONewPipe-${VERSION}-windows-server.zip" ;;
-              *.zip)  dest="ONewPipe-${VERSION}-windows-portable.zip" ;;
               *.deb)  dest="ONewPipe-${VERSION}-linux.deb" ;;
+              *.AppImage) dest="ONewPipe-${VERSION}-linux.AppImage" ;;
               *.dmg)  dest="ONewPipe-${VERSION}-macos.dmg" ;;
               *.jar)  dest="ONewPipe-${VERSION}-server.jar" ;;
-              *)      dest="$(basename "$f")" ;;
+              *)      continue ;;
             esac
             cp "$f" "release-files/$dest"
           done

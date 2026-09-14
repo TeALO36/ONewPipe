@@ -26,3 +26,12 @@ expect fun shareLink(url: String, title: String): Boolean
 
 /** True when the platform player can render subtitle tracks. */
 expect val subtitlesSupported: Boolean
+
+/** True when the platform can check followed channels in the background and notify new videos. */
+expect val newVideoNotificationsAvailable: Boolean
+
+/** Starts or stops the periodic background check for new videos. */
+expect fun setNewVideoNotificationsEnabled(enabled: Boolean)
+
+/** Runs one background check right away; new videos arrive as a notification. */
+expect fun checkNewVideosNow()

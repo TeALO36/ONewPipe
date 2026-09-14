@@ -37,6 +37,11 @@ compose.desktop {
             // makes the video player fail with "NoClassDefFoundError: sun/misc/Unsafe"
             // (black screen) in packaged builds.
             modules("jdk.unsupported")
+
+            // Application icon for the installers, the Start menu and the taskbar.
+            windows { iconFile.set(project.file("icons/onewpipe.ico")) }
+            linux { iconFile.set(project.file("icons/onewpipe.png")) }
+            macOS { iconFile.set(project.file("icons/onewpipe.icns")) }
         }
     }
 }

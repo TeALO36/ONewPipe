@@ -1,0 +1,123 @@
+/*
+ * ONewPipe design tokens. The colours are the Material 3 schemes of the
+ * Compose app (shared/src/commonMain/.../theme/Color.kt), so the web interface
+ * keeps the same identity. Dark is the default; [data-theme="light"] switches.
+ */
+
+:root {
+  --primary: #b9a9ff;
+  --on-primary: #2b176d;
+  --primary-container: #4c3a99;
+  --secondary: #50e3c2;
+  --secondary-container: #1b6b5a;
+  --tertiary: #b6c7e4;
+  --error: #ffb4ab;
+  --background: #0d1320;
+  --on-background: #eef4ff;
+  --surface: #151e2e;
+  --on-surface: #eef4ff;
+  --surface-variant: #202b3e;
+  --on-surface-variant: #aab6c8;
+  --outline: #77859d;
+  --outline-variant: #334158;
+  --surface-container-low: #121a29;
+  --surface-container: #151e2e;
+  --surface-container-high: #1b2638;
+  --surface-container-highest: #202b3e;
+  --scrim: rgba(3, 6, 12, 0.6);
+  --video-background: #000;
+
+  --radius-s: 8px;
+  --radius-m: 12px;
+  --radius-l: 20px;
+  --radius-full: 999px;
+  --sidebar-width: 88px;
+  --topbar-height: 64px;
+  --font: "Inter", "Segoe UI", system-ui, -apple-system, Roboto, "Helvetica Neue", Arial, sans-serif;
+  --shadow-1: 0 1px 2px rgba(0, 0, 0, 0.3), 0 2px 6px rgba(0, 0, 0, 0.2);
+  --shadow-3: 0 8px 28px rgba(0, 0, 0, 0.45);
+  --ease-emphasized: cubic-bezier(0.2, 0, 0, 1);
+
+  color-scheme: dark;
+}
+
+:root[data-theme="light"] {
+  --primary: #7c5cfc;
+  --on-primary: #ffffff;
+  --primary-container: #e8e1ff;
+  --secondary: #247d6b;
+  --secondary-container: #bcefe2;
+  --tertiary: #34445e;
+  --error: #ba1a1a;
+  --background: #f6f7fb;
+  --on-background: #101827;
+  --surface: #ffffff;
+  --on-surface: #101827;
+  --surface-variant: #edf0f7;
+  --on-surface-variant: #667085;
+  --outline: #98a2b3;
+  --outline-variant: #d9deea;
+  --surface-container-low: #f6f7fb;
+  --surface-container: #edf0f7;
+  --surface-container-high: #e7eaf1;
+  --surface-container-highest: #dde2eb;
+  --scrim: rgba(16, 24, 39, 0.4);
+  --shadow-1: 0 1px 2px rgba(16, 24, 39, 0.08), 0 2px 6px rgba(16, 24, 39, 0.06);
+  --shadow-3: 0 8px 28px rgba(16, 24, 39, 0.16);
+
+  color-scheme: light;
+}
+
+*,
+*::before,
+*::after {
+  box-sizing: border-box;
+}
+
+html,
+body,
+#root {
+  height: 100%;
+  margin: 0;
+}
+
+body {
+  font-family: var(--font);
+  font-size: 14px;
+  line-height: 1.45;
+  background: var(--background);
+  color: var(--on-background);
+  -webkit-font-smoothing: antialiased;
+}
+
+button {
+  font: inherit;
+  color: inherit;
+}
+
+a {
+  color: var(--primary);
+}
+
+img {
+  display: block;
+  max-width: 100%;
+}
+
+::selection {
+  background: var(--primary-container);
+}
+
+:focus-visible {
+  outline: 2px solid var(--primary);
+  outline-offset: 2px;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    transition-duration: 0.01ms !important;
+  }
+}

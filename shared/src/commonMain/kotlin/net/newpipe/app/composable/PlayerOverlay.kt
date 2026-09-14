@@ -91,12 +91,22 @@ fun PlayerOverlay(
                 if (state is PlayerState.Playing) handlePlayerKey(event, playerActions) else false
             }
     ) {
-        // Smooth crossfade between loading / playing / error states
+        // Smooth crossfade between loading / playing / error states. The fade is
+        // keyed on the kind of state only: keying it on the state itself made
+        // every update of a playing video (subtitle, audio track, refreshed
+        // format list) compose a second player and dispose the running one,
+        // which left the desktop video black and frozen.
+        val stateKind = when (state) {
+            is PlayerState.Loading -> 0
+            is PlayerState.Playing -> 1
+            is PlayerState.Error -> 2
+            else -> 3
+        }
         Crossfade(
-            targetState = state,
+            targetState = stateKind,
             animationSpec = tween(260),
             label = "playerState"
-        ) { state ->
+        ) { _ ->
         when (state) {
             is PlayerState.Loading -> {
                 // YouTube-style skeleton while the stream is being extracted.
@@ -162,7 +172,36 @@ fun PlayerOverlay(
                         Modifier.verticalScroll(scrollState)
                     }
 
-                    Row(modifier = Modifier.fillMaxSize().then(scrollModifier)) {
+                    val showTopBar = !isFullscreen && !pictureInPictureMode
+
+                    // Back sits at the top-left corner of the screen, like
+                    // YouTube, instead of below the video. The scrolling
+                    // content starts under this bar: the native desktop video
+                    // surface paints above Compose, so the two must not overlap.
+                    if (showTopBar) {
+                        Row(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .height(TOP_BAR_HEIGHT)
+                                .padding(horizontal = 8.dp),
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            IconButton(onClick = { playerViewModel.stop() }) {
+                                Icon(
+                                    imageVector = Icons.Default.ArrowBack,
+                                    contentDescription = "Back",
+                                    tint = Color.White
+                                )
+                            }
+                        }
+                    }
+
+                    Row(
+                        modifier = Modifier
+                            .fillMaxSize()
+                            .padding(top = if (showTopBar) TOP_BAR_HEIGHT else 0.dp)
+                            .then(scrollModifier)
+                    ) {
 
                         // Left Side (or Full Width)
                         Column(
@@ -216,17 +255,6 @@ fun PlayerOverlay(
                             }
 
                             if (!isFullscreen && !pictureInPictureMode) {
-                                IconButton(
-                                    onClick = { playerViewModel.stop() },
-                                    modifier = Modifier.padding(top = 4.dp)
-                                ) {
-                                    Icon(
-                                        imageVector = Icons.Default.ArrowBack,
-                                        contentDescription = "Back",
-                                        tint = Color.White
-                                    )
-                                }
-
                                 // Details & Mobile Related
                                 Spacer(modifier = Modifier.height(16.dp))
                                 VideoDetailsContent(
@@ -308,6 +336,8 @@ fun PlayerOverlay(
         }
     }
 }
+
+private val TOP_BAR_HEIGHT = 56.dp
 
 /**
  * YouTube-style keyboard shortcuts for the player: Space play/pause, arrows

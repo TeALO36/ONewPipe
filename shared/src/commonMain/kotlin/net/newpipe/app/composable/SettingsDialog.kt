@@ -130,6 +130,34 @@ fun SettingsDialog(
                     }
                 }
 
+                // Only platforms with a background scheduler (Android) can
+                // honour this option, so it is hidden everywhere else.
+                if (net.newpipe.app.newVideoNotificationsAvailable) {
+                    HorizontalDivider()
+
+                    Text(
+                        text = "Notifications",
+                        style = MaterialTheme.typography.titleSmall,
+                        fontWeight = FontWeight.Bold
+                    )
+                    val newVideoNotifications by settingsViewModel.newVideoNotifications.collectAsState()
+                    SettingsSwitch(
+                        title = "New videos from subscriptions",
+                        subtitle = "Check followed channels every few hours and notify new uploads.",
+                        checked = newVideoNotifications,
+                        onCheckedChange = { enabled ->
+                            settingsViewModel.setNewVideoNotifications(enabled)
+                            net.newpipe.app.setNewVideoNotificationsEnabled(enabled)
+                        }
+                    )
+                    val followed by settingsViewModel.subscriptions.collectAsState()
+                    OutlinedButton(
+                        onClick = { net.newpipe.app.checkNewVideosNow() },
+                        enabled = followed.isNotEmpty(),
+                        modifier = Modifier.fillMaxWidth()
+                    ) { Text("Check for new videos now") }
+                }
+
                 if (libraryViewModel != null) {
                     HorizontalDivider()
 

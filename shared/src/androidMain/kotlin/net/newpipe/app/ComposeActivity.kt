@@ -46,6 +46,14 @@ class ComposeActivity : ComponentActivity() {
             // The legacy Android application may already have initialized these singletons.
         }
 
+        // Keep the background check for new videos in line with the setting;
+        // an already scheduled check is kept as it is.
+        runCatching {
+            val enabled = net.newpipe.app.di.settings.provideSettings(this)
+                .getBoolean(net.newpipe.app.domain.SettingsViewModel.KEY_NEW_VIDEO_NOTIFICATIONS, false)
+            net.newpipe.app.backend.NewVideosScheduler.apply(this, enabled)
+        }
+
         // A launcher intent has no navigation payload. App currently owns the home shell,
         // while deep-link destinations can be added here without making startup nullable.
         setContent { App() }

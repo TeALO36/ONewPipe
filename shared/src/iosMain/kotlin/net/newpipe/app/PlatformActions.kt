@@ -17,3 +17,10 @@ actual fun openClassicInterface(): Boolean = false
 actual fun shareLink(url: String, title: String): Boolean = false
 
 actual val subtitlesSupported: Boolean = false
+
+// No background scheduler on iOS yet: the settings hide the option.
+actual val newVideoNotificationsAvailable: Boolean = false
+
+actual fun setNewVideoNotificationsEnabled(enabled: Boolean) = Unit
+
+actual fun checkNewVideosNow() = Unit

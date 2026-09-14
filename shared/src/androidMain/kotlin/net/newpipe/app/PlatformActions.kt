@@ -46,3 +46,18 @@ actual fun shareLink(url: String, title: String): Boolean {
 }
 
 actual val subtitlesSupported: Boolean = true
+
+actual val newVideoNotificationsAvailable: Boolean = true
+
+actual fun setNewVideoNotificationsEnabled(enabled: Boolean) {
+    net.newpipe.app.backend.NewVideosScheduler.apply(
+        org.koin.core.context.GlobalContext.get().get<android.content.Context>(),
+        enabled
+    )
+}
+
+actual fun checkNewVideosNow() {
+    net.newpipe.app.backend.NewVideosScheduler.checkNow(
+        org.koin.core.context.GlobalContext.get().get<android.content.Context>()
+    )
+}

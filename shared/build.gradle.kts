@@ -142,6 +142,7 @@ kotlin {
             implementation(libs.androidx.media)
             implementation(libs.ktor.client.okhttp)
             implementation(libs.androidx.browser)
+            implementation(libs.androidx.work.runtime)
         }
         val iosMain by getting {
             dependencies {

@@ -21,3 +21,10 @@ actual fun shareLink(url: String, title: String): Boolean = false
 // The desktop player downloads the selected track and attaches it to libVLC
 // as a subtitle slave (see VideoPlayer.kt).
 actual val subtitlesSupported: Boolean = true
+
+// No background scheduler on desktop: the settings hide the option.
+actual val newVideoNotificationsAvailable: Boolean = false
+
+actual fun setNewVideoNotificationsEnabled(enabled: Boolean) = Unit
+
+actual fun checkNewVideosNow() = Unit

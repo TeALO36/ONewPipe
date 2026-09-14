@@ -6,7 +6,7 @@
 // Video playback uses Chromium's own player, so the native-surface issues of
 // the former Compose/VLC desktop app do not apply here.
 
-const { app, BrowserWindow, dialog, shell } = require('electron');
+const { app, BrowserWindow, dialog, session, shell } = require('electron');
 const { spawn } = require('child_process');
 const crypto = require('crypto');
 const fs = require('fs');
@@ -165,6 +165,62 @@ function createWindow() {
   return mainWindow;
 }
 
+/** "name.mp4", then "name (1).mp4", … so a download never replaces an existing file. */
+function uniquePath(directory, fileName) {
+  const extension = path.extname(fileName);
+  const base = path.basename(fileName, extension);
+  let candidate = path.join(directory, fileName);
+  for (let index = 1; fs.existsSync(candidate); index++) {
+    candidate = path.join(directory, `${base} (${index})${extension}`);
+  }
+  return candidate;
+}
+
+// Files saved by the interface (downloads, backups) go straight to the
+// Downloads folder instead of opening a dialog, so nothing interrupts the page.
+function saveDownloadsToFolder() {
+  session.defaultSession.on('will-download', (_event, item) => {
+    item.setSavePath(uniquePath(app.getPath('downloads'), item.getFilename()));
+  });
+}
+
+const RELEASES_API = 'https://api.github.com/repos/TeALO36/ONewPipe/releases/latest';
+
+function isNewerVersion(candidate, current) {
+  const a = candidate.split('.').map((part) => parseInt(part, 10) || 0);
+  const b = current.split('.').map((part) => parseInt(part, 10) || 0);
+  for (let index = 0; index < 3; index++) {
+    if ((a[index] || 0) !== (b[index] || 0)) return (a[index] || 0) > (b[index] || 0);
+  }
+  return false;
+}
+
+/** Like the previous desktop app: look for a newer GitHub release at start-up and offer its page. */
+async function checkForUpdate() {
+  if (!app.isPackaged) return;
+  try {
+    const response = await fetch(RELEASES_API, {
+      headers: { Accept: 'application/vnd.github+json', 'User-Agent': 'ONewPipe-desktop' }
+    });
+    if (!response.ok) return;
+    const release = await response.json();
+    const latest = String(release.tag_name || '').replace(/^v/, '');
+    if (!latest || !isNewerVersion(latest, app.getVersion())) return;
+    const { response: choice } = await dialog.showMessageBox(mainWindow, {
+      type: 'info',
+      buttons: ['Open download page', 'Later'],
+      defaultId: 0,
+      cancelId: 1,
+      title: 'Update available',
+      message: `ONewPipe ${latest} is available`,
+      detail: `You have version ${app.getVersion()}. Download the new installer from the release page.`
+    });
+    if (choice === 0) await shell.openExternal(release.html_url);
+  } catch {
+    // Offline or GitHub unreachable: check again at the next start.
+  }
+}
+
 if (!app.requestSingleInstanceLock()) {
   app.quit();
 } else {
@@ -175,10 +231,12 @@ if (!app.requestSingleInstanceLock()) {
   });
 
   app.whenReady().then(async () => {
+    saveDownloadsToFolder();
     createWindow();
     try {
       const url = await startServer();
       await mainWindow.loadURL(url);
+      void checkForUpdate();
     } catch (error) {
       dialog.showErrorBox('ONewPipe could not start', error.message);
       app.quit();

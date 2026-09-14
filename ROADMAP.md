@@ -169,9 +169,10 @@ L'app Compose/VLC dessinait parfois la vidéo hors du lecteur et ralentissait l'
 - ✅ **Centre de notifications** en haut à droite et **indicateurs de chargement ondulés** (style Android récent)
 - ✅ **API v2** (`/api/v2/watch|search|trending|channel|comments|more`) avec pagination, testée sur le réseau réel
 - ✅ Android : thème clair/sombre qui ne se mélange plus, icône ONewPipe, notifications de nouvelles vidéos, miniature pendant le chargement
-- [ ] Téléchargements dans l'interface web (progression dans le centre de notifications, sans bloquer la page)
-- [ ] Connexion au compte serveur dans la nouvelle interface (disponible sur `/classic` en attendant)
-- [ ] Installateurs Electron dans la CI de release (les releases publient encore l'app Compose)
+- ✅ **Téléchargements dans l'interface web** : le serveur télécharge vidéo et audio par tranches de 10 Mo puis les réunit avec les muxers de NewPipe (MP4 H.264 + AAC, WebM VP9 + Opus, M4A) ; progression, file d'attente (2 à la fois) et annulation dans le centre de notifications, la page reste utilisable — vérifié : fichiers MP4/WebM lus avec image et son, annulation d'un 2160p en cours (fichiers temporaires supprimés). Réservé à la machine locale ou à un compte connecté
+- ✅ **Compte dans la nouvelle interface** (Réglages → Compte) : connexion ou création sur ce serveur ou un autre (CORS limité aux routes de compte, jeton bearer), fusion à la première connexion, synchro automatique de la bibliothèque, de l'historique et des positions de lecture
+- ✅ **Installateurs Electron dans la CI** : `release.yml` publie `windows-setup.exe`, `windows-portable.exe`, `linux.deb`, `linux.AppImage`, `macos.dmg`, avec le jar serveur et un runtime Java réduit (jlink) — paquet Windows construit et lancé en local (serveur démarré avec le runtime embarqué) ; l'app vérifie les mises à jour GitHub au démarrage
+- ✅ Image Docker : l'interface est construite dans une étape Node dédiée
 
 **Retours d'utilisation — lecteur et téléchargements**
 

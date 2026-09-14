@@ -4,6 +4,11 @@
   "version": "1.3.0",
   "description": "ONewPipe for desktop: the web interface in Electron, with the NewPipe core running in a local server",
   "license": "GPL-3.0-or-later",
+  "author": {
+    "name": "ONewPipe",
+    "email": "83779026+TeALO36@users.noreply.github.com"
+  },
+  "homepage": "https://github.com/TeALO36/ONewPipe",
   "private": true,
   "main": "main.js",
   "scripts": {
@@ -42,20 +47,29 @@
       ],
       "icon": "build/icon.ico"
     },
+    "nsis": {
+      "artifactName": "ONewPipe-${version}-windows-setup.${ext}"
+    },
+    "portable": {
+      "artifactName": "ONewPipe-${version}-windows-portable.${ext}"
+    },
     "linux": {
       "target": [
         "AppImage",
         "deb"
       ],
       "icon": "build/icon.png",
-      "category": "AudioVideo"
+      "category": "AudioVideo",
+      "artifactName": "ONewPipe-${version}-linux.${ext}"
     },
     "mac": {
       "target": [
         "dmg"
       ],
       "icon": "build/icon.icns",
-      "category": "public.app-category.video"
+      "category": "public.app-category.video",
+      "identity": null,
+      "artifactName": "ONewPipe-${version}-macos.${ext}"
     }
   },
   "devDependencies": {

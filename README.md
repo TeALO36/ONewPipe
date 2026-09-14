@@ -14,8 +14,11 @@ ONewPipe is a privacy-focused, ad-free media frontend based on the NewPipe core.
 - **Library** — watch history with resume positions, local playlists,
   a watch-later list, and the list of downloaded files.
 - **Player** — quality selection, playback speed, play queue, repeat modes,
-  audio-only (background) mode, picture-in-picture, fullscreen, keyboard
-  shortcuts, video description and comments.
+  audio-only (background) mode, subtitles, audio tracks, picture-in-picture,
+  fullscreen, keyboard shortcuts, video description and comments.
+- **Downloads** — every video quality saved as one file with its audio track
+  (on desktop the two streams are combined with VLC, which the player already
+  needs), or audio only.
 - **Settings** — theme, playback preferences, history controls, backup and
   restore, self-hosted account, updates. On Android the classic NewPipe
   interface remains reachable from here.

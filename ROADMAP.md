@@ -48,7 +48,10 @@
 
 ### 1.4 Lecture & médias
 - [x] Lecteur : sélection de qualité (+ qualité préférée dans les réglages), **vitesse de lecture**, **file d'attente**, **répétition (off / file / vidéo)**, **mode audio seul**, précédent/suivant, muet, plein écran, cinéma, PiP
-- [x] Sous-titres (Android : sélection de piste + affichage des sous-titres ; desktop : menu masqué tant que VLC n'est pas branché)
+- [x] Sous-titres sur Android et desktop (desktop : la piste choisie est téléchargée puis ajoutée au lecteur VLC en cours de lecture ; « Off » la retire)
+- [x] Bouton retour du lecteur en haut à gauche de l'écran (comme YouTube), fixe pendant le défilement
+- [x] Changer de sous-titres, de piste audio ou ouvrir le menu qualité ne recrée plus le lecteur (sur desktop la vidéo restait noire et figée)
+- [ ] Ouverture d'une vidéo plus rapide : mesuré ~1 s d'extraction + ~2,5 s avant la première image VLC (flux YouTube vidéo seule + audio séparé ; YouTube ne fournit plus de flux « vidéo + audio »)
 - [x] Doublage : menu « Audio track » quand la vidéo propose plusieurs pistes (bascule automatiquement sur un flux vidéo seul pour éviter deux pistes superposées)
 - [ ] Mini-player flottant (mobile)
 - [ ] Cast / Chromecast (optionnel)
@@ -59,6 +62,7 @@
 - [x] Historique de lecture (reprise à la position, suppression d'une entrée, effacement complet, activation/désactivation)
 - [x] Playlists locales (création, renommage, suppression, ajout/retrait de vidéos) + liste « à regarder plus tard »
 - [x] Téléchargements (video/audio) avec liste des fichiers et progression (desktop)
+- [x] Téléchargement vidéo dans toutes les qualités, vidéo et audio réunis dans un seul fichier (Android : MediaMuxer ; desktop : remux VLC, MP4 ou MKV selon les codecs, téléchargement par tranches de 10 Mo pour éviter le bridage YouTube)
 - [x] Export/import : sauvegarde JSON complète (historique, playlists, à regarder plus tard, abonnements) depuis les réglages
 
 ### 1.6 Apps PC & mobile
@@ -154,6 +158,14 @@
 ---
 
 ### État actuel (septembre 2026)
+
+**Retours d'utilisation — lecteur et téléchargements**
+
+- ✅ **Sous-titres sur desktop** : piste téléchargée (YouTube sert du TTML) puis ajoutée à VLC pendant la lecture — vérifié dans l'app : paroles affichées, « Off » les retire, la lecture continue
+- ✅ **Lecteur figé corrigé** : le fondu d'état recréait tout le lecteur à chaque mise à jour (choix de sous-titres, piste audio, menu qualité) → vidéo noire et figée sur desktop
+- ✅ **Bouton retour** en haut à gauche de l'écran, fixe pendant le défilement
+- ✅ **Téléchargement vidéo** : YouTube ne fournit plus aucun flux « vidéo + audio » (seul l'audio était proposé) → toutes les qualités sont proposées et réunies avec l'audio ; sur desktop, remux VLC vérifié sur une vraie vidéo (2 pistes, < 1 s)
+- ⚠️ **Temps d'ouverture d'une vidéo** mesuré : ~1 s d'extraction + ~2,5 s avant la première image VLC ; ni la création de VLC (~50 ms), ni l'audio séparé, ni le format audio n'en sont la cause — reste à creuser
 
 **Mise au point 1.3.0 — synchronisation upstream + menus complets**
 

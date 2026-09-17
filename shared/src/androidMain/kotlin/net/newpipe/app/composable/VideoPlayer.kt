@@ -4,7 +4,6 @@ import android.app.Activity
 import android.app.PictureInPictureParams
 import android.content.Context
 import android.content.ContextWrapper
-import android.net.Uri
 import android.os.Build
 import android.util.Rational
 import android.view.TextureView
@@ -13,9 +12,12 @@ import androidx.compose.foundation.background
 import androidx.compose.foundation.gestures.detectDragGestures
 import androidx.compose.foundation.gestures.detectTapGestures
 import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.aspectRatio
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
@@ -54,12 +56,9 @@ import androidx.compose.ui.viewinterop.AndroidView
 import androidx.core.view.WindowCompat
 import androidx.core.view.WindowInsetsCompat
 import androidx.core.view.WindowInsetsControllerCompat
-import androidx.media3.common.MediaItem
 import androidx.media3.common.Player
-import androidx.media3.exoplayer.ExoPlayer
-import androidx.media3.exoplayer.source.DefaultMediaSourceFactory
-import androidx.media3.exoplayer.source.MergingMediaSource
-import net.newpipe.app.backend.MediaNotificationController
+import androidx.media3.common.VideoSize
+import net.newpipe.app.backend.ComposeMediaSessionService
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 
@@ -81,44 +80,47 @@ actual fun VideoPlayer(
     val context = LocalContext.current
     val coroutineScope = rememberCoroutineScope()
     val textureView = remember(videoUrl, audioUrl) { TextureView(context) }
-    var isPlaying by remember(videoUrl, audioUrl) { mutableStateOf(true) }
+    var isPlaying by remember(videoUrl, audioUrl) { mutableStateOf(false) }
     val pictureInPictureMode = PlatformPictureInPictureMode()
     var controlsVisible by remember(videoUrl, audioUrl) {
         mutableStateOf(!pictureInPictureMode)
     }
     var positionMs by remember(videoUrl, audioUrl) { mutableStateOf(startPositionMs) }
     var durationMs by remember(videoUrl, audioUrl) { mutableStateOf(0L) }
+    var videoAspectRatio by remember(videoUrl, audioUrl) { mutableStateOf(16f / 9f) }
     var seekFeedback by remember(videoUrl, audioUrl) { mutableStateOf<String?>(null) }
     var nativeFullscreen by remember(videoUrl, audioUrl) { mutableStateOf(false) }
+    var sessionService by remember { mutableStateOf(ComposeMediaSessionService.instance) }
 
-    val exoPlayer = remember(videoUrl, audioUrl) {
-        ExoPlayer.Builder(context).build().apply {
-            val mediaSourceFactory = DefaultMediaSourceFactory(context)
-            val videoSource = mediaSourceFactory.createMediaSource(
-                MediaItem.fromUri(Uri.parse(videoUrl))
-            )
-            val source = if (!audioUrl.isNullOrBlank()) {
-                val audioSource = mediaSourceFactory.createMediaSource(
-                    MediaItem.fromUri(Uri.parse(audioUrl))
-                )
-                MergingMediaSource(videoSource, audioSource)
-            } else {
-                videoSource
+    LaunchedEffect(Unit) {
+        ComposeMediaSessionService.start(context)
+        repeat(60) {
+            val current = ComposeMediaSessionService.instance
+            if (current != null) {
+                sessionService = current
+                return@LaunchedEffect
             }
-            setMediaSource(source)
-            if (startPositionMs > 0) seekTo(startPositionMs)
-            prepare()
-            playWhenReady = true
-            addListener(object : Player.Listener {
-                override fun onIsPlayingChanged(playing: Boolean) {
-                    isPlaying = playing
-                }
-
-                override fun onPlaybackStateChanged(playbackState: Int) {
-                    if (playbackState == Player.STATE_ENDED) onPlaybackEnded()
-                }
-            })
+            delay(50)
         }
+    }
+
+    LaunchedEffect(sessionService, videoUrl, audioUrl, startPositionMs) {
+        sessionService?.playVideo(
+            videoUrl = videoUrl,
+            audioUrl = audioUrl,
+            title = title,
+            artist = artistName,
+            thumbnailUrl = thumbnailUrl,
+            startPositionMs = startPositionMs
+        )
+    }
+
+    val exoPlayer = sessionService?.player()
+    if (exoPlayer == null) {
+        Box(modifier = modifier.background(Color.Black), contentAlignment = Alignment.Center) {
+            Text(text = "Starting playback…", color = Color.White)
+        }
+        return
     }
 
     LaunchedEffect(pictureInPictureMode) {
@@ -134,6 +136,29 @@ actual fun VideoPlayer(
     }
 
     DisposableEffect(exoPlayer, textureView) {
+        val listener = object : Player.Listener {
+            override fun onIsPlayingChanged(playing: Boolean) {
+                isPlaying = playing
+            }
+
+            override fun onPlaybackStateChanged(playbackState: Int) {
+                if (playbackState == Player.STATE_ENDED) onPlaybackEnded()
+            }
+
+            override fun onVideoSizeChanged(videoSize: VideoSize) {
+                if (videoSize.width > 0 && videoSize.height > 0) {
+                    val rotated = videoSize.unappliedRotationDegrees % 180 != 0
+                    val width = if (rotated) videoSize.height else videoSize.width
+                    val height = if (rotated) videoSize.width else videoSize.height
+                    videoAspectRatio = (
+                        width.toFloat() * videoSize.pixelWidthHeightRatio / height.toFloat()
+                    ).coerceIn(0.1f, 10f)
+                }
+            }
+        }
+        exoPlayer.addListener(listener)
+        sessionService?.setNavigationCallbacks(onPreviousVideo, onNextVideo)
+
         // Do not use Media3 PlayerView here: the legacy Android module also
         // contains com.google.android.exoplayer2 resources with the same names,
         // which makes PlayerView inflate the wrong AspectRatioFrameLayout.
@@ -204,14 +229,6 @@ actual fun VideoPlayer(
             }
         }
 
-        val notificationController = MediaNotificationController(
-            context = context,
-            player = exoPlayer,
-            onPrevious = onPreviousVideo,
-            onNext = onNextVideo
-        )
-        notificationController.updateMetadata(title, artistName, thumbnailUrl)
-
         val job = coroutineScope.launch {
             while (true) {
                 val currentPosition = exoPlayer.currentPosition.coerceAtLeast(0L)
@@ -219,7 +236,6 @@ actual fun VideoPlayer(
                 positionMs = currentPosition
                 durationMs = currentDuration
                 onPositionChange(currentPosition)
-                notificationController.updatePlaybackState()
                 delay(250)
             }
         }
@@ -233,21 +249,43 @@ actual fun VideoPlayer(
             playerActions.toggleMute = {}
             playerActions.togglePictureInPicture = {}
             playerActions.toggleFullscreen = {}
-            notificationController.release()
+            exoPlayer.removeListener(listener)
+            // Keep navigation callbacks in the service: notification/headset
+            // next/previous commands must remain usable after the activity
+            // leaves the task. They are replaced when the UI attaches again.
             playerActions.reportSeek = {}
             activity?.requestedOrientation = previousRequestedOrientation
             activity?.window?.let { window ->
                 WindowCompat.getInsetsController(window, window.decorView)
                     .show(WindowInsetsCompat.Type.systemBars())
             }
-            exoPlayer.release()
+            // The MediaSessionService owns this player. Releasing it here would
+            // stop audio as soon as the activity is closed or enters PiP.
         }
     }
 
-    Box(modifier = modifier.background(Color.Black)) {
+    BoxWithConstraints(modifier = modifier.background(Color.Black)) {
+        // TextureView fills its own bounds and therefore stretches the decoded
+        // frame when those bounds have the screen's ratio. Size it to the actual
+        // video ratio instead; the surrounding black area becomes the letterbox.
+        val containerAspectRatio = if (maxHeight > 0.dp) {
+            maxWidth.value / maxHeight.value
+        } else {
+            videoAspectRatio
+        }
+        val videoModifier = if (containerAspectRatio > videoAspectRatio) {
+            Modifier
+                .fillMaxHeight()
+                .aspectRatio(videoAspectRatio)
+        } else {
+            Modifier
+                .fillMaxWidth()
+                .aspectRatio(videoAspectRatio)
+        }
+
         AndroidView(
             factory = { textureView },
-            modifier = Modifier.fillMaxSize()
+            modifier = videoModifier.align(Alignment.Center)
         )
 
         // This transparent gesture layer sits above TextureView, which otherwise

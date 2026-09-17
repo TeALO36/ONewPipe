@@ -155,7 +155,10 @@ public abstract class Postprocessing implements Serializable {
 
                     try (CircularFileWriter out = new CircularFileWriter(
                             mission.storage.getStream(), tempFile, checker)) {
-                        out.onProgress = (long position) -> mission.done = position;
+                        out.onProgress = (long position) -> {
+                            mission.done = position;
+                            mission.notifyPostProcessingProgress(position);
+                        };
 
                         out.onWriteError = err -> {
                             mission.psState = 3;

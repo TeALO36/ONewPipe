@@ -22,7 +22,9 @@ sealed class DownloadState {
         /** Video-only streams (no audio), e.g. 1080p WebM — the high resolutions. */
         val videoOnlyStreams: List<VideoStream>,
         val audioStreams: List<AudioStream>,
-        val title: String
+        val title: String,
+        val sourceUrl: String,
+        val streamInfo: StreamInfo
     ) : DownloadState()
     data class Error(val message: String) : DownloadState()
 }
@@ -35,21 +37,26 @@ class DownloadViewModel : ViewModel() {
         _state.value = DownloadState.Loading
         viewModelScope.launch {
             try {
-                val (videos, videoOnly, audios) = withContext(Dispatchers.IO) {
+                val info = withContext(Dispatchers.IO) {
                     val service = NewPipe.getServiceByUrl(url) ?: throw Exception("Service not found")
                     // StreamInfo (not the raw extractor) resolves all video/audio formats
                     // with their real content URLs, including higher resolutions.
-                    val info = StreamInfo.getInfo(service, url)
-                    // Keep mixed and video-only streams separate: on YouTube the WEB
-                    // client only lists ~360p mixed; the higher resolutions
-                    // (720p/1080p/4K) are all video-only streams.
-                    Triple(
-                        info.videoStreams ?: emptyList(),
-                        info.videoOnlyStreams ?: emptyList(),
-                        info.audioStreams ?: emptyList()
-                    )
+                    StreamInfo.getInfo(service, url)
                 }
-                _state.value = DownloadState.Ready(videos, videoOnly, audios, title)
+                // Keep mixed and video-only streams separate: on YouTube the WEB
+                // client only lists ~360p mixed; the higher resolutions
+                // (720p/1080p/4K) are all video-only streams.
+                val videos = info.videoStreams ?: emptyList()
+                val videoOnly = info.videoOnlyStreams ?: emptyList()
+                val audios = info.audioStreams ?: emptyList()
+                _state.value = DownloadState.Ready(
+                    videoStreams = videos,
+                    videoOnlyStreams = videoOnly,
+                    audioStreams = audios,
+                    title = title,
+                    sourceUrl = url,
+                    streamInfo = info
+                )
             } catch (e: Exception) {
                 _state.value = DownloadState.Error(e.message ?: "Failed to fetch download links")
             }

@@ -162,6 +162,7 @@ lisawray-groupie-core = { module = "com.github.lisawray.groupie:groupie", versio
 lisawray-groupie-viewbinding = { module = "com.github.lisawray.groupie:groupie-viewbinding", version.ref = "groupie" }
 livefront-bridge = { module = "com.github.livefront:bridge", version.ref = "bridge" }
 media3-exoplayer = { module = "androidx.media3:media3-exoplayer", version = "1.2.0" }
+media3-session = { module = "androidx.media3:media3-session", version = "1.2.0" }
 media3-ui = { module = "androidx.media3:media3-ui", version = "1.2.0" }
 mockito-core = { module = "org.mockito:mockito-core", version.ref = "mockitoCore" }
 newpipe-extractor = { module = "com.github.TeamNewPipe:NewPipeExtractor", version.ref = "teamnewpipe-newpipe-extractor" }

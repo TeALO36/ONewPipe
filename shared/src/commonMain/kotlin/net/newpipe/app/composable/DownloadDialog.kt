@@ -23,6 +23,7 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.window.Dialog
 import androidx.compose.ui.unit.dp
+import org.schabi.newpipe.extractor.MediaFormat
 import org.schabi.newpipe.extractor.stream.AudioStream
 import org.schabi.newpipe.extractor.stream.VideoStream
 
@@ -38,11 +39,10 @@ fun DownloadDialog(
     onDownloadAudio: (AudioStream) -> Unit,
     showCombinedVideoOptions: Boolean = net.newpipe.app.backend.supportsCombinedVideoDownload()
 ) {
-    val bestAudio = audioStreams
-        .filter { !(it.content ?: it.url).isNullOrBlank() }
-        .maxByOrNull { it.averageBitrate }
     val highQualityVideos = if (showCombinedVideoOptions) {
-        videoOnlyStreams.filter { resolutionHeight(it.resolution) >= 720 }
+        videoOnlyStreams.filter {
+            resolutionHeight(it.resolution) >= 720 && compatibleAudioFor(it, audioStreams) != null
+        }
     } else {
         emptyList()
     }
@@ -79,16 +79,19 @@ fun DownloadDialog(
                         }
                     }
 
-                    if (highQualityVideos.isNotEmpty() && bestAudio != null) {
+                    if (highQualityVideos.isNotEmpty()) {
                         item {
-                            SectionTitle("High quality · packaged MP4")
+                            SectionTitle("High quality · native WebM/MP4")
                         }
                         items(highQualityVideos) { stream ->
-                            FormatRow(
-                                label = "${stream.resolution} · video + audio",
-                                hint = "The audio track will be combined automatically",
-                                onClick = { onDownloadVideoWithAudio(stream, bestAudio) }
-                            )
+                            val audio = compatibleAudioFor(stream, audioStreams)
+                            if (audio != null) {
+                                FormatRow(
+                                    label = "${stream.resolution} · video + audio",
+                                    hint = "NewPipe will resume both tracks and mux the final file",
+                                    onClick = { onDownloadVideoWithAudio(stream, audio) }
+                                )
+                            }
                         }
                     }
 
@@ -161,3 +164,17 @@ private fun FormatRow(
 
 private fun resolutionHeight(value: String?): Int =
     value.orEmpty().filter { it.isDigit() }.toIntOrNull() ?: 0
+
+/** Select the same codec-compatible secondary stream as NewPipe's native dialog. */
+private fun compatibleAudioFor(video: VideoStream, audioStreams: List<AudioStream>): AudioStream? {
+    val candidates = when (video.format) {
+        MediaFormat.MPEG_4 -> audioStreams.filter { it.format == MediaFormat.M4A }
+        MediaFormat.WEBM -> audioStreams.filter {
+            it.format == MediaFormat.WEBMA || it.format == MediaFormat.WEBMA_OPUS
+        }
+        else -> emptyList()
+    }
+    return candidates
+        .filter { !(it.content ?: it.url).isNullOrBlank() }
+        .maxByOrNull { it.averageBitrate }
+}

@@ -19,6 +19,7 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.unit.dp
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
+import net.newpipe.app.backend.VlcRuntime
 import uk.co.caprica.vlcj.player.base.MediaPlayer
 import uk.co.caprica.vlcj.player.base.MediaPlayerEventAdapter
 import uk.co.caprica.vlcj.player.component.CallbackMediaPlayerComponent
@@ -42,6 +43,9 @@ actual fun VideoPlayer(
     // vlcj callback surface on Windows. A modest network cache gets playback
     // started without the old multi-second buffer.
     val mediaPlayerComponent = remember {
+        // Prefer the VLC runtime bundled in the MSI/portable distribution;
+        // fall back to a system VLC installation during development.
+        VlcRuntime.prepare()
         CallbackMediaPlayerComponent(
             "--no-video-title-show",
             "--avcodec-hw=none",

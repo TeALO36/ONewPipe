@@ -49,7 +49,9 @@ import org.schabi.newpipe.util.Localization;
 import java.io.File;
 import java.io.IOException;
 import java.util.ArrayList;
+import java.util.IdentityHashMap;
 import java.util.List;
+import java.util.Map;
 import java.util.Objects;
 
 import us.shandian.giga.get.DownloadMission;
@@ -66,9 +68,12 @@ public class DownloadManagerService extends Service {
     public static final int MESSAGE_FINISHED = 2;
     public static final int MESSAGE_ERROR = 3;
     public static final int MESSAGE_DELETED = 4;
+    public static final int MESSAGE_PROGRESS = 5;
 
     private static final int FOREGROUND_NOTIFICATION_ID = 1000;
     private static final int DOWNLOADS_NOTIFICATION_ID = 1001;
+    private static final int DOWNLOAD_PROGRESS_NOTIFICATION_BASE = 2000;
+    private static final int MUX_PROGRESS_NOTIFICATION_BASE = 3000;
 
     private static final String EXTRA_URLS = "DownloadManagerService.extra.urls";
     private static final String EXTRA_KIND = "DownloadManagerService.extra.kind";
@@ -118,6 +123,22 @@ public class DownloadManagerService extends Service {
     private Bitmap icDownloadFailed;
 
     private PendingIntent mOpenDownloadList;
+
+    /** Progress notifications are kept separate from the legacy foreground notification. */
+    private final Map<DownloadMission, ProgressNotificationIds> mProgressNotifications =
+            new IdentityHashMap<>();
+    private int mNextProgressNotificationId = DOWNLOAD_PROGRESS_NOTIFICATION_BASE;
+
+    private static final class ProgressNotificationIds {
+        final int downloadId;
+        final int muxId;
+
+        ProgressNotificationIds(final int downloadId) {
+            this.downloadId = downloadId;
+            this.muxId = MUX_PROGRESS_NOTIFICATION_BASE
+                    + (downloadId - DOWNLOAD_PROGRESS_NOTIFICATION_BASE);
+        }
+    }
 
     /**
      * notify media scanner on downloaded media file ...
@@ -227,6 +248,7 @@ public class DownloadManagerService extends Service {
             Log.d(TAG, "Destroying");
         }
 
+        clearAllProgressNotifications();
         ServiceCompat.stopForeground(this, ServiceCompat.STOP_FOREGROUND_REMOVE);
 
         if (mNotificationManager != null && downloadDoneNotification != null) {
@@ -260,6 +282,7 @@ public class DownloadManagerService extends Service {
 
         switch (msg.what) {
             case MESSAGE_FINISHED:
+                clearProgressNotifications(mission);
                 notifyMediaScanner(mission.storage.getUri());
                 notifyFinishedDownload(mission.storage.getName());
                 mManager.setFinished(mission);
@@ -267,14 +290,21 @@ public class DownloadManagerService extends Service {
                 updateForegroundState(mManager.runMissions());
                 break;
             case MESSAGE_RUNNING:
+                updateDownloadProgressNotification(mission, -1, true, null);
                 updateForegroundState(true);
                 break;
+            case MESSAGE_PROGRESS:
+                updateProgressNotification(mission, msg.arg1, msg.arg2);
+                break;
             case MESSAGE_ERROR:
+                clearProgressNotifications(mission);
                 notifyFailedDownload(mission);
                 handleConnectivityState(false);
                 updateForegroundState(mManager.runMissions());
                 break;
             case MESSAGE_PAUSED:
+                updateDownloadProgressNotification(
+                        mission, getDownloadProgress(mission), false, "Download paused");
                 updateForegroundState(mManager.getRunningMissionsCount() > 0);
                 break;
         }
@@ -420,6 +450,109 @@ public class DownloadManagerService extends Service {
         handleConnectivityState(true);// first check the actual network status
 
         mManager.startMission(mission);
+    }
+
+    private void updateProgressNotification(final DownloadMission mission,
+                                             final int progress,
+                                             final int phase) {
+        if (phase == DownloadMission.PROGRESS_PHASE_MUX) {
+            if (mNotificationManager != null) {
+                final ProgressNotificationIds ids = getProgressNotificationIds(mission);
+                mNotificationManager.cancel(ids.downloadId);
+            }
+            postProgressNotification(
+                    mission,
+                    phase,
+                    progress,
+                    true,
+                    "Combining video and audio…");
+        } else {
+            updateDownloadProgressNotification(mission, progress, true, null);
+        }
+    }
+
+    private void updateDownloadProgressNotification(final DownloadMission mission,
+                                                     final int progress,
+                                                     final boolean ongoing,
+                                                     @Nullable final String status) {
+        postProgressNotification(
+                mission,
+                DownloadMission.PROGRESS_PHASE_DOWNLOAD,
+                progress,
+                ongoing,
+                status);
+    }
+
+    private void postProgressNotification(final DownloadMission mission,
+                                          final int phase,
+                                          final int progress,
+                                          final boolean ongoing,
+                                          @Nullable final String status) {
+        if (!mDownloadNotificationEnable || mNotificationManager == null) return;
+
+        final ProgressNotificationIds ids = getProgressNotificationIds(mission);
+        final int notificationId = phase == DownloadMission.PROGRESS_PHASE_MUX
+                ? ids.muxId
+                : ids.downloadId;
+        final String title = phase == DownloadMission.PROGRESS_PHASE_MUX
+                ? "Preparing " + mission.storage.getName()
+                : "Downloading " + mission.storage.getName();
+        final String text = status != null
+                ? status
+                : progress >= 0 ? progress + "%" : "Working…";
+
+        final Builder builder = new Builder(this, getString(R.string.notification_channel_id))
+                .setSmallIcon(android.R.drawable.stat_sys_download)
+                .setContentIntent(mOpenDownloadList)
+                .setOnlyAlertOnce(true)
+                .setOngoing(ongoing)
+                .setContentTitle(title)
+                .setContentText(text);
+
+        if (progress >= 0) {
+            builder.setProgress(100, Math.min(progress, 100), false);
+        } else {
+            builder.setProgress(0, 0, true);
+        }
+
+        mNotificationManager.notify(notificationId, builder.build());
+    }
+
+    private int getDownloadProgress(final DownloadMission mission) {
+        if (mission.unknownLength) return -1;
+        final long length = mission.getLength();
+        if (length <= 0) return -1;
+        return (int) Math.min(100L, Math.max(0L, mission.done * 100L / length));
+    }
+
+    private ProgressNotificationIds getProgressNotificationIds(final DownloadMission mission) {
+        ProgressNotificationIds ids = mProgressNotifications.get(mission);
+        if (ids == null) {
+            ids = new ProgressNotificationIds(mNextProgressNotificationId++);
+            mProgressNotifications.put(mission, ids);
+        }
+        return ids;
+    }
+
+    private void clearProgressNotifications(final DownloadMission mission) {
+        if (mNotificationManager != null) {
+            final ProgressNotificationIds ids = mProgressNotifications.get(mission);
+            if (ids != null) {
+                mNotificationManager.cancel(ids.downloadId);
+                mNotificationManager.cancel(ids.muxId);
+            }
+        }
+        mProgressNotifications.remove(mission);
+    }
+
+    private void clearAllProgressNotifications() {
+        if (mNotificationManager != null) {
+            for (ProgressNotificationIds ids : mProgressNotifications.values()) {
+                mNotificationManager.cancel(ids.downloadId);
+                mNotificationManager.cancel(ids.muxId);
+            }
+        }
+        mProgressNotifications.clear();
     }
 
     public void notifyFinishedDownload(String name) {

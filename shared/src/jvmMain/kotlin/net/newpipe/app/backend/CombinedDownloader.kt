@@ -5,7 +5,21 @@ import javax.swing.SwingUtilities
 
 actual fun supportsCombinedVideoDownload(): Boolean = false
 
-actual fun downloadVideoWithAudio(videoUrl: String, audioUrl: String, defaultName: String) {
+actual fun downloadWithNativeManager(request: NativeDownloadRequest) {
+    val isCombined = !request.videoUrl.isNullOrBlank() && !request.audioUrl.isNullOrBlank()
+    if (!isCombined) {
+        val url = request.videoUrl ?: request.audioUrl
+        if (!url.isNullOrBlank()) {
+            val extension = when {
+                request.videoFormatName?.contains("WEBM", ignoreCase = true) == true -> ".webm"
+                request.audioFormatName?.contains("WEBM", ignoreCase = true) == true -> ".webm"
+                else -> ".mp4"
+            }
+            downloadFile(url, request.defaultName + extension)
+        }
+        return
+    }
+
     SwingUtilities.invokeLater {
         JOptionPane.showMessageDialog(
             null,

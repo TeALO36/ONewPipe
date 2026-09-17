@@ -48,6 +48,13 @@ class DownloadDialogTest {
                             .setMediaFormat(MediaFormat.M4A)
                             .setDeliveryMethod(DeliveryMethod.PROGRESSIVE_HTTP)
                             .setAverageBitrate(128)
+                            .build(),
+                        AudioStream.Builder()
+                            .setId("itag-webm-audio")
+                            .setContent("https://googlevideo.example/webm-audio", true)
+                            .setMediaFormat(MediaFormat.WEBMA_OPUS)
+                            .setDeliveryMethod(DeliveryMethod.PROGRESSIVE_HTTP)
+                            .setAverageBitrate(160)
                             .build()
                     ),
                     title = "Test Video",
@@ -62,7 +69,7 @@ class DownloadDialogTest {
 
         onNodeWithText("Download: Test Video").assertIsDisplayed()
         onNodeWithText("Video + audio").assertIsDisplayed()
-        onNodeWithText("High quality · packaged MP4").performScrollTo().assertIsDisplayed()
+        onNodeWithText("High quality · native WebM/MP4").performScrollTo().assertIsDisplayed()
         onNodeWithText("Audio only").performScrollTo().assertIsDisplayed()
         onNodeWithText("360p · MPEG-4").assertIsDisplayed()
         onNodeWithText("1080p · video + audio").performScrollTo().assertIsDisplayed()

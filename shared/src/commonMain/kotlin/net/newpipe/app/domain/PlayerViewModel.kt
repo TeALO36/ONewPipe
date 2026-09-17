@@ -32,6 +32,11 @@ internal fun <T> selectFastStartStream(
     return preferred(progressive) ?: preferred(adaptive)
 }
 
+data class QualityLoadState(
+    val isLoading: Boolean = false,
+    val errorMessage: String? = null
+)
+
 sealed class PlayerState {
     object Idle : PlayerState()
     object Loading : PlayerState()
@@ -67,6 +72,9 @@ class PlayerViewModel(
     private val _state = MutableStateFlow<PlayerState>(PlayerState.Idle)
     val state: StateFlow<PlayerState> = _state.asStateFlow()
 
+    private val _qualityLoadState = MutableStateFlow(QualityLoadState())
+    val qualityLoadState: StateFlow<QualityLoadState> = _qualityLoadState.asStateFlow()
+
     private var currentUrl = ""
     private var currentTitle = ""
     private val playbackHistory = mutableListOf<Pair<String, String>>()
@@ -92,6 +100,7 @@ class PlayerViewModel(
     }
 
     fun loadVideo(url: String, title: String) {
+        _qualityLoadState.value = QualityLoadState()
         if (currentUrl.isNotBlank() && currentUrl != url) {
             playbackHistory += currentUrl to currentTitle
             if (playbackHistory.size > 50) playbackHistory.removeAt(0)
@@ -138,6 +147,7 @@ class PlayerViewModel(
         synchronized(qualityLoads) {
             if (!qualityLoads.add(url)) return
         }
+        _qualityLoadState.value = QualityLoadState(isLoading = true)
         viewModelScope.launch {
             try {
                 val info = withContext(Dispatchers.IO) {
@@ -162,9 +172,16 @@ class PlayerViewModel(
                         audioStreams = info.audioStreams ?: emptyList()
                     )
                 }
-            } catch (_: Exception) {
-                // The fast progressive stream is already playing; keep it if
-                // optional high-quality extraction is blocked or unavailable.
+                _qualityLoadState.value = QualityLoadState()
+            } catch (error: Exception) {
+                // Keep the already-playing progressive stream, but expose the
+                // real extractor failure so the user can retry from the menu.
+                val type = error::class.simpleName ?: "Unknown error"
+                val detail = error.message?.trim().takeUnless { it.isNullOrBlank() }
+                    ?: "The extractor returned no additional details."
+                _qualityLoadState.value = QualityLoadState(
+                    errorMessage = "Unable to load HD/4K profiles ($type): $detail"
+                )
             } finally {
                 synchronized(qualityLoads) { qualityLoads.remove(url) }
             }

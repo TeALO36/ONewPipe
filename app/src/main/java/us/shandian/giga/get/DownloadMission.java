@@ -1,6 +1,7 @@
 package us.shandian.giga.get;
 
 import android.os.Handler;
+import android.os.Message;
 import android.system.ErrnoException;
 import android.system.OsConstants;
 import android.util.Log;
@@ -146,6 +147,12 @@ public class DownloadMission extends Mission {
 
     private transient long writingToFileNext;
     private transient volatile boolean writingToFile;
+    private transient long lastProgressNotificationAt;
+    private transient int lastProgressNotification = Integer.MIN_VALUE;
+    private transient int lastProgressNotificationPhase = Integer.MIN_VALUE;
+
+    public static final int PROGRESS_PHASE_DOWNLOAD = 0;
+    public static final int PROGRESS_PHASE_MUX = 1;
 
     final Object LOCK = new Lock();
 
@@ -274,7 +281,36 @@ public class DownloadMission extends Mission {
 
 
     private void notify(int what) {
-        mHandler.obtainMessage(what, this).sendToTarget();
+        if (mHandler != null) {
+            mHandler.obtainMessage(what, this).sendToTarget();
+        }
+    }
+
+    private synchronized void notifyProgressUpdate(final int phase, final int progress) {
+        if (mHandler == null) return;
+
+        final long now = System.currentTimeMillis();
+        final boolean changed = progress != lastProgressNotification
+                || phase != lastProgressNotificationPhase;
+        if (!changed && now - lastProgressNotificationAt < 500) return;
+
+        lastProgressNotificationAt = now;
+        lastProgressNotification = progress;
+        lastProgressNotificationPhase = phase;
+
+        final Message message = mHandler.obtainMessage(
+                DownloadManagerService.MESSAGE_PROGRESS, this);
+        message.arg1 = progress;
+        message.arg2 = phase;
+        message.sendToTarget();
+    }
+
+    public void notifyPostProcessingProgress(final long position) {
+        final long total = length;
+        final int progress = total > 0
+                ? (int) Math.min(100L, Math.max(0L, position * 100L / total))
+                : -1;
+        notifyProgressUpdate(PROGRESS_PHASE_MUX, progress);
     }
 
     synchronized void notifyProgress(long deltaLen) {
@@ -285,6 +321,12 @@ public class DownloadMission extends Mission {
         done += deltaLen;
 
         if (metadata == null) return;
+
+        final long total = getLength();
+        final int progress = !unknownLength && total > 0
+                ? (int) Math.min(100L, Math.max(0L, done * 100L / total))
+                : -1;
+        notifyProgressUpdate(PROGRESS_PHASE_DOWNLOAD, progress);
 
         if (!writingToFile && (done > writingToFileNext || deltaLen < 0)) {
             writingToFile = true;
@@ -409,6 +451,10 @@ public class DownloadMission extends Mission {
         }
 
         Log.d(TAG, action + " postprocessing on " + storage.getName());
+
+        if (state == 1) {
+            notifyProgressUpdate(PROGRESS_PHASE_MUX, 0);
+        }
 
         if (state == 2) {
             psState = state;

@@ -27,6 +27,7 @@ import coil3.compose.AsyncImage
 import net.newpipe.app.domain.DownloadViewModel
 import net.newpipe.app.domain.PlayerState
 import net.newpipe.app.domain.PlayerViewModel
+import net.newpipe.app.domain.QualityLoadState
 import net.newpipe.app.domain.Subscription
 
 @Composable
@@ -36,7 +37,11 @@ fun VideoDetailsContent(
     downloadViewModel: DownloadViewModel,
     onChannelClick: (String) -> Unit = {},
     isSubscribed: Boolean = false,
-    onToggleSubscription: (Subscription) -> Unit = {}
+    onToggleSubscription: (Subscription) -> Unit = {},
+    qualityLoadStateOverride: QualityLoadState? = null,
+    onQualitySelected: (videoUrl: String, audioUrl: String?) -> Unit = { videoUrl, audioUrl ->
+        playerViewModel.changeQuality(videoUrl, audioUrl)
+    }
 ) {
     // Title & Views
     Text(text = state.title, color = Color.White, style = MaterialTheme.typography.titleLarge)
@@ -117,6 +122,8 @@ fun VideoDetailsContent(
         val qualityProfiles = remember(state.videoStreams, state.videoOnlyStreams, state.audioStreams) {
             buildQualityProfiles(state)
         }
+        val observedQualityLoadState by playerViewModel.qualityLoadState.collectAsState()
+        val qualityLoadState = qualityLoadStateOverride ?: observedQualityLoadState
 
         // Fetch optional HD/4K formats after the popup is visible. Starting
         // extractor work in the button callback made the Android popup race
@@ -145,7 +152,54 @@ fun VideoDetailsContent(
                     .heightIn(max = 360.dp)
                     .background(Color(0xFF2D2D2D))
             ) {
-                if (qualityProfiles.isEmpty()) {
+                if (qualityLoadState.isLoading) {
+                    DropdownMenuItem(
+                        enabled = false,
+                        leadingIcon = {
+                            CircularProgressIndicator(
+                                modifier = Modifier.size(18.dp),
+                                strokeWidth = 2.dp,
+                                color = MaterialTheme.colorScheme.primary
+                            )
+                        },
+                        text = {
+                            Column {
+                                Text("Loading quality profiles…", color = Color.White)
+                                Text(
+                                    "Fetching HD and 4K formats",
+                                    color = Color.LightGray,
+                                    style = MaterialTheme.typography.labelSmall
+                                )
+                            }
+                        },
+                        onClick = {}
+                    )
+                }
+
+                qualityLoadState.errorMessage?.let { message ->
+                    DropdownMenuItem(
+                        text = {
+                            Column {
+                                Text("Quality loading failed", color = MaterialTheme.colorScheme.error)
+                                Text(
+                                    message,
+                                    color = Color.LightGray,
+                                    style = MaterialTheme.typography.labelSmall,
+                                    maxLines = 4,
+                                    overflow = TextOverflow.Ellipsis
+                                )
+                                Text(
+                                    "Tap to retry",
+                                    color = MaterialTheme.colorScheme.primary,
+                                    style = MaterialTheme.typography.labelSmall
+                                )
+                            }
+                        },
+                        onClick = { playerViewModel.loadFullQuality(state.originalUrl) }
+                    )
+                }
+
+                if (qualityProfiles.isEmpty() && !qualityLoadState.isLoading) {
                     DropdownMenuItem(
                         text = { Text("No video quality available", color = Color.LightGray) },
                         onClick = { expandedQuality = false }
@@ -164,7 +218,7 @@ fun VideoDetailsContent(
                                 }
                             },
                             onClick = {
-                                playerViewModel.changeQuality(profile.videoUrl, profile.audioUrl)
+                                onQualitySelected(profile.videoUrl, profile.audioUrl)
                                 expandedQuality = false
                             }
                         )

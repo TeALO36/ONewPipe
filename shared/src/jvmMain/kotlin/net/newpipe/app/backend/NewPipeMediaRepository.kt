@@ -4,6 +4,7 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import net.newpipe.app.domain.MediaItem
 import net.newpipe.app.domain.MediaItemKind
+import net.newpipe.app.domain.ChannelHeader
 import net.newpipe.app.domain.MediaRepository
 import net.newpipe.app.domain.PageResult
 import net.newpipe.app.domain.SearchFilter
@@ -26,6 +27,13 @@ class NewPipeMediaRepository : MediaRepository {
     // Cache pagination states keyed by operation identifier
     private val searchPages = mutableMapOf<String, Page>()
     private val trendingPages = mutableMapOf<String, Page>()
+    private val channelPages = mutableMapOf<String, ChannelPage>()
+
+    /** A channel tab plus the page to request next. */
+    private data class ChannelPage(
+        val handler: org.schabi.newpipe.extractor.linkhandler.ListLinkHandler,
+        val page: Page
+    )
 
     override suspend fun getTrending(
         serviceId: Int,
@@ -71,12 +79,34 @@ class NewPipeMediaRepository : MediaRepository {
             try {
                 val service = NewPipe.getService(serviceId)
                 val channel = ChannelInfo.getInfo(service, url)
+                val header = ChannelHeader(
+                    url = channel.url ?: url,
+                    name = channel.name.orEmpty(),
+                    avatarUrl = channel.avatars?.firstOrNull()?.url.orEmpty(),
+                    bannerUrl = channel.banners?.firstOrNull()?.url.orEmpty(),
+                    subscriberCount = channel.subscriberCount,
+                    description = channel.description.orEmpty(),
+                    verified = channel.isVerified
+                )
                 val tab = channel.tabs.firstOrNull()
                 if (tab == null) {
-                    PageResult(emptyList())
+                    PageResult(emptyList(), channel = header)
                 } else {
                     val tabInfo = ChannelTabInfo.getInfo(service, tab)
-                    PageResult(tabInfo.relatedItems.mapNotNull { it.toMediaItem() })
+                    // Keep the tab handler so the grid can keep scrolling: a
+                    // channel page used to stop after its first page.
+                    val pageId = "channel:${channel.url ?: url}"
+                    val nextPage = tabInfo.nextPage
+                    if (nextPage != null && Page.isValid(nextPage)) {
+                        channelPages[pageId] = ChannelPage(tab, nextPage)
+                    } else {
+                        channelPages.remove(pageId)
+                    }
+                    PageResult(
+                        items = tabInfo.relatedItems.mapNotNull { it.toMediaItem() },
+                        nextPageToken = if (tabInfo.hasNextPage()) pageId else null,
+                        channel = header
+                    )
                 }
             } catch (e: Exception) {
                 e.printStackTrace()
@@ -88,6 +118,23 @@ class NewPipeMediaRepository : MediaRepository {
         withContext(Dispatchers.IO) {
             try {
                 val service = NewPipe.getService(serviceId)
+
+                if (pageToken.startsWith("channel:")) {
+                    val channelPage = channelPages[pageToken]
+                        ?: return@withContext PageResult(emptyList())
+                    val tabInfo = ChannelTabInfo.getMoreItems(service, channelPage.handler, channelPage.page)
+                    val nextPage = tabInfo.nextPage
+                    if (nextPage != null && Page.isValid(nextPage)) {
+                        channelPages[pageToken] = channelPage.copy(page = nextPage)
+                    } else {
+                        channelPages.remove(pageToken)
+                    }
+                    return@withContext PageResult(
+                        items = tabInfo.items.mapNotNull { it.toMediaItem() },
+                        nextPageToken = if (tabInfo.hasNextPage()) pageToken else null
+                    )
+                }
+
                 val page = trendingPages[pageToken] ?: searchPages[pageToken]
                 if (page == null || !Page.isValid(page)) {
                     return@withContext PageResult(emptyList())
@@ -143,22 +190,43 @@ class NewPipeMediaRepository : MediaRepository {
         val queryHandler = buildQueryHandler(service, query, filter)
         val searchInfo = SearchInfo.getInfo(service, queryHandler)
 
-        // Store the next page for later pagination
-        if (searchInfo.hasNextPage()) {
-            if (pageId.startsWith("search:")) {
-                searchPages[pageId] = searchInfo.nextPage
-            } else {
-                trendingPages[pageId] = searchInfo.nextPage
-            }
+        val collected = searchInfo.relatedItems.mapNotNull { item -> item.toMediaItem() }.toMutableList()
+
+        // One search page can be mostly playlists or channels, which leaves a
+        // nearly empty category grid. Pull a couple of extra pages until the
+        // grid is worth showing.
+        var nextPage = if (searchInfo.hasNextPage()) searchInfo.nextPage else null
+        var extraPages = 0
+        while (collected.distinctBy { it.url }.size < MIN_CATEGORY_ITEMS &&
+            nextPage != null &&
+            Page.isValid(nextPage) &&
+            extraPages < MAX_EXTRA_PAGES
+        ) {
+            extraPages++
+            val more = runCatching { SearchInfo.getMoreItems(service, queryHandler, nextPage) }.getOrNull()
+                ?: break
+            collected += more.items.mapNotNull { item -> item.toMediaItem() }
+            nextPage = if (more.hasNextPage()) more.nextPage else null
         }
 
-        val items = searchInfo.relatedItems.mapNotNull { item -> item.toMediaItem() }
-            .sortedByDescending { it.viewCount }
+        if (nextPage != null && Page.isValid(nextPage)) {
+            if (pageId.startsWith("search:")) {
+                searchPages[pageId] = nextPage
+            } else {
+                trendingPages[pageId] = nextPage
+            }
+        } else {
+            searchPages.remove(pageId)
+            trendingPages.remove(pageId)
+        }
+
+        val items = collected
             .distinctBy { it.url }
+            .sortedByDescending { it.viewCount }
 
         return PageResult(
             items = items,
-            nextPageToken = if (searchInfo.hasNextPage()) pageId else null
+            nextPageToken = if (nextPage != null && Page.isValid(nextPage)) pageId else null
         )
     }
 
@@ -216,6 +284,12 @@ class NewPipeMediaRepository : MediaRepository {
         } catch (e: Exception) {
             service.searchQHFactory.fromQuery(query)
         }
+    }
+
+    private companion object {
+        /** A category grid looks broken below this many videos. */
+        const val MIN_CATEGORY_ITEMS = 16
+        const val MAX_EXTRA_PAGES = 3
     }
 
     private fun InfoItem.toMediaItem(): MediaItem? = when (this) {

@@ -9,6 +9,7 @@ plugins {
     alias(libs.plugins.jetbrains.kotlin.jvm)
     alias(libs.plugins.jetbrains.kotlin.compose)
     alias(libs.plugins.jetbrains.compose.multiplatform)
+    alias(libs.plugins.about.libraries)
 }
 
 kotlin {
@@ -39,6 +40,19 @@ compose.desktop {
             // makes the video player fail with "NoClassDefFoundError: sun/misc/Unsafe"
             // (black screen) in packaged builds.
             modules("jdk.unsupported")
+
+            // Application icon for the installers, the Start menu and the taskbar.
+            windows { iconFile.set(project.file("icons/onewpipe.ico")) }
+            linux { iconFile.set(project.file("icons/onewpipe.png")) }
+            macOS { iconFile.set(project.file("icons/onewpipe.icns")) }
         }
+    }
+}
+
+aboutLibraries {
+    export {
+        outputFile = file("../shared/src/jvmMain/resources/aboutlibraries.json")
+        prettyPrint = true
+        excludeFields.addAll("organization", "scm", "funding")
     }
 }

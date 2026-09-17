@@ -22,10 +22,24 @@ data class MediaItem(
     val kind: MediaItemKind = MediaItemKind.VIDEO
 )
 
+/** Identity of a channel, shown above its videos. */
+data class ChannelHeader(
+    val url: String,
+    val name: String,
+    val avatarUrl: String = "",
+    val bannerUrl: String = "",
+    /** -1 when the service does not expose the subscriber count. */
+    val subscriberCount: Long = -1,
+    val description: String = "",
+    val verified: Boolean = false
+)
+
 /** Paginated result from the repository. */
 data class PageResult(
     val items: List<MediaItem>,
-    val nextPageToken: String? = null
+    val nextPageToken: String? = null,
+    /** Set when the page belongs to a channel, so the UI can show its header. */
+    val channel: ChannelHeader? = null
 )
 
 /**

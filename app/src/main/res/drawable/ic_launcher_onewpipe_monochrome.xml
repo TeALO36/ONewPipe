@@ -1,0 +1,16 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- ONewPipe launcher artwork (ring + play) scaled into the adaptive icon safe zone. -->
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="108dp"
+    android:height="108dp"
+    android:viewportWidth="108"
+    android:viewportHeight="108">
+    <path
+        android:pathData="M76.29,36.585 A28.286,28.286 0 1,1 50.636,25.915"
+        android:strokeColor="#FFFFFFFF"
+        android:strokeWidth="9.429"
+        android:strokeLineCap="round" />
+    <path
+        android:pathData="M46.747,40.945 L69.231,54 L46.747,67.055 Z"
+        android:fillColor="#FFFFFFFF" />
+</vector>

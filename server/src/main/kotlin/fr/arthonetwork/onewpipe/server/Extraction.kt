@@ -126,6 +126,8 @@ suspend fun fetchVideoInfo(url: String): VideoInfoDto {
             title = info.name ?: "Unknown",
             streamUrl = streamUrl,
             uploaderName = info.uploaderName ?: "",
+            uploaderUrl = info.uploaderUrl.orEmpty().ifBlank { info.subChannelUrl.orEmpty() },
+            uploaderAvatarUrl = info.uploaderAvatars?.firstOrNull()?.url.orEmpty(),
             uploaderSubscriberCount = info.uploaderSubscriberCount ?: 0L,
             viewCount = info.viewCount ?: 0L,
             durationSeconds = info.duration ?: 0L,

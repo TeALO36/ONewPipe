@@ -9,6 +9,8 @@ package net.newpipe.app.theme
 import androidx.compose.ui.graphics.Color
 
 // Shared ONewPipe brand palette. Keep these values in sync with the web CSS.
+val logoBackground = Color(0xFFCD201F)
+
 val primaryLight = Color(0xFF7C5CFC)
 val onPrimaryLight = Color(0xFFFFFFFF)
 val primaryContainerLight = Color(0xFFE8E1FF)

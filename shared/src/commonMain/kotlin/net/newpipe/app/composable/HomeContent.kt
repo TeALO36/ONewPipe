@@ -24,7 +24,7 @@ import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.ArrowDropDown
-import androidx.compose.material.icons.filled.Cloud
+import androidx.compose.material.icons.filled.Subscriptions
 import androidx.compose.material.icons.filled.VideoLibrary
 import androidx.compose.material3.DropdownMenu
 import androidx.compose.material3.DropdownMenuItem
@@ -32,6 +32,8 @@ import androidx.compose.material3.FilterChip
 import androidx.compose.material3.FilterChipDefaults
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.material3.Button
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
@@ -42,9 +44,14 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.draw.clip
 import androidx.compose.ui.text.style.TextAlign
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
+import net.newpipe.app.domain.CategoryRow
+import net.newpipe.app.domain.ChannelHeader
 import net.newpipe.app.domain.HomeState
+import net.newpipe.app.domain.LibraryViewModel
 import net.newpipe.app.domain.MediaItem
 import net.newpipe.app.domain.SearchFilter
 import net.newpipe.app.domain.Subscription
@@ -57,8 +64,8 @@ import coil3.compose.AsyncImage
  * the section-specific content for each sidebar item.
  *
  * Home and Trending show the media grid (trending by category, or search
- * results). Subscriptions and Library have no data source yet, so they show
- * an honest empty state instead of silently reusing the home feed.
+ * results), Subscriptions lists the channels the user follows and Library
+ * shows the watch history, local playlists, watch-later list and downloads.
  */
 @Composable
 fun HomeContent(
@@ -76,9 +83,23 @@ fun HomeContent(
     onChannelClick: (MediaItem) -> Unit = {},
     subscriptions: List<Subscription> = emptyList(),
     onSubscriptionClick: (Subscription) -> Unit = {},
+    onUnsubscribe: (Subscription) -> Unit = {},
+    onOpenSubscriptionFeed: () -> Unit = {},
+    libraryViewModel: LibraryViewModel? = null,
+    onEnqueue: (MediaItem) -> Unit = {},
+    searchHistory: List<String> = emptyList(),
+    onSearchHistoryRemove: (String) -> Unit = {},
+    onSearchHistoryClear: () -> Unit = {},
+    cardActions: (MediaItem) -> List<Pair<String, () -> Unit>> = { emptyList() },
+    rows: List<CategoryRow> = emptyList(),
+    onSeeAllCategory: (TrendingCategory) -> Unit = {},
+    channel: ChannelHeader? = null,
+    isChannelSubscribed: Boolean = false,
+    onToggleChannelSubscription: (ChannelHeader) -> Unit = {},
     onDownloadClick: (MediaItem) -> Unit,
     onPrefetch: (MediaItem) -> Unit = {},
     onLoadMore: () -> Unit = {},
+    onRetry: () -> Unit = {},
     isLoadingMore: Boolean = false,
     modifier: Modifier = Modifier
 ) {
@@ -96,7 +117,13 @@ fun HomeContent(
                         modifier = Modifier.padding(horizontal = 16.dp),
                         verticalArrangement = Arrangement.spacedBy(10.dp)
                     ) {
-                        GlassSearchBar(onSearch = onSearch, modifier = Modifier.fillMaxWidth())
+                        GlassSearchBar(
+                            onSearch = onSearch,
+                            history = searchHistory,
+                            onHistoryRemove = onSearchHistoryRemove,
+                            onHistoryClear = onSearchHistoryClear,
+                            modifier = Modifier.fillMaxWidth()
+                        )
                         if (!isSearching) {
                             ServiceSwitcher(
                                 service = service,
@@ -112,6 +139,9 @@ fun HomeContent(
                     ) {
                         GlassSearchBar(
                             onSearch = onSearch,
+                            history = searchHistory,
+                            onHistoryRemove = onSearchHistoryRemove,
+                            onHistoryClear = onSearchHistoryClear,
                             modifier = Modifier.weight(1f)
                         )
                         if (!isSearching) {
@@ -131,6 +161,17 @@ fun HomeContent(
                 }
             }
 
+        // Channel header: the identity of the channel currently being browsed,
+        // with the subscribe button NewPipe shows on its channel page.
+        if (channel != null && (selectedItem == NavItem.HOME || selectedItem == NavItem.TRENDING) && !isSearching) {
+            ChannelHeaderRow(
+                channel = channel,
+                isSubscribed = isChannelSubscribed,
+                onToggleSubscription = { onToggleChannelSubscription(channel) },
+                isCompact = isCompact
+            )
+        }
+
         // Dynamic Title (crossfades when switching sections)
         AnimatedContent(
             targetState = selectedItem,
@@ -138,10 +179,10 @@ fun HomeContent(
             label = "title"
         ) { item ->
             Text(
-                text = if (isSearching && (item == NavItem.HOME || item == NavItem.TRENDING)) {
-                    "Search results"
-                } else {
-                    item.title
+                text = when {
+                    isSearching && (item == NavItem.HOME || item == NavItem.TRENDING) -> "Search results"
+                    channel != null && (item == NavItem.HOME || item == NavItem.TRENDING) -> "Videos"
+                    else -> item.title
                 },
                 style = MaterialTheme.typography.headlineMedium.copy(fontWeight = FontWeight.Bold),
                 color = MaterialTheme.colorScheme.onBackground,
@@ -158,7 +199,7 @@ fun HomeContent(
         // OUTSIDE the animated section. AnimatedContent stacks its children in
         // a Box, so a grid inside it would paint over the chips. Keeping the
         // chips here guarantees they are never covered by the video grid.
-        if (selectedItem == NavItem.HOME && !isSearching) {
+        if (selectedItem == NavItem.TRENDING && !isSearching) {
             Row(
                 modifier = Modifier
                     .fillMaxWidth()
@@ -191,6 +232,20 @@ fun HomeContent(
             label = "section"
         ) { item ->
             when (item) {
+                // Home is a set of themed rows (the default landing feed);
+                // Trending keeps the full grid with its category chips.
+                NavItem.HOME if !isSearching && channel == null && rows.isNotEmpty() -> {
+                    HomeRows(
+                        rows = rows,
+                        onMediaClick = onMediaClick,
+                        onChannelClick = onChannelClick,
+                        onDownloadClick = onDownloadClick,
+                        onPrefetch = onPrefetch,
+                        onSeeAll = onSeeAllCategory,
+                        cardActions = cardActions,
+                        isCompact = isCompact
+                    )
+                }
                 NavItem.HOME, NavItem.TRENDING -> {
                     // Crossfade between loading / content / error states
                     Crossfade(
@@ -211,11 +266,17 @@ fun HomeContent(
                                     onDownloadClick = onDownloadClick,
                                     onPrefetch = onPrefetch,
                                     onLoadMore = onLoadMore,
+                                    cardActions = cardActions,
                                     modifier = Modifier.fillMaxSize()
                                 )
                             }
                             is HomeState.Error -> {
-                                MediaGrid(items = emptyList(), errorMessage = state.message, modifier = Modifier.fillMaxSize())
+                                MediaGrid(
+                                    items = emptyList(),
+                                    errorMessage = state.message,
+                                    onRetry = onRetry,
+                                    modifier = Modifier.fillMaxSize()
+                                )
                             }
                         }
                     }
@@ -223,16 +284,26 @@ fun HomeContent(
                 NavItem.SUBSCRIPTIONS -> {
                     SubscriptionSection(
                         subscriptions = subscriptions,
-                        onSubscriptionClick = onSubscriptionClick
+                        onSubscriptionClick = onSubscriptionClick,
+                        onUnsubscribe = onUnsubscribe,
+                        onOpenFeed = onOpenSubscriptionFeed
                     )
                 }
                 NavItem.LIBRARY -> {
-                    EmptySection(
-                        icon = { Icon(Icons.Filled.VideoLibrary, contentDescription = null, modifier = Modifier.size(56.dp)) },
-                        title = "Your library is empty",
-                        message = "Watch history and local downloads will appear here. " +
-                            "Played video positions are synchronized through your server."
-                    )
+                    if (libraryViewModel == null) {
+                        EmptySection(
+                            icon = { Icon(Icons.Filled.VideoLibrary, contentDescription = null, modifier = Modifier.size(56.dp)) },
+                            title = "Library unavailable",
+                            message = "The local library could not be loaded on this device."
+                        )
+                    } else {
+                        LibrarySection(
+                            libraryViewModel = libraryViewModel,
+                            onPlay = onMediaClick,
+                            onDownload = onDownloadClick,
+                            onEnqueue = onEnqueue
+                        )
+                    }
                 }
             }
             }
@@ -243,11 +314,13 @@ fun HomeContent(
 @Composable
 private fun SubscriptionSection(
     subscriptions: List<Subscription>,
-    onSubscriptionClick: (Subscription) -> Unit
+    onSubscriptionClick: (Subscription) -> Unit,
+    onUnsubscribe: (Subscription) -> Unit = {},
+    onOpenFeed: () -> Unit = {}
 ) {
     if (subscriptions.isEmpty()) {
         EmptySection(
-            icon = { Icon(Icons.Filled.Cloud, contentDescription = null, modifier = Modifier.size(56.dp)) },
+            icon = { Icon(Icons.Filled.Subscriptions, contentDescription = null, modifier = Modifier.size(56.dp)) },
             title = "No subscriptions yet",
             message = "Open a video and press Subscribe to keep your favorite channels here."
         )
@@ -261,11 +334,20 @@ private fun SubscriptionSection(
             .padding(horizontal = 24.dp, vertical = 8.dp),
         verticalArrangement = Arrangement.spacedBy(12.dp)
     ) {
-        Text(
-            text = "Your subscriptions",
-            style = MaterialTheme.typography.titleLarge,
-            fontWeight = FontWeight.Bold
-        )
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.SpaceBetween
+        ) {
+            Text(
+                text = "Your subscriptions",
+                style = MaterialTheme.typography.titleLarge,
+                fontWeight = FontWeight.Bold
+            )
+            OutlinedButton(onClick = onOpenFeed) {
+                Text("Show new videos")
+            }
+        }
         subscriptions.forEach { subscription ->
             Row(
                 modifier = Modifier
@@ -282,10 +364,20 @@ private fun SubscriptionSection(
                         contentScale = androidx.compose.ui.layout.ContentScale.Crop
                     )
                 } else {
-                    Icon(Icons.Filled.Cloud, contentDescription = null, modifier = Modifier.size(48.dp))
+                    Icon(Icons.Filled.Subscriptions, contentDescription = null, modifier = Modifier.size(48.dp))
                 }
                 Spacer(modifier = Modifier.width(12.dp))
-                Text(subscription.name, style = MaterialTheme.typography.titleMedium)
+                Text(
+                    text = subscription.name,
+                    style = MaterialTheme.typography.titleMedium,
+                    modifier = Modifier.weight(1f)
+                )
+                RowOverflowMenu(
+                    entries = listOf(
+                        "Open channel" to { onSubscriptionClick(subscription) },
+                        "Unsubscribe" to { onUnsubscribe(subscription) }
+                    )
+                )
             }
         }
     }
@@ -370,6 +462,51 @@ private fun ServiceSwitcher(
                     }
                 )
             }
+        }
+    }
+}
+
+/** Channel identity plus the subscribe button, shown above the channel's videos. */
+@Composable
+private fun ChannelHeaderRow(
+    channel: ChannelHeader,
+    isSubscribed: Boolean,
+    onToggleSubscription: () -> Unit,
+    isCompact: Boolean
+) {
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(horizontal = if (isCompact) 16.dp else 24.dp, vertical = 8.dp),
+        verticalAlignment = Alignment.CenterVertically
+    ) {
+        if (channel.avatarUrl.isNotBlank()) {
+            AsyncImage(
+                model = channel.avatarUrl,
+                contentDescription = channel.name,
+                modifier = Modifier.size(56.dp).clip(CircleShape),
+                contentScale = androidx.compose.ui.layout.ContentScale.Crop
+            )
+            Spacer(modifier = Modifier.width(12.dp))
+        }
+        Column(modifier = Modifier.weight(1f)) {
+            Text(
+                text = if (channel.verified) "${channel.name} ✓" else channel.name,
+                style = MaterialTheme.typography.titleLarge,
+                fontWeight = FontWeight.Bold,
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis
+            )
+            if (channel.subscriberCount >= 0) {
+                Text(
+                    text = "${formatCount(channel.subscriberCount)} subscribers",
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                )
+            }
+        }
+        Button(onClick = onToggleSubscription) {
+            Text(if (isSubscribed) "Subscribed" else "Subscribe")
         }
     }
 }

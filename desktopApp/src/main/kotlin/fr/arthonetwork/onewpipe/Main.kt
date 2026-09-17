@@ -6,6 +6,7 @@
 package fr.arthonetwork.onewpipe
 
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.graphics.toComposeImageBitmap
 import androidx.compose.ui.window.Window
 import androidx.compose.ui.window.application
 import androidx.compose.ui.window.rememberWindowState
@@ -24,17 +25,19 @@ fun main() {
     // Geo-localize trending and search (YouTube gl/hl params) from the system
     // locale, so a French user gets French content instead of US content.
     net.newpipe.app.backend.applySystemGeoLocalization()
-    // Do not fetch the optional iOS player response on the desktop fast path.
-    // It adds another YouTube request even though playback starts from the
-    // progressive Android stream; a real integration run resolved the same
-    // video in about 2.2s with this disabled.
-    org.schabi.newpipe.extractor.services.youtube.extractors.YoutubeStreamExtractor.setFetchIosClient(false)
     KoinApp.init()
     
     application {
         val windowState = rememberWindowState(width = 1440.dp, height = 900.dp)
+        // Without an explicit icon the window and the taskbar show the generic Java icon.
+        val appIcon = androidx.compose.runtime.remember {
+            Thread.currentThread().contextClassLoader.getResourceAsStream("onewpipe-icon.png")
+                ?.use { javax.imageio.ImageIO.read(it) }
+                ?.let { androidx.compose.ui.graphics.painter.BitmapPainter(it.toComposeImageBitmap()) }
+        }
         Window(
             onCloseRequest = ::exitApplication,
+            icon = appIcon,
             title = "ONewPipe",
             state = windowState
         ) {

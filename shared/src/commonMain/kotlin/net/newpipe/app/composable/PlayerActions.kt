@@ -14,4 +14,5 @@ class PlayerActions {
     var togglePictureInPicture: () -> Unit = {}
     var toggleCinema: () -> Unit = {}
     var reportSeek: (Long) -> Unit = {}     // signed seconds, for on-screen feedback
+    var setSpeed: (Float) -> Unit = {}      // 0.25f..3f playback rate
 }

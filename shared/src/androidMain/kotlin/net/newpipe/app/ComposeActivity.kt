@@ -39,16 +39,19 @@ class ComposeActivity : ComponentActivity() {
             NewPipe.init(OkHttpDownloader(OkHttpClient.Builder().build()))
             // Use the device locale for trending/search results.
             net.newpipe.app.backend.applySystemGeoLocalization()
-            // Keep the initial extraction to the fast progressive response. The
-            // quality menu explicitly enables the slower iOS response when HD
-            // and 4K formats are requested.
-            org.schabi.newpipe.extractor.services.youtube.extractors.YoutubeStreamExtractor
-                .setFetchIosClient(false)
             net.newpipe.app.di.KoinApp.init {
                 androidContext(this@ComposeActivity)
             }
         } catch (_: Exception) {
             // The legacy Android application may already have initialized these singletons.
+        }
+
+        // Keep the background check for new videos in line with the setting;
+        // an already scheduled check is kept as it is.
+        runCatching {
+            val enabled = net.newpipe.app.di.settings.provideSettings(this)
+                .getBoolean(net.newpipe.app.domain.SettingsViewModel.KEY_NEW_VIDEO_NOTIFICATIONS, false)
+            net.newpipe.app.backend.NewVideosScheduler.apply(this, enabled)
         }
 
         // A launcher intent has no navigation payload. App currently owns the home shell,

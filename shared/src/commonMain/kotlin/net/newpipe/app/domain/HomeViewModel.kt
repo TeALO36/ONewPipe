@@ -5,9 +5,18 @@ import androidx.lifecycle.viewModelScope
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.Job
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.flow.collectLatest
 import net.newpipe.app.theme.Service
+
+/** One themed row of the home screen (Gaming, Music, …). */
+data class CategoryRow(
+    val category: TrendingCategory,
+    val items: List<MediaItem> = emptyList(),
+    val isLoading: Boolean = true,
+    val error: String? = null
+)
 
 sealed class HomeState {
     object Loading : HomeState()
@@ -31,6 +40,17 @@ class HomeViewModel(
     private val _searchFilter = MutableStateFlow(SearchFilter.ALL)
     val searchFilter: StateFlow<SearchFilter> = _searchFilter.asStateFlow()
 
+    private val _rows = MutableStateFlow(
+        TrendingCategory.entries.filter { it != TrendingCategory.ALL }.map { CategoryRow(it) }
+    )
+    /** Themed rows of the home screen, loaded one category at a time. */
+    val rows: StateFlow<List<CategoryRow>> = _rows.asStateFlow()
+    private var rowsJob: Job? = null
+
+    private val _currentChannel = MutableStateFlow<ChannelHeader?>(null)
+    /** Set while the grid shows one channel, so its header can be displayed. */
+    val currentChannel: StateFlow<ChannelHeader?> = _currentChannel.asStateFlow()
+
     // Pagination state
     private var currentPageToken: String? = null
     private var currentItems = mutableListOf<MediaItem>()
@@ -40,17 +60,82 @@ class HomeViewModel(
     private var currentServiceId: Int = Service.YOUTUBE.serviceId
     private var currentQuery: String? = null
 
+    /** True while a channel page or the subscription feed replaces the default feed. */
+    private var showingCustomFeed = false
+    private var currentChannelUrl: String? = null
+    private var currentFeedSubscriptions: List<Subscription> = emptyList()
+
     init {
         viewModelScope.launch {
             settingsViewModel.currentService.collectLatest { service ->
                 currentServiceId = service.serviceId
                 reload()
+                // The rows belong to the selected service too.
+                loadRows(force = true)
+            }
+        }
+    }
+
+    /**
+     * Goes back to the default feed. A search, a channel page or the
+     * subscription feed is dropped; an unchanged default feed is not reloaded
+     * so switching tabs costs no network request.
+     */
+    fun openHome() {
+        _currentChannel.value = null
+        currentChannelUrl = null
+        currentFeedSubscriptions = emptyList()
+        val needsReload = showingCustomFeed ||
+            !currentQuery.isNullOrBlank() ||
+            _selectedCategory.value != TrendingCategory.ALL
+        showingCustomFeed = false
+        currentQuery = null
+        _searchQuery.value = null
+        _searchFilter.value = SearchFilter.ALL
+        _selectedCategory.value = TrendingCategory.ALL
+        if (needsReload) reload()
+    }
+
+    /**
+     * Loads the themed rows of the home screen. Rows are fetched one after the
+     * other so the first one appears quickly instead of waiting for all of them.
+     */
+    fun loadRows(force: Boolean = false) {
+        if (!force && _rows.value.any { it.items.isNotEmpty() }) return
+        if (rowsJob?.isActive == true) return
+        rowsJob = viewModelScope.launch {
+            _rows.value = _rows.value.map { it.copy(isLoading = true, error = null) }
+            _rows.value.forEach { row ->
+                val result = runCatching { repository.getTrending(currentServiceId, row.category) }
+                _rows.value = _rows.value.map { current ->
+                    if (current.category != row.category) {
+                        current
+                    } else {
+                        result.fold(
+                            onSuccess = { page ->
+                                current.copy(
+                                    items = page.items.take(ROW_SIZE),
+                                    isLoading = false,
+                                    error = if (page.items.isEmpty()) "Nothing to show here right now" else null
+                                )
+                            },
+                            onFailure = { error ->
+                                current.copy(
+                                    isLoading = false,
+                                    error = error.message ?: "Could not load this row"
+                                )
+                            }
+                        )
+                    }
+                }
             }
         }
     }
 
     fun selectCategory(category: TrendingCategory) {
-        if (category == _selectedCategory.value) return
+        if (category == _selectedCategory.value && !showingCustomFeed) return
+        _currentChannel.value = null
+        showingCustomFeed = false
         _selectedCategory.value = category
         currentQuery = null
         _searchQuery.value = null
@@ -58,13 +143,16 @@ class HomeViewModel(
         reload()
     }
 
+    /** Reloads whatever the grid currently shows, including a retry after an error. */
     fun reload() {
         currentItems.clear()
         currentPageToken = null
-        if (currentQuery.isNullOrBlank()) {
-            loadTrending()
-        } else {
-            search(currentQuery!!, _searchFilter.value)
+        val channelUrl = currentChannelUrl
+        when {
+            channelUrl != null -> openChannel(channelUrl)
+            currentFeedSubscriptions.isNotEmpty() -> loadSubscriptionFeed(currentFeedSubscriptions)
+            currentQuery.isNullOrBlank() -> loadTrending()
+            else -> search(currentQuery!!, _searchFilter.value)
         }
     }
 
@@ -107,6 +195,10 @@ class HomeViewModel(
     }
 
     fun search(query: String, filter: SearchFilter = _searchFilter.value) {
+        _currentChannel.value = null
+        currentChannelUrl = null
+        currentFeedSubscriptions = emptyList()
+        showingCustomFeed = false
         val normalizedQuery = query.trim()
         currentQuery = normalizedQuery
         _searchQuery.value = normalizedQuery.takeIf { it.isNotBlank() }
@@ -139,8 +231,52 @@ class HomeViewModel(
         if (!query.isNullOrBlank()) search(query, filter)
     }
 
+    /**
+     * Builds the subscription feed: the newest videos of every subscribed
+     * channel, merged into one list.
+     *
+     * Channels that fail to load are skipped so one broken channel cannot
+     * empty the whole feed.
+     */
+    fun loadSubscriptionFeed(subscriptions: List<Subscription>) {
+        _currentChannel.value = null
+        currentChannelUrl = null
+        currentFeedSubscriptions = subscriptions
+        showingCustomFeed = true
+        currentQuery = null
+        _searchQuery.value = null
+        _searchFilter.value = SearchFilter.ALL
+        currentPageToken = null
+        if (subscriptions.isEmpty()) {
+            currentItems.clear()
+            _state.value = HomeState.Success(emptyList())
+            return
+        }
+        viewModelScope.launch {
+            _state.value = HomeState.Loading
+            val collected = mutableListOf<MediaItem>()
+            for (subscription in subscriptions.take(MAX_FEED_CHANNELS)) {
+                val channelItems = runCatching {
+                    repository.getChannel(currentServiceId, subscription.url).items
+                }.getOrDefault(emptyList())
+                collected += channelItems.take(MAX_VIDEOS_PER_CHANNEL)
+            }
+            currentItems.clear()
+            currentItems.addAll(collected.distinctBy { it.url })
+            _state.value = if (currentItems.isEmpty()) {
+                HomeState.Error("No videos found for your subscriptions")
+            } else {
+                HomeState.Success(currentItems.toList())
+            }
+        }
+    }
+
     fun openChannel(url: String) {
         if (url.isBlank()) return
+        _currentChannel.value = null
+        currentChannelUrl = url
+        currentFeedSubscriptions = emptyList()
+        showingCustomFeed = true
         currentQuery = null
         _searchQuery.value = null
         _searchFilter.value = SearchFilter.ALL
@@ -148,6 +284,7 @@ class HomeViewModel(
             _state.value = HomeState.Loading
             try {
                 val result = repository.getChannel(currentServiceId, url)
+                _currentChannel.value = result.channel
                 currentItems.clear()
                 currentItems.addAll(result.items)
                 currentPageToken = result.nextPageToken
@@ -160,5 +297,12 @@ class HomeViewModel(
                 _state.value = HomeState.Error(e.message ?: "Unable to load channel")
             }
         }
+    }
+
+    companion object {
+        /** Keep the feed responsive: a handful of channels, a few videos each. */
+        const val MAX_FEED_CHANNELS = 20
+        const val MAX_VIDEOS_PER_CHANNEL = 6
+        const val ROW_SIZE = 12
     }
 }

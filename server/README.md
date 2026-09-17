@@ -24,6 +24,39 @@ java -jar server/build/libs/onewpipe-server-all.jar
 
 On Windows, copy `server/run-server.bat` beside `onewpipe-server-all.jar` and double-click it, or run it from PowerShell. The jar is cross-platform; the Windows release also contains a native `ONewPipeServer.exe` launcher when the release workflow completes.
 
+## Debian / Ubuntu (.deb)
+
+Each release ships a headless server package for amd64 and arm64: `ONewPipe-<version>-linux-server-<arch>.deb`. It contains its own jlink'd Java runtime, so **no system Java is required**.
+
+```bash
+sudo apt install ./ONewPipe-1.4.0-linux-server-amd64.deb
+```
+
+Installing it:
+
+- registers and **starts** the `onewpipe-server` systemd service immediately,
+- enables it so it **starts automatically at boot**,
+- exposes the web interface on `http://0.0.0.0:8080` (check with `curl http://localhost:8080/health`).
+
+Configuration lives in `/etc/default/onewpipe-server` (kept across upgrades): set a strong `JWT_SECRET` there before exposing the server beyond localhost, then apply with:
+
+```bash
+sudo systemctl restart onewpipe-server
+```
+
+Useful commands:
+
+```bash
+systemctl status onewpipe-server        # is it running?
+journalctl -u onewpipe-server -f        # live logs
+curl http://localhost:8080/health       # should answer {"status":"ok"}
+```
+
+- Data (accounts, watch states) is persisted in `/var/lib/onewpipe-server`.
+- The service runs under a transient system user with a read-only filesystem except the data directory.
+- To keep the package but not start it at boot: `sudo systemctl disable onewpipe-server`.
+- Uninstall: `sudo apt remove fr.arthonetwork.onewpipe-server` (keeps data and config); `sudo apt purge fr.arthonetwork.onewpipe-server` removes the config too (data stays unless you delete `/var/lib/onewpipe-server`).
+
 ## First connection
 
 1. Start the server. It listens on `0.0.0.0:8080` by default.

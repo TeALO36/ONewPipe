@@ -1,0 +1,13 @@
+#!/bin/sh
+# Maintainer script: stop the service before removal/upgrade.
+set -e
+
+case "$1" in
+    remove|upgrade|deconfigure)
+        if [ -d /run/systemd/system ]; then
+            systemctl stop onewpipe-server.service 2>/dev/null || true
+        fi
+        ;;
+esac
+
+exit 0

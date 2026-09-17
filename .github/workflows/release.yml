@@ -92,11 +92,43 @@ jobs:
           Invoke-WebRequest "https://github.com/wixtoolset/wix3/releases/download/wix3112rtm/wix311-binaries.zip" -OutFile "$env:TEMP\wix.zip"
           Expand-Archive "$env:TEMP\wix.zip" -DestinationPath $wix -Force
           echo "$wix" | Out-File -FilePath $env:GITHUB_PATH -Encoding utf8 -Append
+      - name: Bundle VLC runtime (Windows desktop only)
+        if: runner.os == 'Windows'
+        shell: pwsh
+        run: |
+          $vlcVersion = '3.0.21'
+          $archive = Join-Path $env:RUNNER_TEMP "vlc-$vlcVersion-win64.zip"
+          Invoke-WebRequest `
+            -Uri "https://get.videolan.org/vlc/$vlcVersion/win64/vlc-$vlcVersion-win64.zip" `
+            -OutFile $archive
+          $extractRoot = Join-Path $env:RUNNER_TEMP "onewpipe-vlc"
+          Remove-Item $extractRoot -Recurse -Force -ErrorAction SilentlyContinue
+          Expand-Archive -LiteralPath $archive -DestinationPath $extractRoot -Force
+          $libVlc = Get-ChildItem $extractRoot -Recurse -File -Filter 'libvlc.dll' |
+            Select-Object -First 1
+          if (-not $libVlc) { throw "The VLC archive did not contain libvlc.dll" }
+          $vlcRoot = $libVlc.Directory
+          $plugins = Join-Path $vlcRoot.FullName 'plugins'
+          if (-not (Test-Path $plugins)) { throw "The VLC archive did not contain its plugins directory" }
+          $destination = Join-Path $env:GITHUB_WORKSPACE 'desktopApp/src/main/resources/vlc'
+          New-Item -ItemType Directory -Path $destination -Force | Out-Null
+          Copy-Item (Join-Path $vlcRoot.FullName '*.dll') $destination -Force
+          Copy-Item $plugins (Join-Path $destination 'plugins') -Recurse -Force
+          Write-Host "Bundled VLC from $($vlcRoot.FullName)"
+
       - name: Build Desktop Distribution
         shell: bash
         env:
           VERSION: ${{ github.ref_name }}
         run: ./gradlew :desktopApp:packageDistributionForCurrentOS -DversionNameOverride="${VERSION#v}"
+      - name: Verify bundled VLC in Windows distribution
+        if: runner.os == 'Windows'
+        shell: pwsh
+        run: |
+          $runtime = Get-ChildItem 'desktopApp/build/compose/binaries/main' -Recurse -File -Filter 'libvlc.dll' |
+            Select-Object -First 1
+          if (-not $runtime) { throw 'The Windows distribution does not contain libvlc.dll' }
+          Write-Host "Verified bundled VLC: $($runtime.FullName)"
       - name: Upload Desktop Installer
         uses: actions/upload-artifact@v4
         with:
@@ -115,11 +147,41 @@ jobs:
           java-version: '17'
           distribution: 'temurin'
           cache: gradle
+      - name: Bundle VLC runtime (Windows desktop only)
+        shell: pwsh
+        run: |
+          $vlcVersion = '3.0.21'
+          $archive = Join-Path $env:RUNNER_TEMP "vlc-$vlcVersion-win64.zip"
+          Invoke-WebRequest `
+            -Uri "https://get.videolan.org/vlc/$vlcVersion/win64/vlc-$vlcVersion-win64.zip" `
+            -OutFile $archive
+          $extractRoot = Join-Path $env:RUNNER_TEMP "onewpipe-vlc"
+          Remove-Item $extractRoot -Recurse -Force -ErrorAction SilentlyContinue
+          Expand-Archive -LiteralPath $archive -DestinationPath $extractRoot -Force
+          $libVlc = Get-ChildItem $extractRoot -Recurse -File -Filter 'libvlc.dll' |
+            Select-Object -First 1
+          if (-not $libVlc) { throw "The VLC archive did not contain libvlc.dll" }
+          $vlcRoot = $libVlc.Directory
+          $plugins = Join-Path $vlcRoot.FullName 'plugins'
+          if (-not (Test-Path $plugins)) { throw "The VLC archive did not contain its plugins directory" }
+          $destination = Join-Path $env:GITHUB_WORKSPACE 'desktopApp/src/main/resources/vlc'
+          New-Item -ItemType Directory -Path $destination -Force | Out-Null
+          Copy-Item (Join-Path $vlcRoot.FullName '*.dll') $destination -Force
+          Copy-Item $plugins (Join-Path $destination 'plugins') -Recurse -Force
+          Write-Host "Bundled VLC from $($vlcRoot.FullName)"
+
       - name: Build portable distributable
         shell: bash
         env:
           VERSION: ${{ github.ref_name }}
         run: ./gradlew :desktopApp:createDistributable -DversionNameOverride="${VERSION#v}"
+      - name: Verify bundled VLC in portable distribution
+        shell: pwsh
+        run: |
+          $runtime = Get-ChildItem 'desktopApp/build/compose/binaries/main' -Recurse -File -Filter 'libvlc.dll' |
+            Select-Object -First 1
+          if (-not $runtime) { throw 'The portable Windows distribution does not contain libvlc.dll' }
+          Write-Host "Verified bundled VLC: $($runtime.FullName)"
       - name: Zip portable app
         run: |
           powershell Compress-Archive -Path desktopApp/build/compose/binaries/main/app -DestinationPath "ONewPipe-portable-win.zip" -Force
@@ -162,6 +224,41 @@ jobs:
         with:
           name: Server-Windows
           path: ONewPipe-server-windows.zip
+
+  build-server-deb:
+    name: Build Server .deb (${{ matrix.arch }})
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - os: ubuntu-latest
+            arch: amd64
+          - os: ubuntu-24.04-arm
+            arch: arm64
+    runs-on: ${{ matrix.os }}
+    steps:
+      - uses: actions/checkout@v4
+      - name: Set up JDK 21
+        uses: actions/setup-java@v4
+        with:
+          java-version: '21'
+          distribution: 'temurin'
+          cache: gradle
+      - name: Build server .deb
+        shell: bash
+        env:
+          VERSION: ${{ github.ref_name }}
+        run: ./gradlew :server:packageServerDeb -DversionNameOverride="${VERSION#v}" --stacktrace
+      - name: Inspect package
+        shell: bash
+        run: |
+          dpkg-deb --info server/build/distributions/*.deb
+          dpkg-deb --contents server/build/distributions/*.deb
+      - name: Upload Server .deb
+        uses: actions/upload-artifact@v4
+        with:
+          name: Server-deb-${{ matrix.arch }}
+          path: server/build/distributions/*.deb
 
   build-server:
     name: Build Server fat jar
@@ -218,7 +315,7 @@ jobs:
 
   release:
     name: Create GitHub Release
-    needs: [build-android, build-desktop, build-desktop-portable, build-server, build-server-windows]
+    needs: [build-android, build-desktop, build-desktop-portable, build-server, build-server-windows, build-server-deb]
     runs-on: ubuntu-latest
     steps:
       - name: Download build artifacts
@@ -226,7 +323,7 @@ jobs:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
           mkdir -p artifacts
-          for a in Android-APK Desktop-ubuntu-latest Desktop-windows-latest Desktop-macos-latest Desktop-Portable-Windows Server-jar Server-Windows; do
+          for a in Android-APK Desktop-ubuntu-latest Desktop-windows-latest Desktop-macos-latest Desktop-Portable-Windows Server-jar Server-Windows Server-deb-amd64 Server-deb-arm64; do
             gh run download "${{ github.run_id }}" -R "${{ github.repository }}" --dir artifacts --name "$a"
           done
 
@@ -241,6 +338,8 @@ jobs:
               *.msi)  dest="ONewPipe-${VERSION}-windows-setup.msi" ;;
               *server-windows.zip) dest="ONewPipe-${VERSION}-windows-server.zip" ;;
               *.zip)  dest="ONewPipe-${VERSION}-windows-portable.zip" ;;
+              *onewpipe-server*amd64*.deb) dest="ONewPipe-${VERSION}-linux-server-amd64.deb" ;;
+              *onewpipe-server*arm64*.deb) dest="ONewPipe-${VERSION}-linux-server-arm64.deb" ;;
               *.deb)  dest="ONewPipe-${VERSION}-linux.deb" ;;
               *.dmg)  dest="ONewPipe-${VERSION}-macos.dmg" ;;
               *.jar)  dest="ONewPipe-${VERSION}-server.jar" ;;

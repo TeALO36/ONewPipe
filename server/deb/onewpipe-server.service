@@ -1,0 +1,27 @@
+[Unit]
+Description=ONewPipe self-hosted server (account API, watch-state sync, web UI)
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+# DynamicUser lets systemd allocate a transient system user for the service;
+# StateDirectory creates /var/lib/onewpipe-server with the right ownership and
+# keeps the data across restarts and reboots.
+DynamicUser=yes
+StateDirectory=onewpipe-server
+EnvironmentFile=/etc/default/onewpipe-server
+ExecStart=/usr/lib/onewpipe-server/runtime/bin/java $JAVA_OPTS -jar /usr/lib/onewpipe-server/onewpipe-server.jar
+WorkingDirectory=/var/lib/onewpipe-server
+Restart=on-failure
+RestartSec=5
+
+# Moderate hardening: read-only filesystem except the data directory.
+NoNewPrivileges=true
+PrivateTmp=true
+ProtectHome=true
+ProtectSystem=strict
+ReadWritePaths=/var/lib/onewpipe-server
+
+[Install]
+WantedBy=multi-user.target

@@ -138,7 +138,6 @@ kotlin {
             implementation(libs.coil.network.okhttp)
             implementation(libs.koin.android)
             implementation(libs.media3.exoplayer)
-            implementation(libs.media3.session)
             implementation(libs.media3.ui)
             implementation(libs.androidx.media)
             implementation(libs.ktor.client.okhttp)

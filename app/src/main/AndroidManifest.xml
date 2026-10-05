@@ -92,21 +92,6 @@
             </intent-filter>
         </service>
 
-        <!-- Compose player: Media3 owns the player and media session so playback survives
-             activity destruction and task removal. The legacy service above remains available
-             to the existing NewPipe player and Android Auto integrations. -->
-        <service
-            android:name="net.newpipe.app.backend.ComposeMediaSessionService"
-            android:exported="true"
-            android:foregroundServiceType="mediaPlayback"
-            android:stopWithTask="false">
-            <intent-filter>
-                <action android:name="androidx.media3.session.MediaSessionService" />
-                <action android:name="android.media.browse.MediaBrowserService" />
-                <action android:name="android.intent.action.MEDIA_BUTTON" />
-            </intent-filter>
-        </service>
-
         <activity
             android:name=".player.PlayQueueActivity"
             android:exported="false"

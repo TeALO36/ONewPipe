@@ -4,6 +4,7 @@ import android.app.Activity
 import android.app.PictureInPictureParams
 import android.content.Context
 import android.content.ContextWrapper
+import android.net.Uri
 import android.os.Build
 import android.util.Rational
 import android.view.TextureView
@@ -12,12 +13,9 @@ import androidx.compose.foundation.background
 import androidx.compose.foundation.gestures.detectDragGestures
 import androidx.compose.foundation.gestures.detectTapGestures
 import androidx.compose.foundation.layout.Arrangement
-import androidx.compose.foundation.layout.aspectRatio
 import androidx.compose.foundation.layout.Box
-import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
-import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
@@ -30,6 +28,10 @@ import androidx.compose.material.icons.filled.FullscreenExit
 import androidx.compose.material.icons.filled.Pause
 import androidx.compose.material.icons.filled.PlayArrow
 import androidx.compose.material.icons.filled.SkipNext
+import androidx.compose.material.icons.filled.SkipPrevious
+import androidx.compose.material.icons.filled.Speed
+import androidx.compose.material3.DropdownMenu
+import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.Text
@@ -48,7 +50,9 @@ import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.StrokeCap
 import androidx.compose.ui.input.pointer.pointerInput
+import androidx.compose.material3.MaterialTheme
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.platform.LocalContext
 import android.content.pm.ActivityInfo
@@ -56,9 +60,15 @@ import androidx.compose.ui.viewinterop.AndroidView
 import androidx.core.view.WindowCompat
 import androidx.core.view.WindowInsetsCompat
 import androidx.core.view.WindowInsetsControllerCompat
+import androidx.media3.common.MediaItem
 import androidx.media3.common.Player
-import androidx.media3.common.VideoSize
-import net.newpipe.app.backend.ComposeMediaSessionService
+import androidx.media3.common.C
+import androidx.media3.common.MimeTypes
+import androidx.media3.common.text.CueGroup
+import androidx.media3.exoplayer.ExoPlayer
+import androidx.media3.exoplayer.source.DefaultMediaSourceFactory
+import androidx.media3.exoplayer.source.MergingMediaSource
+import net.newpipe.app.backend.MediaNotificationController
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 
@@ -75,52 +85,85 @@ actual fun VideoPlayer(
     onPreviousVideo: () -> Unit,
     onNextVideo: () -> Unit,
     onPositionChange: (Long) -> Unit,
+    isFullscreen: Boolean,
+    playbackSpeed: Float,
+    subtitleUrl: String?,
+    subtitleMimeType: String?,
     playerActions: PlayerActions
 ) {
     val context = LocalContext.current
     val coroutineScope = rememberCoroutineScope()
     val textureView = remember(videoUrl, audioUrl) { TextureView(context) }
-    var isPlaying by remember(videoUrl, audioUrl) { mutableStateOf(false) }
+    var isPlaying by remember(videoUrl, audioUrl) { mutableStateOf(true) }
     val pictureInPictureMode = PlatformPictureInPictureMode()
     var controlsVisible by remember(videoUrl, audioUrl) {
         mutableStateOf(!pictureInPictureMode)
     }
     var positionMs by remember(videoUrl, audioUrl) { mutableStateOf(startPositionMs) }
+    var showSpeedMenu by remember { mutableStateOf(false) }
+    var subtitleText by remember(videoUrl, audioUrl, subtitleUrl) { mutableStateOf<String?>(null) }
     var durationMs by remember(videoUrl, audioUrl) { mutableStateOf(0L) }
-    var videoAspectRatio by remember(videoUrl, audioUrl) { mutableStateOf(16f / 9f) }
     var seekFeedback by remember(videoUrl, audioUrl) { mutableStateOf<String?>(null) }
     var nativeFullscreen by remember(videoUrl, audioUrl) { mutableStateOf(false) }
-    var sessionService by remember { mutableStateOf(ComposeMediaSessionService.instance) }
+    /** False until ExoPlayer renders a frame; the thumbnail covers the black surface meanwhile. */
+    var firstFrameRendered by remember(videoUrl, audioUrl) { mutableStateOf(false) }
 
-    LaunchedEffect(Unit) {
-        ComposeMediaSessionService.start(context)
-        repeat(60) {
-            val current = ComposeMediaSessionService.instance
-            if (current != null) {
-                sessionService = current
-                return@LaunchedEffect
+    val exoPlayer = remember(videoUrl, audioUrl, subtitleUrl) {
+        ExoPlayer.Builder(context).build().apply {
+            val mediaSourceFactory = DefaultMediaSourceFactory(context)
+            // The selected subtitle rides along as a side-loaded track, which
+            // is how a subtitle file that is not part of the stream is played.
+            val videoMediaItem = MediaItem.Builder()
+                .setUri(Uri.parse(videoUrl))
+                .apply {
+                    if (!subtitleUrl.isNullOrBlank()) {
+                        setSubtitleConfigurations(
+                            listOf(
+                                MediaItem.SubtitleConfiguration.Builder(Uri.parse(subtitleUrl))
+                                    .setMimeType(subtitleMimeType ?: MimeTypes.TEXT_VTT)
+                                    .setSelectionFlags(C.SELECTION_FLAG_DEFAULT)
+                                    .build()
+                            )
+                        )
+                    }
+                }
+                .build()
+            val videoSource = mediaSourceFactory.createMediaSource(videoMediaItem)
+            val source = if (!audioUrl.isNullOrBlank()) {
+                val audioSource = mediaSourceFactory.createMediaSource(
+                    MediaItem.fromUri(Uri.parse(audioUrl))
+                )
+                MergingMediaSource(videoSource, audioSource)
+            } else {
+                videoSource
             }
-            delay(50)
-        }
-    }
+            setMediaSource(source)
+            if (startPositionMs > 0) seekTo(startPositionMs)
+            prepare()
+            playWhenReady = true
+            addListener(object : Player.Listener {
+                override fun onIsPlayingChanged(playing: Boolean) {
+                    isPlaying = playing
+                }
 
-    LaunchedEffect(sessionService, videoUrl, audioUrl, startPositionMs) {
-        sessionService?.playVideo(
-            videoUrl = videoUrl,
-            audioUrl = audioUrl,
-            title = title,
-            artist = artistName,
-            thumbnailUrl = thumbnailUrl,
-            startPositionMs = startPositionMs
-        )
-    }
+                override fun onPlaybackStateChanged(playbackState: Int) {
+                    if (playbackState == Player.STATE_ENDED) onPlaybackEnded()
+                }
 
-    val exoPlayer = sessionService?.player()
-    if (exoPlayer == null) {
-        Box(modifier = modifier.background(Color.Black), contentAlignment = Alignment.Center) {
-            Text(text = "Starting playback…", color = Color.White)
+                override fun onRenderedFirstFrame() {
+                    firstFrameRendered = true
+                }
+
+                override fun onCues(cueGroup: CueGroup) {
+                    // TextureView has no subtitle view of its own, so the cues
+                    // are drawn by Compose over the video.
+                    subtitleText = cueGroup.cues
+                        .mapNotNull { it.text?.toString() }
+                        .joinToString("\n")
+                        .takeIf { it.isNotBlank() }
+                }
+            })
         }
-        return
     }
 
     LaunchedEffect(pictureInPictureMode) {
@@ -136,29 +179,6 @@ actual fun VideoPlayer(
     }
 
     DisposableEffect(exoPlayer, textureView) {
-        val listener = object : Player.Listener {
-            override fun onIsPlayingChanged(playing: Boolean) {
-                isPlaying = playing
-            }
-
-            override fun onPlaybackStateChanged(playbackState: Int) {
-                if (playbackState == Player.STATE_ENDED) onPlaybackEnded()
-            }
-
-            override fun onVideoSizeChanged(videoSize: VideoSize) {
-                if (videoSize.width > 0 && videoSize.height > 0) {
-                    val rotated = videoSize.unappliedRotationDegrees % 180 != 0
-                    val width = if (rotated) videoSize.height else videoSize.width
-                    val height = if (rotated) videoSize.width else videoSize.height
-                    videoAspectRatio = (
-                        width.toFloat() * videoSize.pixelWidthHeightRatio / height.toFloat()
-                    ).coerceIn(0.1f, 10f)
-                }
-            }
-        }
-        exoPlayer.addListener(listener)
-        sessionService?.setNavigationCallbacks(onPreviousVideo, onNextVideo)
-
         // Do not use Media3 PlayerView here: the legacy Android module also
         // contains com.google.android.exoplayer2 resources with the same names,
         // which makes PlayerView inflate the wrong AspectRatioFrameLayout.
@@ -194,6 +214,11 @@ actual fun VideoPlayer(
             exoPlayer.volume = if (exoPlayer.volume > 0f) 0f else 1f
         }
         val activity = context.findActivity()
+        playerActions.setSpeed = { speed ->
+            runCatching { exoPlayer.setPlaybackSpeed(speed) }
+        }
+        runCatching { exoPlayer.setPlaybackSpeed(playbackSpeed) }
+
         val parentFullscreenAction = playerActions.toggleFullscreen
         val previousRequestedOrientation = activity?.requestedOrientation
             ?: ActivityInfo.SCREEN_ORIENTATION_UNSPECIFIED
@@ -229,6 +254,14 @@ actual fun VideoPlayer(
             }
         }
 
+        val notificationController = MediaNotificationController(
+            context = context,
+            player = exoPlayer,
+            onPrevious = onPreviousVideo,
+            onNext = onNextVideo
+        )
+        notificationController.updateMetadata(title, artistName, thumbnailUrl)
+
         val job = coroutineScope.launch {
             while (true) {
                 val currentPosition = exoPlayer.currentPosition.coerceAtLeast(0L)
@@ -236,6 +269,7 @@ actual fun VideoPlayer(
                 positionMs = currentPosition
                 durationMs = currentDuration
                 onPositionChange(currentPosition)
+                notificationController.updatePlaybackState()
                 delay(250)
             }
         }
@@ -247,46 +281,51 @@ actual fun VideoPlayer(
             playerActions.seekToFraction = {}
             playerActions.adjustVolume = {}
             playerActions.toggleMute = {}
+            playerActions.setSpeed = {}
             playerActions.togglePictureInPicture = {}
             playerActions.toggleFullscreen = {}
-            exoPlayer.removeListener(listener)
-            // Keep navigation callbacks in the service: notification/headset
-            // next/previous commands must remain usable after the activity
-            // leaves the task. They are replaced when the UI attaches again.
+            notificationController.release()
             playerActions.reportSeek = {}
             activity?.requestedOrientation = previousRequestedOrientation
             activity?.window?.let { window ->
                 WindowCompat.getInsetsController(window, window.decorView)
                     .show(WindowInsetsCompat.Type.systemBars())
             }
-            // The MediaSessionService owns this player. Releasing it here would
-            // stop audio as soon as the activity is closed or enters PiP.
+            exoPlayer.release()
         }
     }
 
-    BoxWithConstraints(modifier = modifier.background(Color.Black)) {
-        // TextureView fills its own bounds and therefore stretches the decoded
-        // frame when those bounds have the screen's ratio. Size it to the actual
-        // video ratio instead; the surrounding black area becomes the letterbox.
-        val containerAspectRatio = if (maxHeight > 0.dp) {
-            maxWidth.value / maxHeight.value
-        } else {
-            videoAspectRatio
-        }
-        val videoModifier = if (containerAspectRatio > videoAspectRatio) {
-            Modifier
-                .fillMaxHeight()
-                .aspectRatio(videoAspectRatio)
-        } else {
-            Modifier
-                .fillMaxWidth()
-                .aspectRatio(videoAspectRatio)
-        }
-
+    Box(modifier = modifier.background(Color.Black)) {
         AndroidView(
             factory = { textureView },
-            modifier = videoModifier.align(Alignment.Center)
+            modifier = Modifier.fillMaxSize()
         )
+
+        // The thumbnail covers the black surface until the first frame is
+        // rendered, so opening a video shows what is coming.
+        if (!firstFrameRendered && !thumbnailUrl.isNullOrBlank()) {
+            coil3.compose.AsyncImage(
+                model = thumbnailUrl,
+                contentDescription = null,
+                contentScale = androidx.compose.ui.layout.ContentScale.Fit,
+                modifier = Modifier.fillMaxSize()
+            )
+        }
+
+        // Subtitle cues, drawn above the video and below the controls.
+        subtitleText?.let { cue ->
+            Text(
+                text = cue,
+                color = Color.White,
+                textAlign = TextAlign.Center,
+                style = MaterialTheme.typography.titleMedium,
+                modifier = Modifier
+                    .align(Alignment.BottomCenter)
+                    .padding(bottom = if (controlsVisible) 96.dp else 32.dp, start = 24.dp, end = 24.dp)
+                    .background(Color.Black.copy(alpha = 0.6f), RoundedCornerShape(6.dp))
+                    .padding(horizontal = 12.dp, vertical = 6.dp)
+            )
+        }
 
         // This transparent gesture layer sits above TextureView, which otherwise
         // consumes all taps before Compose can show its controls.
@@ -303,7 +342,8 @@ actual fun VideoPlayer(
                         },
                         onTap = {
                             // A single tap only reveals the controls. Playback is
-                            // changed explicitly with the play/pause button, so a                            // user can inspect the timeline without interrupting it.
+                            // changed explicitly with the play/pause button, so a
+                            // user can inspect the timeline without interrupting it.
                             controlsVisible = true
                         }
                     )
@@ -353,6 +393,14 @@ actual fun VideoPlayer(
                     horizontalArrangement = Arrangement.SpaceBetween
                 ) {
                     Row(verticalAlignment = Alignment.CenterVertically) {
+                        IconButton(onClick = onPreviousVideo) {
+                            Icon(
+                                imageVector = Icons.Filled.SkipPrevious,
+                                contentDescription = "Previous video",
+                                tint = Color.White,
+                                modifier = Modifier.size(28.dp)
+                            )
+                        }
                         IconButton(onClick = { playerActions.togglePlayPause() }) {
                             Icon(
                                 imageVector = if (isPlaying) Icons.Filled.Pause else Icons.Filled.PlayArrow,
@@ -368,6 +416,30 @@ actual fun VideoPlayer(
                                 tint = Color.White,
                                 modifier = Modifier.size(28.dp)
                             )
+                        }
+                        Box {
+                            IconButton(onClick = { showSpeedMenu = true }) {
+                                Icon(
+                                    imageVector = Icons.Filled.Speed,
+                                    contentDescription = "Playback speed",
+                                    tint = Color.White,
+                                    modifier = Modifier.size(28.dp)
+                                )
+                            }
+                            DropdownMenu(
+                                expanded = showSpeedMenu,
+                                onDismissRequest = { showSpeedMenu = false }
+                            ) {
+                                listOf(0.25f, 0.5f, 0.75f, 1f, 1.25f, 1.5f, 1.75f, 2f).forEach { speed ->
+                                    DropdownMenuItem(
+                                        text = { Text(if (speed == 1f) "Normal" else "${speed}x") },
+                                        onClick = {
+                                            showSpeedMenu = false
+                                            playerActions.setSpeed(speed)
+                                        }
+                                    )
+                                }
+                            }
                         }
                         IconButton(
                             onClick = { playerActions.togglePictureInPicture() },

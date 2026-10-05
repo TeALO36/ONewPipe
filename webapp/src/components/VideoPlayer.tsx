@@ -26,6 +26,8 @@ interface Props {
   onTimeUpdate: (seconds: number) => void;
   onEnded: () => void;
   onError: (message: string) => void;
+  /** Receives the native video element, for features that read frames (ambient mode). */
+  onVideoEl?: (video: HTMLVideoElement | null) => void;
 }
 
 shaka.polyfill.installAll();
@@ -35,7 +37,7 @@ shaka.polyfill.installAll();
  * video and audio streams, and Shaka Player plays them in the native <video>.
  */
 export const VideoPlayer = forwardRef<VideoPlayerHandle, Props>(function VideoPlayer(
-  { url, poster, startTime, speed, loop, onReady, onTimeUpdate, onEnded, onError },
+  { url, poster, startTime, speed, loop, onReady, onTimeUpdate, onEnded, onError, onVideoEl },
   ref
 ) {
   const videoRef = useRef<HTMLVideoElement>(null);
@@ -126,6 +128,11 @@ export const VideoPlayer = forwardRef<VideoPlayerHandle, Props>(function VideoPl
   useEffect(() => {
     if (videoRef.current) videoRef.current.playbackRate = speed;
   }, [speed, loading]);
+
+  useEffect(() => {
+    onVideoEl?.(videoRef.current);
+    return () => onVideoEl?.(null);
+  }, [onVideoEl]);
 
   return (
     <div className="video-frame">

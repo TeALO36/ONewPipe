@@ -24,11 +24,9 @@ import io.reactivex.rxjava3.plugins.RxJavaPlugins
 import java.io.IOException
 import java.io.InterruptedIOException
 import java.net.SocketException
-import net.newpipe.app.backend.NativeDownloadBridge
 import org.acra.ACRA.init
 import org.acra.ACRA.isACRASenderServiceProcess
 import org.acra.config.CoreConfigurationBuilder
-import org.schabi.newpipe.download.ComposeDownloadManager
 import org.schabi.newpipe.error.ReCaptchaActivity
 import org.schabi.newpipe.extractor.NewPipe
 import org.schabi.newpipe.extractor.downloader.Downloader
@@ -103,12 +101,6 @@ open class App :
             Localization.getPreferredLocalization(this),
             Localization.getPreferredContentCountry(this)
         )
-
-        // The Compose module delegates Android downloads back to NewPipe's
-        // native mission manager without introducing an app/shared dependency cycle.
-        NativeDownloadBridge.register { request ->
-            ComposeDownloadManager.enqueue(this, request)
-        }
         Localization.initPrettyTime(Localization.resolvePrettyTime())
 
         BridgeStateSaverInitializer.init(this)

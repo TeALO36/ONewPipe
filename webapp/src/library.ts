@@ -19,6 +19,11 @@ export interface HistoryEntry extends SavedVideo {
   watchedAt: number;
 }
 
+/** Liked videos, stored locally like the other library parts. */
+export type LikedVideo = SavedVideo & {
+  likedAt: number;
+};
+
 export interface Playlist {
   id: string;
   name: string;
@@ -35,6 +40,8 @@ export type ThemeMode = 'system' | 'light' | 'dark';
 
 export interface Settings {
   theme: ThemeMode;
+  /** Video ambient mode: the interface floats translucently over the video. */
+  ambientMode: boolean;
   autoplayNext: boolean;
   resumePlayback: boolean;
   keepHistory: boolean;
@@ -46,6 +53,7 @@ export interface LibraryState {
   watchLater: SavedVideo[];
   playlists: Playlist[];
   subscriptions: Subscription[];
+  likes: LikedVideo[];
   searchHistory: string[];
   settings: Settings;
   /** Last change of the synchronized parts (history, watch later, playlists, subscriptions). */
@@ -54,6 +62,9 @@ export interface LibraryState {
 
 /** The parts of the library shared with the server. */
 export type SyncedLibrary = Pick<LibraryState, 'history' | 'watchLater' | 'playlists' | 'subscriptions'>;
+
+/** Everything stored on this device only (settings, searches, likes). */
+export type LocalLibrary = Pick<LibraryState, 'likes' | 'searchHistory' | 'settings'>;
 
 const STORAGE_KEY = 'onewpipe-library-v1';
 export const MAX_HISTORY = 500;
@@ -64,9 +75,11 @@ const defaultState: LibraryState = {
   watchLater: [],
   playlists: [],
   subscriptions: [],
+  likes: [],
   searchHistory: [],
   settings: {
     theme: 'system',
+    ambientMode: false,
     autoplayNext: true,
     resumePlayback: true,
     keepHistory: true,
@@ -214,6 +227,19 @@ export const library = {
     }));
   },
   isSubscribed: (url: string) => state.subscriptions.some((c) => c.url === url),
+  isLiked: (url: string) => state.likes.some((v) => v.url === url),
+  toggleLike(video: Omit<LikedVideo, 'likedAt'>) {
+    update(
+      (s) => ({
+        ...s,
+        likes: s.likes.some((v) => v.url === video.url) ? s.likes.filter((v) => v.url !== video.url) : [{ ...video, likedAt: Date.now() }, ...s.likes]
+      }),
+      false
+    );
+  },
+  clearLikes() {
+    update((s) => ({ ...s, likes: [] }), false);
+  },
   toggleSubscription(channel: Subscription) {
     update((s) => ({
       ...s,

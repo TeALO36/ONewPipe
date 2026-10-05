@@ -11,15 +11,12 @@ import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
-import net.newpipe.app.backend.NativeDownloadRequest
-import net.newpipe.app.backend.downloadWithNativeManager
 import net.newpipe.app.domain.DownloadState
 import net.newpipe.app.domain.DownloadViewModel
 
 /**
  * Overlay shown while streams are loading or when the user picks a format to
- * download. Android uses NewPipe's native mission manager for pause, resume,
- * notifications, recovery and WebM/MP4 post-processing.
+ * download. Uses the platform-specific [downloadFile] helper under the hood.
  */
 @Composable
 fun DownloadOverlay(
@@ -46,19 +43,18 @@ fun DownloadOverlay(
                 title = state.title,
                 onDismiss = { downloadViewModel.dismiss() },
                 onDownloadVideo = { stream ->
-                    val videoUrl = stream.content ?: stream.url
-                    if (!videoUrl.isNullOrBlank()) {
-                        downloadWithNativeManager(
-                            NativeDownloadRequest(
-                                sourceUrl = state.sourceUrl,
-                                streamInfo = state.streamInfo,
-                                videoUrl = videoUrl,
-                                defaultName = safeDownloadName(state.title),
-                                videoResolution = stream.resolution,
-                                videoFormat = stream.format,
-                                videoFormatName = stream.format?.name
-                            )
-                        )
+                    // The actual media URL lives in `content`; `url` is often null
+                    // for direct streams, which silently skipped downloads before.
+                    val url = stream.content ?: stream.url
+                    if (url != null) {
+                        val safeTitle = state.title.replace(Regex("[\\\\/:*?\"<>|]"), "_")
+                        val ext = if (stream.format?.name?.contains("webm", ignoreCase = true) == true) {
+                            ".webm"
+                        } else {
+                            ".mp4"
+                        }
+                        net.newpipe.app.backend.downloadFile(url, safeTitle + ext)
+                        downloadViewModel.recordDownload(safeTitle + ext, state.title, isAudioOnly = false)
                     }
                     downloadViewModel.dismiss()
                 },
@@ -66,38 +62,29 @@ fun DownloadOverlay(
                     val videoUrl = videoStream.content ?: videoStream.url
                     val audioUrl = audioStream.content ?: audioStream.url
                     if (!videoUrl.isNullOrBlank() && !audioUrl.isNullOrBlank()) {
-                        downloadWithNativeManager(
-                            NativeDownloadRequest(
-                                sourceUrl = state.sourceUrl,
-                                streamInfo = state.streamInfo,
-                                videoUrl = videoUrl,
-                                audioUrl = audioUrl,
-                                defaultName = safeDownloadName(state.title),
-                                videoResolution = videoStream.resolution,
-                                videoFormat = videoStream.format,
-                                audioFormat = audioStream.format,
-                                videoFormatName = videoStream.format?.name,
-                                audioFormatName = audioStream.format?.name,
-                                audioBitrate = audioStream.averageBitrate
-                            )
+                        val safeTitle = state.title.replace(Regex("[\\\\/:*?\"<>|]"), "_")
+                        val fileName = safeTitle +
+                            net.newpipe.app.backend.combinedDownloadExtension(videoStream, audioStream)
+                        net.newpipe.app.backend.downloadVideoWithAudio(
+                            videoUrl,
+                            audioUrl,
+                            fileName
                         )
+                        downloadViewModel.recordDownload(fileName, state.title, isAudioOnly = false)
                     }
                     downloadViewModel.dismiss()
                 },
                 onDownloadAudio = { stream ->
-                    val audioUrl = stream.content ?: stream.url
-                    if (!audioUrl.isNullOrBlank()) {
-                        downloadWithNativeManager(
-                            NativeDownloadRequest(
-                                sourceUrl = state.sourceUrl,
-                                streamInfo = state.streamInfo,
-                                audioUrl = audioUrl,
-                                defaultName = safeDownloadName(state.title),
-                                audioFormat = stream.format,
-                                audioFormatName = stream.format?.name,
-                                audioBitrate = stream.averageBitrate
-                            )
-                        )
+                    val url = stream.content ?: stream.url
+                    if (url != null) {
+                        val safeTitle = state.title.replace(Regex("[\\\\/:*?\"<>|]"), "_")
+                        val ext = when {
+                            stream.format?.name?.contains("webm", ignoreCase = true) == true -> ".webm"
+                            stream.format?.name?.contains("m4a", ignoreCase = true) == true -> ".m4a"
+                            else -> ".mp3"
+                        }
+                        net.newpipe.app.backend.downloadFile(url, safeTitle + ext)
+                        downloadViewModel.recordDownload(safeTitle + ext, state.title, isAudioOnly = true)
                     }
                     downloadViewModel.dismiss()
                 }
@@ -115,9 +102,6 @@ fun DownloadOverlay(
                 }
             )
         }
-        else -> Unit
+        else -> {}
     }
 }
-
-private fun safeDownloadName(title: String): String =
-    title.replace(Regex("[\\\\/:*?\"<>|]"), "_").ifBlank { "ONewPipe-download" }

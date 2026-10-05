@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
 import { reportPosition } from '../account';
+import { useAmbientVideo } from '../ambient';
 import { api, formatCount, type Comments, type Item, type Subtitle, type Watch } from '../api';
 import { Description } from '../components/Description';
 import { AddToPlaylistDialog } from '../components/Dialogs';
@@ -11,6 +12,7 @@ import { VideoPlayer, type QualityOption, type VideoPlayerHandle } from '../comp
 import { CircularWavyProgress } from '../components/WavyProgress';
 import { useAsync } from '../hooks/useAsync';
 import {
+  AmbientIcon,
   CheckIcon,
   CloseIcon,
   CommentIcon,
@@ -24,6 +26,7 @@ import {
   SpeedIcon,
   SubtitlesIcon,
   ThumbUpIcon,
+  ThumbUpFilledIcon,
   TuneIcon,
   VerifiedIcon,
   WatchLaterIcon
@@ -173,9 +176,10 @@ function RelatedList({ items }: { items: Item[] }) {
 
 export function WatchPage({ url, startTime }: { url: string; startTime: number }) {
   const result = useAsync((signal) => api.watch(url, signal), [url]);
-  const { settings, subscriptions, watchLater } = useLibrary();
+  const { settings, subscriptions, watchLater, likes } = useLibrary();
   const { queue, repeat, speed } = usePlayer();
   const playerRef = useRef<VideoPlayerHandle>(null);
+  const [videoElement, setVideoElement] = useState<HTMLVideoElement | null>(null);
   const [playbackError, setPlaybackError] = useState<string | null>(null);
   const [qualities, setQualities] = useState<QualityOption[]>([]);
   const [quality, setQuality] = useState<number | 'auto'>('auto');
@@ -187,6 +191,9 @@ export function WatchPage({ url, startTime }: { url: string; startTime: number }
 
   const watch = result.status === 'ready' ? result.data : null;
   const saved = useMemo(() => (watch ? watchToSaved(watch) : null), [watch]);
+
+  // Ambient mode: the interface floats over a blurred copy of the video.
+  useAmbientVideo(videoElement, true);
 
   // Resume where the video was left off unless the link asks for a time.
   const initialTime = useMemo(() => {
@@ -294,6 +301,7 @@ export function WatchPage({ url, startTime }: { url: string; startTime: number }
 
   const subscribed = watch ? subscriptions.some((s) => s.url === watch.uploaderUrl) : false;
   const inWatchLater = watch ? watchLater.some((v) => v.url === watch.url) : false;
+  const liked = watch ? likes.some((v) => v.url === watch.url) : false;
 
   return (
     <div className="watch">
@@ -302,6 +310,7 @@ export function WatchPage({ url, startTime }: { url: string; startTime: number }
           <>
             <VideoPlayer
               ref={playerRef}
+              onVideoEl={setVideoElement}
               url={watch.url}
               poster={watch.thumbnailUrl}
               startTime={initialTime}
@@ -390,6 +399,18 @@ export function WatchPage({ url, startTime }: { url: string; startTime: number }
             {repeat === 'one' ? <RepeatOneIcon size={18} /> : <RepeatIcon size={18} />}
             {repeat === 'off' ? 'Repeat off' : repeat === 'all' ? 'Repeat queue' : 'Repeat video'}
           </button>
+
+          <button
+            type="button"
+            className={`button ${settings.ambientMode ? 'active' : ''}`}
+            onClick={() => {
+              library.setSettings({ ambientMode: !settings.ambientMode });
+            }}
+            title="Ambient mode: the interface floats over the video"
+            aria-pressed={settings.ambientMode}
+          >
+            <AmbientIcon size={18} /> Ambient
+          </button>
         </div>
 
         {watch ? (
@@ -420,9 +441,25 @@ export function WatchPage({ url, startTime }: { url: string; startTime: number }
               )}
               <div className="watch-actions">
                 {watch.likeCount >= 0 && (
-                  <span className="button tonal" style={{ cursor: 'default' }}>
-                    <ThumbUpIcon size={18} /> {formatCount(watch.likeCount)}
-                  </span>
+                  <button
+                    type="button"
+                    className={`button tonal ${liked ? 'active' : ''}`}
+                    aria-pressed={liked}
+                    title={liked ? 'Remove from your liked videos' : 'Add to your liked videos'}
+                    onClick={() =>
+                      saved &&
+                      library.toggleLike({
+                        url: watch.url,
+                        title: watch.title,
+                        uploaderName: watch.uploaderName,
+                        uploaderUrl: watch.uploaderUrl,
+                        thumbnailUrl: watch.thumbnailUrl,
+                        durationText: ''
+                      })
+                    }
+                  >
+                    {liked ? <ThumbUpFilledIcon size={18} /> : <ThumbUpIcon size={18} />} {formatCount(watch.likeCount)}
+                  </button>
                 )}
                 <button type="button" className="button tonal" onClick={() => saved && (library.toggleWatchLater(saved), toast(inWatchLater ? 'Removed from Watch later' : 'Saved to Watch later'))}>
                   {inWatchLater ? <CheckIcon size={18} /> : <WatchLaterIcon size={18} />} Watch later

@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from 'react';
 import { formatCount, type Item } from '../api';
-import { CheckIcon, MoreIcon, OpenInNewIcon, QueueIcon, ShareIcon, SubscriptionsIcon, WatchLaterIcon } from '../icons';
+import { CheckIcon, MoreIcon, OpenInNewIcon, QueueIcon, ShareIcon, SkipNextIcon, SubscriptionsIcon, WatchLaterIcon } from '../icons';
 import { library, toSaved, useLibrary } from '../library';
 import { player } from '../player';
 import { routeHref } from '../router';
@@ -61,6 +61,17 @@ function CardMenu({ item }: { item: Item }) {
             })}
           >
             <QueueIcon size={20} /> Add to queue
+          </button>
+          <button
+            type="button"
+            role="menuitem"
+            className="menu-item"
+            onClick={run(() => {
+              player.playNext(toSaved(item));
+              toast('Playing next');
+            })}
+          >
+            <SkipNextIcon size={20} /> Play next
           </button>
           <button
             type="button"

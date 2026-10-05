@@ -11,6 +11,7 @@ import {
 } from '../icons';
 import { library, useLibrary } from '../library';
 import { goBack, routeHref, type Route } from '../router';
+import { AmbientButton } from './AmbientButton';
 import { NotificationCenter } from './NotificationCenter';
 import { SearchBox } from './SearchBox';
 import { Toaster } from './Toast';
@@ -33,19 +34,27 @@ export function BrandMark({ size = 32 }: { size?: number }) {
   );
 }
 
+/** Cycles system → light → dark, like the apps. */
 function ThemeToggle() {
   const { settings } = useLibrary();
   const dark = document.documentElement.dataset.theme !== 'light';
+  const next = settings.theme === 'system' ? 'light' : settings.theme === 'light' ? 'dark' : 'system';
+  const label =
+    settings.theme === 'system'
+      ? 'Theme: following the system — switch to the light theme'
+      : settings.theme === 'light'
+        ? 'Theme: light — switch to the dark theme'
+        : 'Theme: dark — follow the system';
   return (
     <button
       type="button"
       className="icon-button"
-      title={dark ? 'Use the light theme' : 'Use the dark theme'}
-      aria-label={dark ? 'Use the light theme' : 'Use the dark theme'}
-      onClick={() => library.setSettings({ theme: dark ? 'light' : 'dark' })}
+      title={label}
+      aria-label={label}
+      onClick={() => library.setSettings({ theme: next })}
       data-theme-setting={settings.theme}
     >
-      {dark ? <LightModeIcon /> : <DarkModeIcon />}
+      {settings.theme === 'system' ? <SettingsIcon size={20} /> : dark ? <LightModeIcon /> : <DarkModeIcon />}
     </button>
   );
 }
@@ -77,6 +86,7 @@ export function Shell({ route, children }: { route: Route; children: ReactNode }
         )}
         <SearchBox initialQuery={route.name === 'search' ? route.query : ''} />
         <div className="topbar-actions" style={{ display: 'flex', gap: 4 }}>
+          <AmbientButton />
           <NotificationCenter />
           <ThemeToggle />
         </div>

@@ -25,7 +25,7 @@ export function Toaster() {
   }, []);
   if (!message) return null;
   return (
-    <div className="toast" role="status">
+    <div className="toast" role="status" style={{ animation: 'pop-in 0.18s var(--ease-emphasized)' }}>
       {message}
     </div>
   );

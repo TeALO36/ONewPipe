@@ -1,7 +1,7 @@
 import { useState, type ReactNode } from 'react';
 import { TextInputDialog } from '../components/Dialogs';
 import { toast } from '../components/Toast';
-import { CloseIcon, DeleteIcon, HistoryIcon, LibraryIcon, PlayIcon, WatchLaterIcon } from '../icons';
+import { CloseIcon, DeleteIcon, HistoryIcon, LibraryIcon, PlayIcon, ThumbUpIcon, WatchLaterIcon } from '../icons';
 import { library, useLibrary, type SavedVideo } from '../library';
 import { player } from '../player';
 import { navigate, routeHref } from '../router';
@@ -10,7 +10,8 @@ import './LibraryPage.css';
 const TABS = [
   { id: 'history', label: 'History' },
   { id: 'watch-later', label: 'Watch later' },
-  { id: 'playlists', label: 'Playlists' }
+  { id: 'playlists', label: 'Playlists' },
+  { id: 'likes', label: 'Liked videos' }
 ];
 
 function VideoRow({ video, onRemove, progress }: { video: SavedVideo; onRemove: () => void; progress?: number }) {
@@ -49,7 +50,7 @@ function Empty({ icon, title, text }: { icon: ReactNode; title: string; text: st
 }
 
 export function LibraryPage({ tab }: { tab: string }) {
-  const { history, watchLater, playlists, settings } = useLibrary();
+  const { history, watchLater, playlists, likes, settings } = useLibrary();
   const current = TABS.some((t) => t.id === tab) ? tab : 'history';
   const [dialog, setDialog] = useState<{ kind: 'create' } | { kind: 'rename'; id: string; name: string } | null>(null);
   const [openPlaylist, setOpenPlaylist] = useState<string | null>(null);
@@ -123,6 +124,33 @@ export function LibraryPage({ tab }: { tab: string }) {
             <Empty icon={<WatchLaterIcon size={48} />} title="Nothing saved" text="Save videos to watch later from their menu or the video page." />
           ) : (
             watchLater.map((video) => <VideoRow key={video.url} video={video} onRemove={() => library.toggleWatchLater(video)} />)
+          )}
+        </>
+      )}
+
+      {current === 'likes' && (
+        <>
+          {likes.length > 0 && (
+            <div className="library-actions">
+              <button type="button" className="button" onClick={() => player.playAll(likes)}>
+                <PlayIcon size={18} /> Play all
+              </button>
+              <button
+                type="button"
+                className="button"
+                onClick={() => {
+                  library.clearLikes();
+                  toast('Liked videos cleared');
+                }}
+              >
+                <DeleteIcon size={18} /> Clear likes
+              </button>
+            </div>
+          )}
+          {likes.length === 0 ? (
+            <Empty icon={<ThumbUpIcon size={48} />} title="Nothing liked yet" text="Use the like button under a video to keep it here, on this device." />
+          ) : (
+            likes.map((video) => <VideoRow key={video.url} video={video} onRemove={() => library.toggleLike(video)} />)
           )}
         </>
       )}

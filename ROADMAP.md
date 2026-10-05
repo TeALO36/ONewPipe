@@ -157,6 +157,14 @@
 
 ---
 
+### Mise au point 1.6.0 — mode ambiance + boutons réparés (interface web)
+
+- ✅ **Mode ambiance vidéo** (nouveau) : pendant la lecture, toute l'interface devient une fenêtre translucide posée sur une version floutée et élargie de la vidéo, qui suit ses couleurs en direct — la vidéo, elle, reste opaque. Activable depuis la barre du lecteur, la barre d'outils ou Réglages → Lecture. Rendu à ~20 fps sur canvas basse résolution, suspendu quand la vidéo est en pause, l'onglet caché ou pendant un défilement rapide : coût GPU négligeable.
+- ✅ **Bouton Like réparé** : il était purement décoratif (un `span` non cliquable) — c'est maintenant un vrai like local (pouce rempli, état `aria-pressed`), listé dans Bibliothèque → « Liked videos » avec lecture en chaîne et effacement. Stocké sur l'appareil comme les autres données locales.
+- ✅ **« Play next » branché** : l'action existait dans le lecteur mais aucun bouton n'y menait ; elle est maintenant dans le menu ⋮ de chaque carte.
+- ✅ **Bouton thème à 3 états** : il écrasait « système » dès le premier clic ; il cycle maintenant système → clair → sombre avec info-bulle explicite.
+- ✅ Interface plus fluide : transitions harmonisées sur boutons et navigation, bascule d'état visuelle sur les boutons ronds, toast animé, images de carte centrées proprement pendant le zoom de survol.
+
 ### État actuel (septembre 2026)
 
 **PC : passage à une interface web (Electron)**

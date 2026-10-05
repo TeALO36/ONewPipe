@@ -218,6 +218,12 @@ export function SettingsPage() {
 
       <section className="settings-section">
         <h2>Playback</h2>
+        <Switch
+          label="Ambient mode"
+          description="While watching a video, the whole interface floats translucently over a soft glow that follows the video's colours. The video itself stays unchanged."
+          checked={settings.ambientMode}
+          onChange={(ambientMode) => set({ ambientMode })}
+        />
         <Switch label="Autoplay" description="Play the next video of the queue, or the first related video, when a video ends." checked={settings.autoplayNext} onChange={(autoplayNext) => set({ autoplayNext })} />
         <Switch label="Resume playback" description="Start a video where you stopped watching it." checked={settings.resumePlayback} onChange={(resumePlayback) => set({ resumePlayback })} />
         <Choice<Settings['preferredQuality']>

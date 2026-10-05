@@ -92,6 +92,7 @@
   text-decoration: none;
   font-size: 11px;
   font-weight: 500;
+  transition: color 0.15s var(--ease-emphasized);
 }
 
 .sidebar-item .sidebar-pill {
@@ -191,6 +192,12 @@
   cursor: pointer;
   position: relative;
   flex-shrink: 0;
+  transition: background 0.15s var(--ease-emphasized), color 0.15s var(--ease-emphasized);
+}
+
+.icon-button.active {
+  background: var(--primary-container);
+  color: var(--on-background);
 }
 
 .icon-button:hover {
@@ -233,6 +240,7 @@
   cursor: pointer;
   white-space: nowrap;
   text-decoration: none;
+  transition: background 0.15s var(--ease-emphasized), border-color 0.15s var(--ease-emphasized), color 0.15s var(--ease-emphasized);
 }
 
 .button:hover {

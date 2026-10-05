@@ -1,7 +1,7 @@
 {
   "name": "onewpipe-desktop",
   "productName": "ONewPipe",
-  "version": "1.3.0",
+  "version": "1.6.0",
   "description": "ONewPipe for desktop: the web interface in Electron, with the NewPipe core running in a local server",
   "license": "GPL-3.0-or-later",
   "author": {

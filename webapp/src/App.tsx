@@ -12,7 +12,7 @@ import { SubscriptionsPage } from './pages/SubscriptionsPage';
 import { TrendingPage } from './pages/TrendingPage';
 import { WatchPage } from './pages/WatchPage';
 
-function useTheme() {
+export function useIsDarkTheme(): boolean {
   const { settings } = useLibrary();
   useEffect(() => {
     const media = window.matchMedia('(prefers-color-scheme: dark)');
@@ -25,11 +25,12 @@ function useTheme() {
     media.addEventListener('change', apply);
     return () => media.removeEventListener('change', apply);
   }, [settings.theme]);
+  return settings.theme === 'dark' || (settings.theme === 'system' && window.matchMedia('(prefers-color-scheme: dark)').matches);
 }
 
 export default function App() {
   const route = useRoute();
-  useTheme();
+  useIsDarkTheme();
 
   let page;
   switch (route.name) {
